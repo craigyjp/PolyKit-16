@@ -20,18 +20,17 @@ ADC *adc = new ADC();
 #define MUX4_S A3
 #define MUX5_S A4
 
-#define DEMUX_0 33
-#define DEMUX_1 34
-#define DEMUX_2 35
-#define DEMUX_3 36
+#define DEMUX_0 36
+#define DEMUX_1 35
+#define DEMUX_2 34
+#define DEMUX_3 33
 
 #define DEMUX_EN_1 37
 #define DEMUX_EN_2 38
 #define DEMUX_EN_3 39
-#define DEMUX_EN_4 40
-#define DEMUX_EN_5 41
 
 //Note DAC
+#define DACMULT 25.75
 #define DAC_NOTE1 7
 #define NOTE_DAC(CH) (CH==0 ? DAC_NOTE1)
 #define NOTE_AB(CH)  (CH==1 ? 1 : 0)
@@ -270,14 +269,10 @@ void setupHardware()
   pinMode(DEMUX_EN_1, OUTPUT);
   pinMode(DEMUX_EN_2, OUTPUT);
   pinMode(DEMUX_EN_3, OUTPUT);
-  pinMode(DEMUX_EN_4, OUTPUT);
-  pinMode(DEMUX_EN_5, OUTPUT);
 
   digitalWrite(DEMUX_EN_1, HIGH);
   digitalWrite(DEMUX_EN_2, HIGH);
   digitalWrite(DEMUX_EN_3, HIGH);
-  digitalWrite(DEMUX_EN_4, HIGH);
-  digitalWrite(DEMUX_EN_5, HIGH);
 
 
   //Switches

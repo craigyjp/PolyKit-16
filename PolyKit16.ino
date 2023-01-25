@@ -1,14 +1,14 @@
 /*
-  PolyKit DUO MUX - Firmware Rev 1.3
+  PolyKit 16 MUX - Firmware Rev 1.0
 
   Includes code by:
     Dave Benn - Handling MUXs, a few other bits and original inspiration  https://www.notesandvolts.com/2019/01/teensy-synth-part-10-hardware.html
 
   Arduino IDE
   Tools Settings:
-  Board: "Teensy3.6"
-  USB Type: "Serial + MIDI + Audio"
-  CPU Speed: "180"
+  Board: "Teensy4.1"
+  USB Type: "Serial + MIDI"
+  CPU Speed: "600"
   Optimize: "Fastest"
 
   Additional libraries:
@@ -31,6 +31,12 @@
 #include "Settings.h"
 #include <ShiftRegister74HC595.h>
 #include <RoxMux.h>
+#include <MCP4922.h>
+
+#define DAC_MOSI 11
+#define DAC_SCK 13
+#define DAC_LDAC 7
+#define DAC_CS1 10
 
 #define PARAMETER 0      //The main page for displaying the current patch and control (parameter) changes
 #define RECALL 1         //Patches list
@@ -61,11 +67,13 @@ MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI);  //RX - Pin 0
 
 
 int count = 0;  //For MIDI Clk Sync
-int DelayForSH3 = 30;
+int DelayForSH3 = 100;
 int patchNo = 0;
 int voiceToReturn = -1;        //Initialise
 long earliestTime = millis();  //For voice allocation - initialise to now
 unsigned long buttonDebounce = 0;
+
+MCP4922 DAC1(DAC_MOSI, DAC_SCK, DAC_CS1, DAC_LDAC);
 
 ShiftRegister74HC595<2> sr(23, 22, 21);
 ShiftRegister74HC595<3> srp(52, 53, 54);
@@ -81,12 +89,13 @@ RoxOctoswitch<OCTO_TOTAL, BTN_DEBOUNCE> octoswitch;
 
 void setup() {
   SPI.begin();
+  SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE0));
   octoswitch.begin(PIN_DATA, PIN_LOAD, PIN_CLK);
   octoswitch.setCallback(onButtonPress);
-  //sr.begin(LED_DATA, LED_LATCH, LED_CLK, LED_PWM);
   setupDisplay();
   setUpSettings();
   setupHardware();
+  DAC1.Set(0, 0);
 
   cardStatus = SD.begin(BUILTIN_SDCARD);
   if (cardStatus) {
@@ -146,36 +155,21 @@ void setup() {
 
   //  reinitialiseToPanel();
 
-  // pinMode(48, OUTPUT);
-  // pinMode(49, OUTPUT);
-  // pinMode(50, OUTPUT);
-  // pinMode(51, OUTPUT);
-  // pinMode(52, OUTPUT);
-  // pinMode(53, OUTPUT);
-  // pinMode(54, OUTPUT);
-
-  // digitalWrite(48, LOW);
-  // digitalWrite(49, LOW);
-  // digitalWrite(50, LOW);
-  // digitalWrite(51, LOW);
-  // digitalWrite(52, LOW);
-  // digitalWrite(53, LOW);
-  // digitalWrite(54, HIGH);
 }
 
-void setVoltage(int dacpin, bool channel, bool gain, unsigned int mV) {
-  int command = channel ? 0x9000 : 0x1000;
+// void setVoltage(int dacpin, bool channel, bool gain, unsigned int mV) {
+//   int command = channel ? 0x9000 : 0x1000;
 
-  command |= gain ? 0x0000 : 0x2000;
-  command |= (mV & 0x0FFF);
+//   command |= gain ? 0x0000 : 0x2000;
+//   command |= (mV & 0x0FFF);
 
-  SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
-  digitalWrite(dacpin, LOW);
-  SPI.transfer(command >> 8);
-  SPI.transfer(command & 0xFF);
-  digitalWrite(dacpin, HIGH);
-  SPI.endTransaction();
-}
+//   SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
+//   digitalWrite(dacpin, LOW);
+//   SPI.transfer(command >> 8);
+//   SPI.transfer(command & 0xFF);
+//   digitalWrite(dacpin, HIGH);
+//   SPI.endTransaction();
+// }
 
 void allNotesOff() {
 }
@@ -1447,194 +1441,189 @@ void midiCCOut(byte cc, byte value) {
 }
 
 void writeDemux() {
-  delayMicroseconds(DelayForSH3);
-  //analogWrite(A21, 0);
+  //DAC1.Set(0, 0);
 
   //DEMUX 1
-  digitalWriteFast(DEMUX_EN_1, LOW);
+  digitalWrite(DEMUX_EN_1, LOW);
   switch (muxOutput) {
     case 0:
-      //analogWrite(A21, int(fmDepth / 1.57));
+      DAC1.Set(int(fmDepth * DACMULT), int(fmDepth * DACMULT));
       break;
     case 1:
-      //analogWrite(A21, int(osc2PWM / 1.57));
+      DAC1.Set(int(osc2PWM * DACMULT), int(osc2PWM * DACMULT));
       break;
     case 2:
-      //analogWrite(A21, int(osc1PWM / 1.57));
+      DAC1.Set(int(osc1PWM * DACMULT), int(osc1PWM * DACMULT));
       break;
     case 3:
-      //analogWrite(A21, int(stack));
+      DAC1.Set(int(stack * DACMULT), int(stack * DACMULT));
       break;
     case 4:
-      //analogWrite(A21, int(osc2Detune));
+      DAC1.Set(int(osc2Detune * DACMULT), int(osc2Detune * DACMULT));
       break;
     case 5:
-      //analogWrite(A21, int(noiseLevel / 1.57));
+      DAC1.Set(int(noiseLevel * DACMULT), int(noiseLevel * DACMULT));
       break;
     case 6:
-      //analogWrite(A21, int(filterLFO / 1.57));
+      DAC1.Set(int(filterLFO * DACMULT), int(filterLFO * DACMULT));
       break;
     case 7:
-      //analogWrite(A21, int(volumeControl / 1.57));
+      DAC1.Set(int(volumeControl * DACMULT), int(volumeControl * DACMULT));
       break;
     case 8:
-      //analogWrite(A21, int(osc1SawLevel / 1.57));
+      DAC1.Set(int(osc1SawLevel * DACMULT), int(osc1SawLevel * DACMULT));
       break;
     case 9:
-      //analogWrite(A21, int(osc1PulseLevel / 1.57));
+      DAC1.Set(int(osc1PulseLevel * DACMULT), int(osc1PulseLevel * DACMULT));
       break;
     case 10:
-      //analogWrite(A21, int(osc2SawLevel / 1.57));
+      DAC1.Set(int(osc2SawLevel * DACMULT), int(osc2SawLevel * DACMULT));
       break;
     case 11:
-      //analogWrite(A21, int(osc2PulseLevel / 1.57));
+      DAC1.Set(int(osc2PulseLevel * DACMULT), int(osc2PulseLevel * DACMULT));
       break;
     case 12:
-      //analogWrite(A21, int(PitchBendLevel / 1.57));
+      DAC1.Set(int(PitchBendLevel * DACMULT), int(PitchBendLevel * DACMULT));
       break;
     case 13:
-      //analogWrite(A21, int(osc1PW));
+      DAC1.Set(int(osc1PW * DACMULT), int(osc1PW * DACMULT));
       break;
     case 14:
-      //analogWrite(A21, int(osc2PW));
+      DAC1.Set(int(osc2PW * DACMULT),int(osc2PW * DACMULT) );
       break;
     case 15:
-      //analogWrite(A21, int(modWheelLevel / 1.57));
+      DAC1.Set(int(modWheelLevel * DACMULT), int(modWheelLevel * DACMULT));
       break;
   }
   delayMicroseconds(DelayForSH3);
-  digitalWriteFast(DEMUX_EN_1, HIGH);
-  //analogWrite(A21, 0);
-  //setVoltage(DAC_NOTE1, 0, 1, 0);
+  digitalWrite(DEMUX_EN_1, HIGH);
+  //DAC1.Set(0, 0);
 
   //DEMUX 2
 
-  digitalWriteFast(DEMUX_EN_2, LOW);
+  digitalWrite(DEMUX_EN_2, LOW);
   switch (muxOutput) {
     case 0:
-      //analogWrite(A21, int(filterAttack));
+      DAC1.Set(int(filterAttack * DACMULT), int(filterAttack * DACMULT));
       break;
     case 1:
-      //analogWrite(A21, int(filterDecay));
+      DAC1.Set(int(filterDecay * DACMULT), int(filterDecay * DACMULT));
       break;
     case 2:
-      //analogWrite(A21, int(filterSustain));
+      DAC1.Set(int(filterSustain * DACMULT), int(filterSustain * DACMULT));
       break;
     case 3:
-      //analogWrite(A21, int(filterRelease));
+      DAC1.Set(int(filterRelease * DACMULT), int(filterRelease * DACMULT));
       break;
     case 4:
-      //analogWrite(A21, int(ampAttack));
+      DAC1.Set(int(ampAttack * DACMULT), int(ampAttack * DACMULT));
       break;
     case 5:
-      //analogWrite(A21, int(ampDecay));
+      DAC1.Set(int(ampDecay * DACMULT), int(ampDecay * DACMULT));
       break;
     case 6:
-      //analogWrite(A21, int(ampSustain));
+      DAC1.Set(int(ampSustain * DACMULT), int(ampSustain * DACMULT));
       break;
     case 7:
-      //analogWrite(A21, int(ampRelease));
+      DAC1.Set(int(ampRelease * DACMULT), int(ampRelease * DACMULT));
       break;
     case 8:
-      //analogWrite(A21, int(pwLFO));
+      DAC1.Set(int(pwLFO * DACMULT), int(pwLFO * DACMULT));
       break;
     case 9:
-      //analogWrite(A21, int(LFORate));
+      DAC1.Set(int(LFORate * DACMULT), int(LFORate * DACMULT));
       break;
     case 10:
-      //analogWrite(A21, int(LFOWaveform));
+      DAC1.Set(int(LFOWaveform * DACMULT), int(LFOWaveform * DACMULT));
       break;
     case 11:
-      //analogWrite(A21, int(filterEGlevel));
+      DAC1.Set(int(filterEGlevel * DACMULT), int(filterEGlevel * DACMULT));
       break;
     case 12:
-      //analogWrite(A21, int(filterCutoff));
+      DAC1.Set(int(filterCutoff * DACMULT), int(filterCutoff * DACMULT));
       break;
     case 13:
-      //analogWrite(A21, int(filterRes / 2.5));
+      DAC1.Set(int(filterRes * DACMULT), int(filterRes * DACMULT));
       break;
     case 14:
-      //analogWrite(A21, int(filterCutoff));
+      DAC1.Set(int(filterCutoff * DACMULT), int(filterCutoff * DACMULT));
       break;
     case 15:
-      //analogWrite(A21, int(filterRes / 2.5));
+      DAC1.Set(int(filterRes * DACMULT), int(filterRes * DACMULT));
       break;
   }
   delayMicroseconds(DelayForSH3);
-  digitalWriteFast(DEMUX_EN_2, HIGH);
-  //analogWrite(A21, 0);
-  //setVoltage(DAC_NOTE1, 0, 1, 0);
+  digitalWrite(DEMUX_EN_2, HIGH);
+  //DAC1.Set(0, 0);
+
 
   //DEMUX 3
 
-  digitalWriteFast(DEMUX_EN_3, LOW);
+  digitalWrite(DEMUX_EN_3, LOW);
   switch (muxOutput) {
     case 0:
-      //analogWrite(A21, int(filterA));
+      DAC1.Set((filterA * 4), (filterA * 4));
       break;
     case 1:
-      //analogWrite(A21, int(filterB));
+      DAC1.Set((filterB * 4),(filterB * 4) );
       break;
     case 2:
-      //analogWrite(A21, int(filterC));
+      DAC1.Set((filterC * 4), (filterC * 4));
       break;
     case 3:
-      //analogWrite(A21, 0);
+      DAC1.Set(0, 0);
       break;
     case 4:
-      //analogWrite(A21, int(oct1A));
+      DAC1.Set((oct1A * 4), (oct1A * 4));
       break;
     case 5:
-      //analogWrite(A21, int(oct1B));
+      DAC1.Set((oct1B * 4), (oct1B * 4));
       break;
     case 6:
-      //analogWrite(A21, int(oct2A));
+      DAC1.Set((oct2A * 4), (oct2A * 4));
       break;
     case 7:
-      //analogWrite(A21, int(oct2B));
+      DAC1.Set((oct2B * 4), (oct2B * 4) );
       break;
     case 8:
-      //analogWrite(A21, 0);
+      DAC1.Set(0, 0);
       break;
     case 9:
-      //analogWrite(A21, 0);
+      DAC1.Set(0, 0);
       break;
     case 10:
-      //analogWrite(A21, 0);
+      DAC1.Set(0, 0);
       break;
     case 11:
-      //analogWrite(A21, 0);
+      DAC1.Set(0, 0);
       break;
     case 12:
-      //analogWrite(A21, 0);
+      DAC1.Set(0, 0);
       break;
     case 13:
-      //analogWrite(A21, 0);
+      DAC1.Set(0, 0);
       break;
     case 14:
-      //analogWrite(A21, 0);
+      DAC1.Set(0, 0);
       break;
     case 15:
-      //analogWrite(A21, 0);
+      DAC1.Set(0, 0);
       break;
   }
   delayMicroseconds(DelayForSH3);
-  digitalWriteFast(DEMUX_EN_3, HIGH);
-  //analogWrite(A21, 0);
+  digitalWrite(DEMUX_EN_3, HIGH);
+  //DAC1.Set(0, 0);
 
   muxOutput++;
   if (muxOutput >= DEMUXCHANNELS)
+
     muxOutput = 0;
 
   digitalWriteFast(DEMUX_0, muxOutput & B0001);
   digitalWriteFast(DEMUX_1, muxOutput & B0010);
   digitalWriteFast(DEMUX_2, muxOutput & B0100);
   digitalWriteFast(DEMUX_3, muxOutput & B1000);
-}
 
-void updateDAC() {
-  setVoltage(DAC_NOTE1, 0, 1, int(osc1PW * 2));
-  setVoltage(DAC_NOTE1, 1, 1, int(osc2PW * 2));
 }
 
 void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
@@ -1995,7 +1984,6 @@ void loop() {
   octoswitch.update();
   checkSwitches();
   writeDemux();
-  updateDAC();
   checkMux();
   checkEncoder();
   //sr.update();
