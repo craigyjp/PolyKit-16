@@ -43,8 +43,8 @@ float osc1PulseLevel = 0;
 float osc1PulseLevelstr = 0; // for display
 float osc2TriangleLevel = 0;
 float osc2TriangleLevelstr = 0; // for display
-float osc1TriangleLevel = 0;
-float osc1TriangleLevelstr = 0; // for display
+float osc1SubLevel = 0;
+float osc1SubLevelstr = 0; // for display
 
 float filterCutoff = 0;
 float oldfilterCutoff = 0;

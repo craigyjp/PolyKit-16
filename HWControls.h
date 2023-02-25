@@ -25,61 +25,60 @@ ADC *adc = new ADC();
 #define DEMUX_2 34
 #define DEMUX_3 33
 
-#define DEMUX_EN_1 37
+#define DEMUX_EN_1 39
 #define DEMUX_EN_2 38
-#define DEMUX_EN_3 39
+
 
 //Note DAC
-#define DACMULT 25.75
-#define DAC_NOTE1 7
-#define NOTE_DAC(CH) (CH==0 ? DAC_NOTE1)
-#define NOTE_AB(CH)  (CH==1 ? 1 : 0)
+#define DACMULT 3.30
+#define DAC_CS1 10
+#define DAC_CS2 37
 
 //Mux 1 Connections
-#define MUX1_PBDepth 0
-#define MUX1_pwLFO 1
-#define MUX1_osc2PW 2
-#define MUX1_osc1PW 3
-#define MUX1_MWDepth 4
-#define MUX1_fmDepth 5
-#define MUX1_osc2PWM 6
-#define MUX1_osc1PWM 7
+#define MUX1_PBDepth 0 			// 2V
+#define MUX1_pwLFO 1   			// 5V
+#define MUX1_osc2PW 2			// 12V
+#define MUX1_osc1PW 3			// 12V
+#define MUX1_MWDepth 4			// 2V
+#define MUX1_fmDepth 5			// 2V
+#define MUX1_osc2PWM 6			// 2V
+#define MUX1_osc1PWM 7  		// 2V
 
-#define MUX1_osc1Range 8
-#define MUX1_noiseLevel 9
-#define MUX1_osc1SawLevel 10
-#define MUX1_osc2Detune 11
-#define MUX1_osc2Range 12
-#define MUX1_stack 13
-#define MUX1_osc2SawLevel 14
-#define MUX1_glideTime 15
+#define MUX1_osc1Range 8  		// 3.3V switches
+#define MUX1_noiseLevel 9 		// 2V
+#define MUX1_osc1SawLevel 10		// 2V 
+#define MUX1_osc2Detune 11		// 3.3V
+#define MUX1_osc2Range 12  		// 3.3V switches
+#define MUX1_stack 13			// 3.3V
+#define MUX1_osc2SawLevel 14		// 2V
+#define MUX1_glideTime 15		// MIDI CC
 
 //Mux 3 Connections
-#define MUX2_filterType 0
-#define MUX2_LFOWaveform 1
-#define MUX2_LFODelay 2
-#define MUX2_LFORate 3
-#define MUX2_osc2TriangleLevel 4
-#define MUX2_osc2PulseLevel 5 // spare mux output - decouple from DAC
-#define MUX2_osc1PulseLevel 6
-#define MUX2_osc1TriangleLevel 7 // spare mux output
+#define MUX2_filterType 0		// 5V switches
+#define MUX2_LFOWaveform 1		// 5V
+#define MUX2_LFODelay 2			// ? software
+#define MUX2_LFORate 3			// 5V
+#define MUX2_osc2TriangleLevel 4	// 2V
+#define MUX2_osc2PulseLevel 5 		// 2V
+#define MUX2_osc1PulseLevel 6		// 2V
+#define MUX2_osc1SubLevel 7	// 2V
 
-#define MUX2_filterDecay 8
-#define MUX2_ampAttack 9
-#define MUX2_filterAttack 10
-#define MUX2_filterRes 11
-#define MUX2_filterCutoff 12 // spare mux output - decouple from DAC
-#define MUX2_filterEGlevel 13
-#define MUX2_keyTrack 14
-#define MUX2_filterLFO 15
+#define MUX2_filterDecay 8		// 5V
+#define MUX2_ampAttack 9		// 5V
+#define MUX2_filterAttack 10		// 5V
+#define MUX2_filterRes 11		// 2.5V
+#define MUX2_filterCutoff 12 		// 5V
+#define MUX2_filterEGlevel 13		// 5V
+#define MUX2_keyTrack 14		// 2V
+#define MUX2_filterLFO 15		// 5V
 
-#define MUX3_volumeControl 0
-#define MUX3_balance 1
-#define MUX3_ampSustain 2
-#define MUX3_ampRelease 3
-#define MUX3_filterRelease 4 // spare mux output - decouple from DAC
-#define MUX3_filterSustain 5
-#define MUX3_ampDecay 6
+#define MUX3_volumeControl 0		// 2V
+#define MUX3_balance 1			// 2V
+#define MUX3_ampSustain 2		// 5V
+#define MUX3_ampRelease 3		// 5V
+#define MUX3_filterRelease 4		// 5V
+#define MUX3_filterSustain 5		// 5V
+#define MUX3_ampDecay 6			// 5V
 
 
 //DeMux 1 Connections
@@ -122,11 +121,11 @@ ADC *adc = new ADC();
 #define DEMUX3_filterA 0                    // filterA 0-5v switched
 #define DEMUX3_filterB 1                    // filterB 0-5v switched
 #define DEMUX3_filterC 2                    // filterC 0-5v switched
-#define DEMUX3_filterLoopA0 3                     // syncA0 0-5v switched
-#define DEMUX3_filterLoopA1 4                     // syncA1 0-5v switched    
+#define DEMUX3_filterLoopA0 3               // syncA0 0-5v switched
+#define DEMUX3_filterLoopA1 4               // syncA1 0-5v switched    
 #define DEMUX3_LFOalt 5                     // lFOalt 0-5v switched
 #define DEMUX3_spare 6                      // spare 0-5v switched
-#define DEMUX3_spare1 7                      // spare 0-5v switched
+#define DEMUX3_spare1 7                     // spare 0-5v switched
 #define DEMUX3_pitchAttack 8                // Pitchattack 0-5v
 #define DEMUX3_pitchDecay 9                 // Pitchdecay 0-5v
 #define DEMUX3_pitchSustain 10              // Pitchsustain  0-5v
@@ -138,21 +137,33 @@ ADC *adc = new ADC();
 
 // 595 outputs
 
-#define FILTER_EG_INV 10
-#define FILTER_POLE 11
-#define FILTER_KEYTRACK 12
-#define AMP_VELOCITY 13
-#define FILTER_VELOCITY 14
+#define FILTERA 0
+#define FILTERB 1
+#define FILTERC 2
+#define FILTER_POLE 3
+#define FILTER_EG_INV 4
+#define FILTER_VELOCITY 5
+#define AMP_VELOCITY 6
+#define LFO_ALT 7
+
+#define CHORUS1_OUT 8 
+#define CHORUS2_OUT 9
+#define FILTER_MODE_BIT0 10
+#define FILTER_MODE_BIT1 11
+#define AMP_MODE_BIT0 12
+#define AMP_MODE_BIT1 13
+#define FILTER_LIN_LOG 14
 #define AMP_LIN_LOG 15
-#define FILTER_LIN_LOG 16
-#define LFO_ALT 17
-#define AMP_LOOP 20
-#define FILTER_LOOP 21
-#define CHORUS1_OUT 0 
-#define CHORUS2_OUT 1
+
+#define OCT1A 16
+#define OCT1B 17
+#define OCT2A 18
+#define OCT2B 19
+#define FILTER_KEYTRACK 20
+
+#define UPPER_CHORUS1_OUT 32 
 
 // 595 LEDs
-
 
 #define CHORUS1_LED 0 
 #define CHORUS2_LED 1
@@ -198,12 +209,16 @@ ADC *adc = new ADC();
 
 #define MUXCHANNELS 16
 #define DEMUXCHANNELS 16
-#define QUANTISE_FACTOR 2
+#define QUANTISE_FACTOR 10
 
 #define DEBOUNCE 30
 
 static byte muxInput = 0;
 static byte muxOutput = 0;
+static byte muxOutput1 = 0;
+static byte muxOutput2 = 0;
+static byte whichmux = 0;
+
 static int mux1ValuesPrev[MUXCHANNELS] = {};
 static int mux2ValuesPrev[MUXCHANNELS] = {};
 static int mux3ValuesPrev[MUXCHANNELS] = {};
@@ -228,23 +243,27 @@ Encoder encoder(ENCODER_PINB, ENCODER_PINA);//This often needs the pins swapping
 void setupHardware()
 {
      //Volume Pot is on ADC0
-  adc->adc0->setAveraging(32); // set number of averages 0, 4, 8, 16 or 32.
-  adc->adc0->setResolution(8); // set bits of resolution  8, 10, 12 or 16 bits.
-  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::LOW_SPEED); // change the conversion speed
-  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::LOW_SPEED); // change the sampling speed
+  //Volume Pot is on ADC0
+  adc->adc0->setAveraging(16); // set number of averages 0, 4, 8, 16 or 32.
+  adc->adc0->setResolution(10); // set bits of resolution  8, 10, 12 or 16 bits.
+  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_LOW_SPEED); // change the conversion speed
+  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::MED_SPEED); // change the sampling speed
 
   //MUXs on ADC1
-  adc->adc1->setAveraging(32); // set number of averages 0, 4, 8, 16 or 32.
-  adc->adc1->setResolution(8); // set bits of resolution  8, 10, 12 or 16 bits.
-  adc->adc1->setConversionSpeed(ADC_CONVERSION_SPEED::LOW_SPEED); // change the conversion speed
-  adc->adc1->setSamplingSpeed(ADC_SAMPLING_SPEED::LOW_SPEED); // change the sampling speed
+  adc->adc1->setAveraging(16); // set number of averages 0, 4, 8, 16 or 32.
+  adc->adc1->setResolution(10); // set bits of resolution  8, 10, 12 or 16 bits.
+  adc->adc1->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_LOW_SPEED); // change the conversion speed
+  adc->adc1->setSamplingSpeed(ADC_SAMPLING_SPEED::MED_SPEED); // change the sampling speed
 
-  analogReadResolution(8);
+  analogReadResolution(10);
+
 
   //Mux address pins
 
-  pinMode(DAC_NOTE1, OUTPUT);
-  digitalWrite(DAC_NOTE1, HIGH);
+  pinMode(DAC_CS1, OUTPUT);
+  digitalWrite(DAC_CS1, HIGH);
+  pinMode(DAC_CS2, OUTPUT);
+  digitalWrite(DAC_CS2, HIGH);
 
   pinMode(MUX_0, OUTPUT);
   pinMode(MUX_1, OUTPUT);
@@ -268,11 +287,9 @@ void setupHardware()
 
   pinMode(DEMUX_EN_1, OUTPUT);
   pinMode(DEMUX_EN_2, OUTPUT);
-  pinMode(DEMUX_EN_3, OUTPUT);
 
   digitalWrite(DEMUX_EN_1, HIGH);
   digitalWrite(DEMUX_EN_2, HIGH);
-  digitalWrite(DEMUX_EN_3, HIGH);
 
 
   //Switches

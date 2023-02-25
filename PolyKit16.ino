@@ -31,12 +31,7 @@
 #include "Settings.h"
 #include <ShiftRegister74HC595.h>
 #include <RoxMux.h>
-#include <MCP4922.h>
 
-#define DAC_MOSI 11
-#define DAC_SCK 13
-#define DAC_LDAC 7
-#define DAC_CS1 10
 
 #define PARAMETER 0      //The main page for displaying the current patch and control (parameter) changes
 #define RECALL 1         //Patches list
@@ -67,16 +62,15 @@ MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI);  //RX - Pin 0
 
 
 int count = 0;  //For MIDI Clk Sync
-int DelayForSH3 = 100;
+int DelayForSH3 = 50;
+int midioutfrig = 8;
 int patchNo = 0;
 int voiceToReturn = -1;        //Initialise
 long earliestTime = millis();  //For voice allocation - initialise to now
 unsigned long buttonDebounce = 0;
 
-MCP4922 DAC1(DAC_MOSI, DAC_SCK, DAC_CS1, DAC_LDAC);
-
 ShiftRegister74HC595<2> sr(23, 22, 21);
-ShiftRegister74HC595<3> srp(52, 53, 54);
+ShiftRegister74HC595<6> srp(52, 53, 54);
 
 #define OCTO_TOTAL 2
 #define BTN_DEBOUNCE 50
@@ -95,7 +89,6 @@ void setup() {
   setupDisplay();
   setUpSettings();
   setupHardware();
-  DAC1.Set(0, 0);
 
   cardStatus = SD.begin(BUILTIN_SDCARD);
   if (cardStatus) {
@@ -154,7 +147,6 @@ void setup() {
   recallPatch(patchNo);  //Load first patch
 
   //  reinitialiseToPanel();
-
 }
 
 // void setVoltage(int dacpin, bool channel, bool gain, unsigned int mV) {
@@ -201,38 +193,39 @@ void updateosc1PWM() {
 void updateosc1Range() {
   if (osc1Range > 100) {
     showCurrentParameterPage("Osc1 Range", String("8"));
-    oct1A = 0;
-    oct1B = 1023;
+    srp.set(OCT1A, LOW);
+    srp.set(OCT1B, HIGH);
+    ;
   } else if (osc1Range < 100 && osc1Range > 33) {
     showCurrentParameterPage("Osc1 Range", String("16"));
-    oct1A = 1023;
-    oct1B = 1023;
+    srp.set(OCT1A, HIGH);
+    srp.set(OCT1B, HIGH);
   } else {
     showCurrentParameterPage("Osc1 Range", String("32"));
-    oct1A = 1023;
-    oct1B = 0;
+    srp.set(OCT1A, HIGH);
+    srp.set(OCT1B, LOW);
   }
 }
 
 void updateosc2Range() {
   if (osc2Range > 100) {
     showCurrentParameterPage("Osc2 Range", String("8"));
-    oct2A = 0;
-    oct2B = 1023;
+    srp.set(OCT2A, LOW);
+    srp.set(OCT2B, HIGH);
   } else if (osc2Range < 100 && osc2Range > 33) {
     showCurrentParameterPage("Osc2 Range", String("16"));
-    oct2A = 1023;
-    oct2B = 1023;
+    srp.set(OCT2A, HIGH);
+    srp.set(OCT2B, HIGH);
   } else {
     showCurrentParameterPage("Osc2 Range", String("32"));
-    oct2A = 1023;
-    oct2B = 0;
+    srp.set(OCT2A, HIGH);
+    srp.set(OCT2B, LOW);
   }
 }
 
 void updatestack() {
   if (stack > 120) {
-  showCurrentParameterPage("Voice Stack", String("8 Note"));
+    showCurrentParameterPage("Voice Stack", String("8 Note"));
   } else if (stack < 120 && stack > 105) {
     showCurrentParameterPage("Voice Stack", String("7 Note"));
   } else if (stack < 105 && stack > 88) {
@@ -282,8 +275,8 @@ void updateosc2TriangleLevel() {
   showCurrentParameterPage("OSC2 Triangle", int(osc2TriangleLevelstr));
 }
 
-void updateOsc1TriangleLevel() {
-  showCurrentParameterPage("OSC1 Triangle", int(osc1TriangleLevelstr));
+void updateOsc1SubLevel() {
+  showCurrentParameterPage("OSC1 Sub", int(osc1SubLevelstr));
 }
 
 void updatebalance() {
@@ -311,9 +304,9 @@ void updateFilterType() {
     } else {
       showCurrentParameterPage("Filter Type", String("4P LowPass"));
     }
-    filterA = 0;
-    filterB = 0;
-    filterC = 0;
+    srp.set(FILTERA, LOW);
+    srp.set(FILTERB, LOW);
+    srp.set(FILTERC, LOW);
 
   } else if (filterType > 12 && filterType < 22) {
     if (filterPoleSW == 1) {
@@ -321,9 +314,9 @@ void updateFilterType() {
     } else {
       showCurrentParameterPage("Filter Type", String("2P LowPass"));
     }
-    filterA = 1023;
-    filterB = 0;
-    filterC = 0;
+    srp.set(FILTERA, HIGH);
+    srp.set(FILTERB, LOW);
+    srp.set(FILTERC, LOW);
 
   } else if (filterType > 22 && filterType < 44) {
     if (filterPoleSW == 1) {
@@ -331,9 +324,9 @@ void updateFilterType() {
     } else {
       showCurrentParameterPage("Filter Type", String("4P HighPass"));
     }
-    filterA = 0;
-    filterB = 1023;
-    filterC = 0;
+    srp.set(FILTERA, LOW);
+    srp.set(FILTERB, HIGH);
+    srp.set(FILTERC, LOW);
 
   } else if (filterType > 44 && filterType < 66) {
     if (filterPoleSW == 1) {
@@ -341,9 +334,9 @@ void updateFilterType() {
     } else {
       showCurrentParameterPage("Filter Type", String("2P HighPass"));
     }
-    filterA = 1023;
-    filterB = 1023;
-    filterC = 0;
+    srp.set(FILTERA, HIGH);
+    srp.set(FILTERB, HIGH);
+    srp.set(FILTERC, LOW);
 
   } else if (filterType > 66 && filterType < 88) {
     if (filterPoleSW == 1) {
@@ -351,9 +344,9 @@ void updateFilterType() {
     } else {
       showCurrentParameterPage("Filter Type", String("4P BandPass"));
     }
-    filterA = 0;
-    filterB = 0;
-    filterC = 1023;
+    srp.set(FILTERA, LOW);
+    srp.set(FILTERB, LOW);
+    srp.set(FILTERC, HIGH);
 
   } else if (filterType > 88 && filterType < 105) {
     if (filterPoleSW == 1) {
@@ -361,9 +354,9 @@ void updateFilterType() {
     } else {
       showCurrentParameterPage("Filter Type", String("2P BandPass"));
     }
-    filterA = 1023;
-    filterB = 0;
-    filterC = 1023;
+    srp.set(FILTERA, HIGH);
+    srp.set(FILTERB, LOW);
+    srp.set(FILTERC, HIGH);
 
   } else if (filterType > 105 && filterType < 120) {
     if (filterPoleSW == 1) {
@@ -371,9 +364,9 @@ void updateFilterType() {
     } else {
       showCurrentParameterPage("Filter Type", String("3P AllPass"));
     }
-    filterA = 0;
-    filterB = 1023;
-    filterC = 1023;
+    srp.set(FILTERA, LOW);
+    srp.set(FILTERB, HIGH);
+    srp.set(FILTERC, HIGH);
 
   } else {
     if (filterPoleSW == 1) {
@@ -381,9 +374,9 @@ void updateFilterType() {
     } else {
       showCurrentParameterPage("Filter Type", String("Notch"));
     }
-    filterA = 1023;
-    filterB = 1023;
-    filterC = 1023;
+    srp.set(FILTERA, HIGH);
+    srp.set(FILTERB, HIGH);
+    srp.set(FILTERC, HIGH);
   }
 }
 
@@ -409,42 +402,40 @@ void updateStratusLFOWaveform() {
 }
 
 int getStratusLFOWaveform(int value) {
-    Serial.print("LFO Type ");
-  Serial.println(value);
-  if (lfoAlt == 1) {    
-    if (value >= 0 && value < 12) {
+  if (lfoAlt == 1) {
+    if (value >= 0 && value < 127) {
       StratusLFOWaveform = "Saw +Oct";
-    } else if (value >= 12 && value < 22) {
+    } else if (value >= 128 && value < 255) {
       StratusLFOWaveform = "Quad Saw";
-    } else if (value >= 22 && value < 44) {
+    } else if (value >= 256 && value < 383) {
       StratusLFOWaveform = "Quad Pulse";
-    } else if (value >= 44 && value < 66) {
+    } else if (value >= 384 && value < 511) {
       StratusLFOWaveform = "Tri Step";
-    } else if (value >= 66 && value < 88) {
+    } else if (value >= 512 && value < 639) {
       StratusLFOWaveform = "Sine +Oct";
-    } else if (value >= 88 && value < 105) {
+    } else if (value >= 640 && value < 767) {
       StratusLFOWaveform = "Sine +3rd";
-    } else if (value >= 105 && value < 120) {
+    } else if (value >= 768 && value < 895) {
       StratusLFOWaveform = "Sine +4th";
-    } else if (value >= 120 && value < 128) {
+    } else if (value >= 896 && value < 1024) {
       StratusLFOWaveform = "Rand Slopes";
     }
   } else {
-    if (value >= 0 && value < 12) {
+    if (value >= 0 && value < 127) {
       StratusLFOWaveform = "Sawtooth Up";
-    } else if (value >= 12 && value < 22) {
+    } else if (value >= 128 && value < 255) {
       StratusLFOWaveform = "Sawtooth Down";
-    } else if (value >= 22 && value < 44) {
+    } else if (value >= 256 && value < 383) {
       StratusLFOWaveform = "Squarewave";
-    } else if (value >= 44 && value < 66) {
+    } else if (value >= 384 && value < 511) {
       StratusLFOWaveform = "Triangle";
-    } else if (value >= 66 && value < 88) {
+    } else if (value >= 512 && value < 639) {
       StratusLFOWaveform = "Sinewave";
-    } else if (value >= 88 && value < 105) {
+    } else if (value >= 640 && value < 767) {
       StratusLFOWaveform = "Sweeps";
-    } else if (value >= 105 && value < 120) {
+    } else if (value >= 768 && value < 895) {
       StratusLFOWaveform = "Lumps";
-    } else if (value >= 120 && value < 128) {
+    } else if (value >= 896 && value < 1024) {
       StratusLFOWaveform = "Sample & Hold";
     }
   }
@@ -546,12 +537,15 @@ void updatefilterLoop() {
   if (filterLoop == 1) {
     showCurrentParameterPage("VCF EG Loop", "On");
     sr.set(FILTERLOOP_LED, HIGH);  // LED on
-    srp.set(FILTER_LOOP, HIGH);
+    srp.set(FILTER_MODE_BIT0, HIGH);
+    srp.set(FILTER_MODE_BIT1, HIGH);
+
     midiCCOut(CCfilterLoop, 127);
   } else {
     showCurrentParameterPage("VCF EG Loop", "Off");
     sr.set(FILTERLOOP_LED, LOW);  // LED off
-    srp.set(FILTER_LOOP, LOW);
+    srp.set(FILTER_MODE_BIT0, LOW);
+    srp.set(FILTER_MODE_BIT1, LOW);
     midiCCOut(CCfilterLoop, 1);
   }
 }
@@ -588,12 +582,14 @@ void updatevcaLoop() {
   if (vcaLoop == 1) {
     showCurrentParameterPage("VCA EG Loop", "On");
     sr.set(VCALOOP_LED, HIGH);  // LED on
-    srp.set(AMP_LOOP, HIGH);
+    srp.set(AMP_MODE_BIT0, HIGH);
+    srp.set(AMP_MODE_BIT1, HIGH);
     midiCCOut(CCvcaLoop, 127);
   } else {
     showCurrentParameterPage("VCA EG Loop", "Off");
     sr.set(VCALOOP_LED, LOW);  // LED off
-    srp.set(AMP_LOOP, LOW);
+    srp.set(AMP_MODE_BIT0, LOW);
+    srp.set(AMP_MODE_BIT1, LOW);
     midiCCOut(CCvcaLoop, 1);
   }
 }
@@ -652,11 +648,13 @@ void updatechorus1() {
     showCurrentParameterPage("Chorus 1", String("Off"));
     sr.set(CHORUS1_LED, LOW);  // LED off
     srp.set(CHORUS1_OUT, LOW);
+    srp.set(UPPER_CHORUS1_OUT, LOW);
     midiCCOut(CCchorus1, 1);
   } else {
     showCurrentParameterPage("Chorus 1", String("On"));
     sr.set(CHORUS1_LED, HIGH);  // LED on
     srp.set(CHORUS1_OUT, HIGH);
+    srp.set(UPPER_CHORUS1_OUT, HIGH);
     midiCCOut(CCchorus1, 127);
   }
 }
@@ -718,47 +716,47 @@ void myControlChange(byte channel, byte control, int value) {
   switch (control) {
     case CCpwLFO:
       pwLFO = value;
-      pwLFOstr = value;  // for display
+      pwLFOstr = value / midioutfrig;  // for display
       updatepwLFO();
       break;
 
     case CCfmDepth:
       fmDepth = value;
-      fmDepthstr = value;
+      fmDepthstr = value / midioutfrig;
       updatefmDepth();
       break;
 
     case CCosc2PW:
       osc2PW = value;
-      osc2PWstr = PULSEWIDTH[value];
+      osc2PWstr = PULSEWIDTH[value / midioutfrig];
       updateosc2PW();
       break;
 
     case CCosc2PWM:
       osc2PWM = value;
-      osc2PWMstr = value;
+      osc2PWMstr = value / midioutfrig;
       updateosc2PWM();
       break;
 
     case CCosc1PW:
       osc1PW = value;
-      osc1PWstr = PULSEWIDTH[value];
+      osc1PWstr = PULSEWIDTH[value / midioutfrig];
       updateosc1PW();
       break;
 
     case CCosc1PWM:
       osc1PWM = value;
-      osc1PWMstr = value;
+      osc1PWMstr = value / midioutfrig;
       updateosc1PWM();
       break;
 
     case CCosc1Range:
-      osc1Range = value;
+      osc1Range = value / midioutfrig;
       updateosc1Range();
       break;
 
     case CCosc2Range:
-      osc2Range = value;
+      osc2Range = value / midioutfrig;
       updateosc2Range();
       break;
 
@@ -768,96 +766,96 @@ void myControlChange(byte channel, byte control, int value) {
       break;
 
     case CCglideTime:
-      glideTimestr = LINEAR[value];
+      glideTimestr = LINEAR[value / midioutfrig];
       glideTime = value;
       updateglideTime();
       break;
 
     case CCosc2Detune:
-      osc2Detunestr = PULSEWIDTH[value];
+      osc2Detunestr = PULSEWIDTH[value / midioutfrig];
       osc2Detune = value;
       updateosc2Detune();
       break;
 
     case CCnoiseLevel:
       noiseLevel = value;
-      noiseLevelstr = LINEARCENTREZERO[value];
+      noiseLevelstr = LINEARCENTREZERO[value / midioutfrig];
       updatenoiseLevel();
       break;
 
     case CCosc2SawLevel:
       osc2SawLevel = value;
-      osc2SawLevelstr = value;  // for display
+      osc2SawLevelstr = value / midioutfrig;  // for display
       updateOsc2SawLevel();
       break;
 
     case CCosc1SawLevel:
       osc1SawLevel = value;
-      osc1SawLevelstr = value;  // for display
+      osc1SawLevelstr = value / midioutfrig;  // for display
       updateOsc1SawLevel();
       break;
 
     case CCosc2PulseLevel:
       osc2PulseLevel = value;
-      osc2PulseLevelstr = value;  // for display
+      osc2PulseLevelstr = value / midioutfrig;  // for display
       updateosc2PulseLevel();
       break;
 
     case CCosc1PulseLevel:
       osc1PulseLevel = value;
-      osc1PulseLevelstr = value;  // for display
+      osc1PulseLevelstr = value / midioutfrig;  // for display
       updateOsc1PulseLevel();
       break;
 
     case CCosc2TriangleLevel:
       osc2TriangleLevel = value;
-      osc2TriangleLevelstr = value;  // for display
+      osc2TriangleLevelstr = value / midioutfrig;  // for display
       updateosc2TriangleLevel();
       break;
 
-    case CCosc1TriangleLevel:
-      osc1TriangleLevel = value;
-      osc1TriangleLevelstr = value;  // for display
-      updateOsc1TriangleLevel();
+    case CCosc1SubLevel:
+      osc1SubLevel = value;
+      osc1SubLevelstr = value / midioutfrig;  // for display
+      updateOsc1SubLevel();
       break;
 
     case CCLFODelay:
       LFODelay = value;
-      LFODelaystr = value;  // for display
+      LFODelaystr = value / midioutfrig;  // for display
       updateLFODelay();
       break;
 
     case CCfilterCutoff:
       filterCutoff = value;
-      filterCutoffstr = FILTERCUTOFF[value];
+      filterCutoffstr = FILTERCUTOFF[value / midioutfrig];
       updateFilterCutoff();
       break;
 
     case CCfilterLFO:
       filterLFO = value;
-      filterLFOstr = value;
+      filterLFOstr = value / midioutfrig;
       updatefilterLFO();
       break;
 
     case CCfilterRes:
       filterRes = value;
-      filterResstr = int(value);
+      filterResstr = int(value / midioutfrig);
       updatefilterRes();
       break;
 
     case CCfilterType:
-      filterType = value;
+      filterType = value / midioutfrig;
       updateFilterType();
       break;
 
     case CCfilterEGlevel:
       filterEGlevel = value;
-      filterEGlevelstr = int(value);
+      filterEGlevelstr = int(value / midioutfrig);
       updatefilterEGlevel();
       break;
 
     case CCLFORate:
-      LFORatestr = LFOTEMPO[value];  // for display
+      LFORatestr = LFOTEMPO[value / midioutfrig];  // for display
       LFORate = value;
       updateLFORate();
       break;
@@ -869,65 +867,65 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CCfilterAttack:
       filterAttack = value;
-      filterAttackstr = ENVTIMES[value];
+      filterAttackstr = ENVTIMES[value / midioutfrig];
       updatefilterAttack();
       break;
 
     case CCfilterDecay:
       filterDecay = value;
-      filterDecaystr = ENVTIMES[value];
+      filterDecaystr = ENVTIMES[value / midioutfrig];
       updatefilterDecay();
       break;
 
     case CCfilterSustain:
       filterSustain = value;
-      filterSustainstr = LINEAR_FILTERMIXERSTR[value];
+      filterSustainstr = LINEAR_FILTERMIXERSTR[value / midioutfrig];
       updatefilterSustain();
       break;
 
     case CCfilterRelease:
       filterRelease = value;
-      filterReleasestr = ENVTIMES[value];
+      filterReleasestr = ENVTIMES[value / midioutfrig];
       updatefilterRelease();
       break;
 
     case CCampAttack:
       ampAttack = value;
       oldampAttack = value;
-      ampAttackstr = ENVTIMES[value];
+      ampAttackstr = ENVTIMES[value / midioutfrig];
       updateampAttack();
       break;
 
     case CCampDecay:
       ampDecay = value;
       oldampDecay = value;
-      ampDecaystr = ENVTIMES[value];
+      ampDecaystr = ENVTIMES[value / midioutfrig];
       updateampDecay();
       break;
 
     case CCampSustain:
       ampSustain = value;
       oldampSustain = value;
-      ampSustainstr = LINEAR_FILTERMIXERSTR[value];
+      ampSustainstr = LINEAR_FILTERMIXERSTR[value / midioutfrig];
       updateampSustain();
       break;
 
     case CCampRelease:
       ampRelease = value;
       oldampRelease = value;
-      ampReleasestr = ENVTIMES[value];
+      ampReleasestr = ENVTIMES[value / midioutfrig];
       updateampRelease();
       break;
 
     case CCvolumeControl:
       volumeControl = value;
-      volumeControlstr = value;
+      volumeControlstr = value / midioutfrig;
       updatevolumeControl();
       break;
 
     case CCkeyTrack:
       keytrack = value;
-      keytrackstr = value;
+      keytrackstr = value / midioutfrig;
       updatekeytrack();
       break;
 
@@ -990,19 +988,19 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CCPBDepth:
       PitchBendLevel = value;
-      PitchBendLevelstr = PITCHBEND[value];  // for display
+      PitchBendLevelstr = PITCHBEND[value / midioutfrig];  // for display
       updatePitchBend();
       break;
 
     case CCPitchBend:
       PitchBendLevel = value;
-      PitchBendLevelstr = PITCHBEND[value];  // for display
+      PitchBendLevelstr = PITCHBEND[value / midioutfrig];  // for display
       updatePitchBend();
       break;
 
     case CCMWDepth:
       PitchBendLevel = value;
-      PitchBendLevelstr = PITCHBEND[value];  // for display
+      PitchBendLevelstr = PITCHBEND[value / midioutfrig];  // for display
       //updatePitchBend();
       break;
 
@@ -1013,7 +1011,7 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CCbalance:
       balance = value;
-      balancestr = value;
+      balancestr = value / midioutfrig;
       updatebalance();
       break;
 
@@ -1023,75 +1021,75 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CCmodwheel:
       switch (modWheelDepth) {
-      //   case 1:
-      //     modWheelLevel = ((value) / 5);
-      //     fmDepth = (int(modWheelLevel));
-      //     //          Serial.print("ModWheel Depth ");
-      //     //          Serial.println(modWheelLevel);
-      //     break;
+        //   case 1:
+        //     modWheelLevel = ((value) / 5);
+        //     fmDepth = (int(modWheelLevel));
+        //     //          Serial.print("ModWheel Depth ");
+        //     //          Serial.println(modWheelLevel);
+        //     break;
 
-      //   case 2:
-      //     modWheelLevel = ((value) / 4);
-      //     fmDepth = (int(modWheelLevel));
-      //     //          Serial.print("ModWheel Depth ");
-      //     //          Serial.println(modWheelLevel);
-      //     break;
+        //   case 2:
+        //     modWheelLevel = ((value) / 4);
+        //     fmDepth = (int(modWheelLevel));
+        //     //          Serial.print("ModWheel Depth ");
+        //     //          Serial.println(modWheelLevel);
+        //     break;
 
-      //   case 3:
-      //     modWheelLevel = ((value) / 3.5);
-      //     fmDepth = (int(modWheelLevel));
-      //     //          Serial.print("ModWheel Depth ");
-      //     //          Serial.println(modWheelLevel);
-      //     break;
+        //   case 3:
+        //     modWheelLevel = ((value) / 3.5);
+        //     fmDepth = (int(modWheelLevel));
+        //     //          Serial.print("ModWheel Depth ");
+        //     //          Serial.println(modWheelLevel);
+        //     break;
 
-      //   case 4:
-      //     modWheelLevel = ((value) / 3);
-      //     fmDepth = (int(modWheelLevel));
-      //     //          Serial.print("ModWheel Depth ");
-      //     //          Serial.println(modWheelLevel);
-      //     break;
+        //   case 4:
+        //     modWheelLevel = ((value) / 3);
+        //     fmDepth = (int(modWheelLevel));
+        //     //          Serial.print("ModWheel Depth ");
+        //     //          Serial.println(modWheelLevel);
+        //     break;
 
-      //   case 5:
-      //     modWheelLevel = ((value) / 2.5);
-      //     fmDepth = (int(modWheelLevel));
-      //     //          Serial.print("ModWheel Depth ");
-      //     //          Serial.println(modWheelLevel);
-      //     break;
+        //   case 5:
+        //     modWheelLevel = ((value) / 2.5);
+        //     fmDepth = (int(modWheelLevel));
+        //     //          Serial.print("ModWheel Depth ");
+        //     //          Serial.println(modWheelLevel);
+        //     break;
 
-      //   case 6:
-      //     modWheelLevel = ((value) / 2);
-      //     fmDepth = (int(modWheelLevel));
-      //     //          Serial.print("ModWheel Depth ");
-      //     //          Serial.println(modWheelLevel);
-      //     break;
+        //   case 6:
+        //     modWheelLevel = ((value) / 2);
+        //     fmDepth = (int(modWheelLevel));
+        //     //          Serial.print("ModWheel Depth ");
+        //     //          Serial.println(modWheelLevel);
+        //     break;
 
-      //   case 7:
-      //     modWheelLevel = ((value) / 1.75);
-      //     fmDepth = (int(modWheelLevel));
-      //     //          Serial.print("ModWheel Depth ");
-      //     //          Serial.println(modWheelLevel);
-      //     break;
+        //   case 7:
+        //     modWheelLevel = ((value) / 1.75);
+        //     fmDepth = (int(modWheelLevel));
+        //     //          Serial.print("ModWheel Depth ");
+        //     //          Serial.println(modWheelLevel);
+        //     break;
 
-      //   case 8:
-      //     modWheelLevel = ((value) / 1.5);
-      //     fmDepth = (int(modWheelLevel));
-      //     //          Serial.print("ModWheel Depth ");
-      //     //          Serial.println(modWheelLevel);
-      //     break;
+        //   case 8:
+        //     modWheelLevel = ((value) / 1.5);
+        //     fmDepth = (int(modWheelLevel));
+        //     //          Serial.print("ModWheel Depth ");
+        //     //          Serial.println(modWheelLevel);
+        //     break;
 
-      //   case 9:
-      //     modWheelLevel = ((value) / 1.25);
-      //     fmDepth = (int(modWheelLevel));
-      //     //          Serial.print("ModWheel Depth ");
-      //     //          Serial.println(modWheelLevel);
-      //     break;
+        //   case 9:
+        //     modWheelLevel = ((value) / 1.25);
+        //     fmDepth = (int(modWheelLevel));
+        //     //          Serial.print("ModWheel Depth ");
+        //     //          Serial.println(modWheelLevel);
+        //     break;
 
-      //   case 10:
-      //     modWheelLevel = (value);
-      //     fmDepth = (int(modWheelLevel));
-      //     //          Serial.print("ModWheel Depth ");
-      //     //          Serial.println(modWheelLevel);
-      //     break;
+        //   case 10:
+        //     modWheelLevel = (value);
+        //     fmDepth = (int(modWheelLevel));
+        //     //          Serial.print("ModWheel Depth ");
+        //     //          Serial.println(modWheelLevel);
+        //     break;
       }
       break;
 
@@ -1206,6 +1204,9 @@ void setCurrentPatchData(String data[]) {
   AfterTouchDest = data[60].toInt();
   filterLogLin = data[61].toInt();
   ampLogLin = data[62].toInt();
+  osc2TriangleLevel = data[63].toFloat();
+  osc1SubLevel = data[64].toFloat();
+
   oldfilterCutoff = filterCutoff;
   //Switches
 
@@ -1236,7 +1237,16 @@ void setCurrentPatchData(String data[]) {
 }
 
 String getCurrentPatchData() {
-  return patchName + "," + String(pwLFO) + "," + String(fmDepth) + "," + String(osc2PW) + "," + String(osc2PWM) + "," + String(osc1PW) + "," + String(osc1PWM) + "," + String(osc1Range) + "," + String(osc2Range) + "," + String(stack) + "," + String(glideTime) + "," + String(osc2Detune) + "," + String(noiseLevel) + "," + String(osc2SawLevel) + "," + String(osc1SawLevel) + "," + String(osc2PulseLevel) + "," + String(osc1PulseLevel) + "," + String(filterCutoff) + "," + String(filterLFO) + "," + String(filterRes) + "," + String(filterType) + "," + String(filterA) + "," + String(filterB) + "," + String(filterC) + "," + String(filterEGlevel) + "," + String(LFORate) + "," + String(LFOWaveform) + "," + String(filterAttack) + "," + String(filterDecay) + "," + String(filterSustain) + "," + String(filterRelease) + "," + String(ampAttack) + "," + String(ampDecay) + "," + String(ampSustain) + "," + String(ampRelease) + "," + String(volumeControl) + "," + String(glideSW) + "," + String(keytrack) + "," + String(filterPoleSW) + "," + String(filterLoop) + "," + String(filterEGinv) + "," + String(filterVel) + "," + String(vcaLoop) + "," + String(vcaVel) + "," + String(vcaGate) + "," + String(lfoAlt) + "," + String(chorus1) + "," + String(chorus2) + "," + String(monoMulti) + "," + String(modWheelLevel) + "," + String(PitchBendLevel) + "," + String(linLog) + "," + String(oct1A) + "," + String(oct1B) + "," + String(oct2A) + "," + String(oct2B) + "," + String(oldampAttack) + "," + String(oldampDecay) + "," + String(oldampSustain) + "," + String(oldampRelease) + "," + String(AfterTouchDest) + "," + String(filterLogLin) + "," + String(ampLogLin);
+  return patchName + "," + String(pwLFO) + "," + String(fmDepth) + "," + String(osc2PW) + "," + String(osc2PWM) + "," + String(osc1PW) + "," + String(osc1PWM) + "," + String(osc1Range) + "," + 
+  String(osc2Range) + "," + String(stack) + "," + String(glideTime) + "," + String(osc2Detune) + "," + String(noiseLevel) + "," + String(osc2SawLevel) + "," + String(osc1SawLevel) + "," + 
+  String(osc2PulseLevel) + "," + String(osc1PulseLevel) + "," + String(filterCutoff) + "," + String(filterLFO) + "," + String(filterRes) + "," + String(filterType) + "," + String(filterA) + "," + 
+  String(filterB) + "," + String(filterC) + "," + String(filterEGlevel) + "," + String(LFORate) + "," + String(LFOWaveform) + "," + String(filterAttack) + "," + String(filterDecay) + "," + 
+  String(filterSustain) + "," + String(filterRelease) + "," + String(ampAttack) + "," + String(ampDecay) + "," + String(ampSustain) + "," + String(ampRelease) + "," + 
+  String(volumeControl) + "," + String(glideSW) + "," + String(keytrack) + "," + String(filterPoleSW) + "," + String(filterLoop) + "," + String(filterEGinv) + "," + 
+  String(filterVel) + "," + String(vcaLoop) + "," + String(vcaVel) + "," + String(vcaGate) + "," + String(lfoAlt) + "," + String(chorus1) + "," + String(chorus2) + "," + 
+  String(monoMulti) + "," + String(modWheelLevel) + "," + String(PitchBendLevel) + "," + String(linLog) + "," + String(oct1A) + "," + String(oct1B) + "," + 
+  String(oct2A) + "," + String(oct2B) + "," + String(oldampAttack) + "," + String(oldampDecay) + "," + String(oldampSustain) + "," + String(oldampRelease) + "," + 
+  String(AfterTouchDest) + "," + String(filterLogLin) + "," + String(ampLogLin) + "," + String(osc2TriangleLevel) + "," + String(osc1SubLevel);
 }
 
 void checkMux() {
@@ -1248,70 +1258,70 @@ void checkMux() {
 
   if (mux1Read > (mux1ValuesPrev[muxInput] + QUANTISE_FACTOR) || mux1Read < (mux1ValuesPrev[muxInput] - QUANTISE_FACTOR)) {
     mux1ValuesPrev[muxInput] = mux1Read;
-    mux1Read = (mux1Read >> 1); //Change range to 0-127
+    //    mux1Read = (mux1Read >> 3); //Change range to 0-127
     switch (muxInput) {
       case MUX1_osc1PW:
-        midiCCOut(CCosc1PW, mux1Read);
+        midiCCOut(CCosc1PW, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc1PW, mux1Read);
         break;
       case MUX1_MWDepth:
-        midiCCOut(CCMWDepth, mux1Read);
+        midiCCOut(CCMWDepth, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCMWDepth, mux1Read);
         break;
       case MUX1_osc2PWM:
-        midiCCOut(CCosc2PWM, mux1Read);
+        midiCCOut(CCosc2PWM, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc2PWM, mux1Read);
         break;
       case MUX1_osc2PW:
-        midiCCOut(CCosc2PW, mux1Read);
+        midiCCOut(CCosc2PW, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc2PW, mux1Read);
         break;
       case MUX1_PBDepth:
-        midiCCOut(CCPBDepth, mux1Read);
+        midiCCOut(CCPBDepth, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCPBDepth, mux1Read);
         break;
       case MUX1_osc1PWM:
-        midiCCOut(CCosc1PWM, mux1Read);
+        midiCCOut(CCosc1PWM, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc1PWM, mux1Read);
         break;
       case MUX1_pwLFO:
-        midiCCOut(CCpwLFO, mux1Read);
+        midiCCOut(CCpwLFO, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCpwLFO, mux1Read);
         break;
       case MUX1_fmDepth:
-        midiCCOut(CCfmDepth, mux1Read);
+        midiCCOut(CCfmDepth, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCfmDepth, mux1Read);
         break;
       case MUX1_osc2SawLevel:
-        midiCCOut(CCosc2SawLevel, mux1Read);
+        midiCCOut(CCosc2SawLevel, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc2SawLevel, mux1Read);
         break;
       case MUX1_noiseLevel:
-        midiCCOut(CCnoiseLevel, mux1Read);
+        midiCCOut(CCnoiseLevel, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCnoiseLevel, mux1Read);
         break;
       case MUX1_osc1SawLevel:
-        midiCCOut(CCosc1SawLevel, mux1Read);
+        midiCCOut(CCosc1SawLevel, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc1SawLevel, mux1Read);
         break;
       case MUX1_osc2Detune:
-        midiCCOut(CCosc2Detune, mux1Read);
+        midiCCOut(CCosc2Detune, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc2Detune, mux1Read);
         break;
       case MUX1_osc1Range:
-        midiCCOut(CCosc1Range, mux1Read);
+        midiCCOut(CCosc1Range, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc1Range, mux1Read);
         break;
       case MUX1_glideTime:
-        midiCCOut(CCglideTime, mux1Read);
+        midiCCOut(CCglideTime, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCglideTime, mux1Read);
         break;
       case MUX1_osc2Range:
-        midiCCOut(CCosc2Range, mux1Read);
+        midiCCOut(CCosc2Range, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc2Range, mux1Read);
         break;
       case MUX1_stack:
-        midiCCOut(CCstack, mux1Read);
+        midiCCOut(CCstack, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCstack, mux1Read);
         break;
     }
@@ -1319,70 +1329,70 @@ void checkMux() {
 
   if (mux2Read > (mux2ValuesPrev[muxInput] + QUANTISE_FACTOR) || mux2Read < (mux2ValuesPrev[muxInput] - QUANTISE_FACTOR)) {
     mux2ValuesPrev[muxInput] = mux2Read;
-mux2Read = (mux2Read >> 1); //Change range to 0-127
+    //mux2Read = (mux2Read >> 1); //Change range to 0-127
     switch (muxInput) {
       case MUX2_osc2TriangleLevel:
-        midiCCOut(CCosc2TriangleLevel, mux2Read);
+        midiCCOut(CCosc2TriangleLevel, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCosc2TriangleLevel, mux2Read);
         break;
       case MUX2_filterLFO:
-        midiCCOut(CCfilterLFO, mux2Read);
+        midiCCOut(CCfilterLFO, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterLFO, mux2Read);
         break;
       case MUX2_filterCutoff:
-        midiCCOut(CCfilterCutoff, mux2Read);
+        midiCCOut(CCfilterCutoff, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterCutoff, mux2Read);
         break;
       case MUX2_LFOWaveform:
-        midiCCOut(CCLFOWaveform, mux2Read);
+        midiCCOut(CCLFOWaveform, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCLFOWaveform, mux2Read);
         break;
       case MUX2_osc1PulseLevel:
-        midiCCOut(CCosc1PulseLevel, mux2Read);
+        midiCCOut(CCosc1PulseLevel, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCosc1PulseLevel, mux2Read);
         break;
       case MUX2_LFODelay:
-        midiCCOut(CCLFODelay, mux2Read);
+        midiCCOut(CCLFODelay, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCLFODelay, mux2Read);
         break;
       case MUX2_osc2PulseLevel:
-        midiCCOut(CCosc2PulseLevel, mux2Read);
+        midiCCOut(CCosc2PulseLevel, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCosc2PulseLevel, mux2Read);
         break;
-      case MUX2_osc1TriangleLevel:
-        midiCCOut(CCosc1TriangleLevel, mux2Read);
-        myControlChange(midiChannel, CCosc1TriangleLevel, mux2Read);
+      case MUX2_osc1SubLevel:
+        midiCCOut(CCosc1SubLevel, mux2Read / midioutfrig);
+        myControlChange(midiChannel, CCosc1SubLevel, mux2Read);
         break;
       case MUX2_LFORate:
-        midiCCOut(CCLFORate, mux2Read);
+        midiCCOut(CCLFORate, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCLFORate, mux2Read);
         break;
       case MUX2_filterDecay:
-        midiCCOut(CCfilterDecay, mux2Read);
+        midiCCOut(CCfilterDecay, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterDecay, mux2Read);
         break;
       case MUX2_filterAttack:
-        midiCCOut(CCfilterAttack, mux2Read);
+        midiCCOut(CCfilterAttack, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterAttack, mux2Read);
         break;
       case MUX2_ampAttack:
-        midiCCOut(CCampAttack, mux2Read);
+        midiCCOut(CCampAttack, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCampAttack, mux2Read);
         break;
       case MUX2_filterRes:
-        midiCCOut(CCfilterRes, mux2Read);
+        midiCCOut(CCfilterRes, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterRes, mux2Read);
         break;
       case MUX2_filterType:
-        midiCCOut(CCfilterType, mux2Read);
+        midiCCOut(CCfilterType, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterType, mux2Read);
         break;
       case MUX2_keyTrack:
-        midiCCOut(CCkeyTrack, mux2Read);
+        midiCCOut(CCkeyTrack, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCkeyTrack, mux2Read);
         break;
       case MUX2_filterEGlevel:
-        midiCCOut(CCfilterEGlevel, mux2Read);
+        midiCCOut(CCfilterEGlevel, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterEGlevel, mux2Read);
         break;
     }
@@ -1390,34 +1400,34 @@ mux2Read = (mux2Read >> 1); //Change range to 0-127
 
   if (mux3Read > (mux3ValuesPrev[muxInput] + QUANTISE_FACTOR) || mux3Read < (mux3ValuesPrev[muxInput] - QUANTISE_FACTOR)) {
     mux3ValuesPrev[muxInput] = mux3Read;
-mux3Read = (mux3Read >> 1); //Change range to 0-127
+    //mux3Read = (mux3Read >> 1); //Change range to 0-127
     switch (muxInput) {
       case MUX3_balance:
-        midiCCOut(CCbalance, mux3Read);
+        midiCCOut(CCbalance, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCbalance, mux3Read);
         break;
       case MUX3_ampSustain:
-        midiCCOut(CCampSustain, mux3Read);
+        midiCCOut(CCampSustain, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCampSustain, mux3Read);
         break;
       case MUX3_ampDecay:
-        midiCCOut(CCampDecay, mux3Read);
+        midiCCOut(CCampDecay, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCampDecay, mux3Read);
         break;
       case MUX3_volumeControl:
-        midiCCOut(CCvolumeControl, mux3Read);
+        midiCCOut(CCvolumeControl, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCvolumeControl, mux3Read);
         break;
       case MUX3_filterSustain:
-        midiCCOut(CCfilterSustain, mux3Read);
+        midiCCOut(CCfilterSustain, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCfilterSustain, mux3Read);
         break;
       case MUX3_filterRelease:
-        midiCCOut(CCfilterRelease, mux3Read);
+        midiCCOut(CCfilterRelease, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCfilterRelease, mux3Read);
         break;
       case MUX3_ampRelease:
-        midiCCOut(CCampRelease, mux3Read);
+        midiCCOut(CCampRelease, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCampRelease, mux3Read);
         break;
     }
@@ -1431,7 +1441,6 @@ mux3Read = (mux3Read >> 1); //Change range to 0-127
   digitalWrite(MUX_1, muxInput & B0010);
   digitalWrite(MUX_2, muxInput & B0100);
   digitalWrite(MUX_3, muxInput & B1000);
-
 }
 
 void midiCCOut(byte cc, byte value) {
@@ -1440,179 +1449,178 @@ void midiCCOut(byte cc, byte value) {
   MIDI.sendControlChange(cc, value, midiChannel);  //MIDI DIN is set to Out
 }
 
+void MCP4922_write(const int &slavePin, const int &value1, const int &value2) {
+  int value = 0;
+  byte configByte = 0;
+  byte data = 0;
+  int channel = 0;
+
+  for (channel = 0; channel < 2; channel++) {
+    digitalWrite(slavePin, LOW);  //set DAC ready to accept commands
+    if (channel == 0) {
+      configByte = B01110000;  //channel 0, Vref buffered, Gain of 1x, Active Mode
+      value = value1;
+    } else {
+      configByte = B11110000;  //channel 1, Vref buffered, Gain of 1x, Active Mode
+      value = value2;
+    }
+
+    //write first byte
+    data = highByte(value);
+    data = B00001111 & data;   //clear out the 4 command bits
+    data = configByte | data;  //set the first four command bits
+    SPI.transfer(data);
+
+    //write second byte
+    data = lowByte(value);
+    SPI.transfer(data);
+
+    //close the transfer
+    digitalWrite(slavePin, HIGH);  //set DAC ready to accept commands
+  }
+}
+
 void writeDemux() {
-  //DAC1.Set(0, 0);
+      //DEMUX 1
+      digitalWriteFast(DEMUX_EN_1, LOW);
 
-  //DEMUX 1
-  digitalWrite(DEMUX_EN_1, LOW);
-  switch (muxOutput) {
-    case 0:
-      DAC1.Set(int(fmDepth * DACMULT), int(fmDepth * DACMULT));
-      break;
-    case 1:
-      DAC1.Set(int(osc2PWM * DACMULT), int(osc2PWM * DACMULT));
-      break;
-    case 2:
-      DAC1.Set(int(osc1PWM * DACMULT), int(osc1PWM * DACMULT));
-      break;
-    case 3:
-      DAC1.Set(int(stack * DACMULT), int(stack * DACMULT));
-      break;
-    case 4:
-      DAC1.Set(int(osc2Detune * DACMULT), int(osc2Detune * DACMULT));
-      break;
-    case 5:
-      DAC1.Set(int(noiseLevel * DACMULT), int(noiseLevel * DACMULT));
-      break;
-    case 6:
-      DAC1.Set(int(filterLFO * DACMULT), int(filterLFO * DACMULT));
-      break;
-    case 7:
-      DAC1.Set(int(volumeControl * DACMULT), int(volumeControl * DACMULT));
-      break;
-    case 8:
-      DAC1.Set(int(osc1SawLevel * DACMULT), int(osc1SawLevel * DACMULT));
-      break;
-    case 9:
-      DAC1.Set(int(osc1PulseLevel * DACMULT), int(osc1PulseLevel * DACMULT));
-      break;
-    case 10:
-      DAC1.Set(int(osc2SawLevel * DACMULT), int(osc2SawLevel * DACMULT));
-      break;
-    case 11:
-      DAC1.Set(int(osc2PulseLevel * DACMULT), int(osc2PulseLevel * DACMULT));
-      break;
-    case 12:
-      DAC1.Set(int(PitchBendLevel * DACMULT), int(PitchBendLevel * DACMULT));
-      break;
-    case 13:
-      DAC1.Set(int(osc1PW * DACMULT), int(osc1PW * DACMULT));
-      break;
-    case 14:
-      DAC1.Set(int(osc2PW * DACMULT),int(osc2PW * DACMULT) );
-      break;
-    case 15:
-      DAC1.Set(int(modWheelLevel * DACMULT), int(modWheelLevel * DACMULT));
-      break;
-  }
-  delayMicroseconds(DelayForSH3);
-  digitalWrite(DEMUX_EN_1, HIGH);
-  //DAC1.Set(0, 0);
+      switch (muxOutput) {
+        case 0:
+          MCP4922_write(DAC_CS1, int(fmDepth * DACMULT), int(fmDepth * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 1:
+        MCP4922_write(DAC_CS1, int(osc2PWM * DACMULT), int(osc2PWM * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 2:
+          MCP4922_write(DAC_CS1, int(osc1PWM * DACMULT), int(osc1PWM * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 3:
+          MCP4922_write(DAC_CS1, int(stack * DACMULT), int(stack * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 4:
+          MCP4922_write(DAC_CS1, int(osc2Detune * DACMULT), int(osc2Detune * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 5:
+          MCP4922_write(DAC_CS1, int(noiseLevel * DACMULT), int(noiseLevel * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 6:
+          MCP4922_write(DAC_CS1, int(filterLFO * DACMULT), int(filterLFO * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 7:
+          MCP4922_write(DAC_CS1, int(volumeControl * DACMULT), int(volumeControl * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 8:
+          MCP4922_write(DAC_CS1, int(osc1SawLevel * DACMULT), int(osc1SawLevel * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 9:
+          MCP4922_write(DAC_CS1, int(osc1PulseLevel * DACMULT), int(osc1PulseLevel * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 10:
+          MCP4922_write(DAC_CS1, int(osc2SawLevel * DACMULT), int(osc2SawLevel * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 11:
+          MCP4922_write(DAC_CS1, int(osc2PulseLevel * DACMULT), int(osc2PulseLevel * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 12:
+          MCP4922_write(DAC_CS1, int(keytrack * DACMULT), int(keytrack * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 13:
+          MCP4922_write(DAC_CS1, int(osc1PW * DACMULT), int(osc1PW * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 14:
+          MCP4922_write(DAC_CS1, int(osc2PW * DACMULT), int(osc2PW * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 15:
+          MCP4922_write(DAC_CS1, int(balance * DACMULT), int(balance * DACMULT));  // use for balance
+          delayMicroseconds(DelayForSH3);
+          break;
+      }
+      digitalWriteFast(DEMUX_EN_1, HIGH);
 
-  //DEMUX 2
+      digitalWriteFast(DEMUX_EN_2, LOW);
+      switch (muxOutput) {
 
-  digitalWrite(DEMUX_EN_2, LOW);
-  switch (muxOutput) {
-    case 0:
-      DAC1.Set(int(filterAttack * DACMULT), int(filterAttack * DACMULT));
-      break;
-    case 1:
-      DAC1.Set(int(filterDecay * DACMULT), int(filterDecay * DACMULT));
-      break;
-    case 2:
-      DAC1.Set(int(filterSustain * DACMULT), int(filterSustain * DACMULT));
-      break;
-    case 3:
-      DAC1.Set(int(filterRelease * DACMULT), int(filterRelease * DACMULT));
-      break;
-    case 4:
-      DAC1.Set(int(ampAttack * DACMULT), int(ampAttack * DACMULT));
-      break;
-    case 5:
-      DAC1.Set(int(ampDecay * DACMULT), int(ampDecay * DACMULT));
-      break;
-    case 6:
-      DAC1.Set(int(ampSustain * DACMULT), int(ampSustain * DACMULT));
-      break;
-    case 7:
-      DAC1.Set(int(ampRelease * DACMULT), int(ampRelease * DACMULT));
-      break;
-    case 8:
-      DAC1.Set(int(pwLFO * DACMULT), int(pwLFO * DACMULT));
-      break;
-    case 9:
-      DAC1.Set(int(LFORate * DACMULT), int(LFORate * DACMULT));
-      break;
-    case 10:
-      DAC1.Set(int(LFOWaveform * DACMULT), int(LFOWaveform * DACMULT));
-      break;
-    case 11:
-      DAC1.Set(int(filterEGlevel * DACMULT), int(filterEGlevel * DACMULT));
-      break;
-    case 12:
-      DAC1.Set(int(filterCutoff * DACMULT), int(filterCutoff * DACMULT));
-      break;
-    case 13:
-      DAC1.Set(int(filterRes * DACMULT), int(filterRes * DACMULT));
-      break;
-    case 14:
-      DAC1.Set(int(filterCutoff * DACMULT), int(filterCutoff * DACMULT));
-      break;
-    case 15:
-      DAC1.Set(int(filterRes * DACMULT), int(filterRes * DACMULT));
-      break;
-  }
-  delayMicroseconds(DelayForSH3);
-  digitalWrite(DEMUX_EN_2, HIGH);
-  //DAC1.Set(0, 0);
-
-
-  //DEMUX 3
-
-  digitalWrite(DEMUX_EN_3, LOW);
-  switch (muxOutput) {
-    case 0:
-      DAC1.Set((filterA * 4), (filterA * 4));
-      break;
-    case 1:
-      DAC1.Set((filterB * 4),(filterB * 4) );
-      break;
-    case 2:
-      DAC1.Set((filterC * 4), (filterC * 4));
-      break;
-    case 3:
-      DAC1.Set(0, 0);
-      break;
-    case 4:
-      DAC1.Set((oct1A * 4), (oct1A * 4));
-      break;
-    case 5:
-      DAC1.Set((oct1B * 4), (oct1B * 4));
-      break;
-    case 6:
-      DAC1.Set((oct2A * 4), (oct2A * 4));
-      break;
-    case 7:
-      DAC1.Set((oct2B * 4), (oct2B * 4) );
-      break;
-    case 8:
-      DAC1.Set(0, 0);
-      break;
-    case 9:
-      DAC1.Set(0, 0);
-      break;
-    case 10:
-      DAC1.Set(0, 0);
-      break;
-    case 11:
-      DAC1.Set(0, 0);
-      break;
-    case 12:
-      DAC1.Set(0, 0);
-      break;
-    case 13:
-      DAC1.Set(0, 0);
-      break;
-    case 14:
-      DAC1.Set(0, 0);
-      break;
-    case 15:
-      DAC1.Set(0, 0);
-      break;
-  }
-  delayMicroseconds(DelayForSH3);
-  digitalWrite(DEMUX_EN_3, HIGH);
-  //DAC1.Set(0, 0);
+        case 0:
+          MCP4922_write(DAC_CS2, int(filterAttack * DACMULT), int(filterAttack * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 1:
+          MCP4922_write(DAC_CS2, int(filterDecay * DACMULT), int(filterDecay * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 2:
+          MCP4922_write(DAC_CS2, int(filterSustain * DACMULT), int(filterSustain * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 3:
+          MCP4922_write(DAC_CS2, int(filterRelease * DACMULT), int(filterRelease * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 4:
+          MCP4922_write(DAC_CS2, int(ampAttack * DACMULT), int(ampAttack * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 5:
+          MCP4922_write(DAC_CS2, int(ampDecay * DACMULT), int(ampDecay * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 6:
+          MCP4922_write(DAC_CS2, int(ampSustain * DACMULT), int(ampSustain * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 7:
+          MCP4922_write(DAC_CS2, int(ampRelease * DACMULT), int(ampRelease * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 8:
+          MCP4922_write(DAC_CS2, int(pwLFO * DACMULT), int(pwLFO * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 9:
+          MCP4922_write(DAC_CS2, int(LFORate * DACMULT), int(LFORate * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 10:
+          MCP4922_write(DAC_CS2, int(LFOWaveform * DACMULT), int(LFOWaveform * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 11:
+          MCP4922_write(DAC_CS2, int(filterEGlevel * DACMULT), int(filterEGlevel * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 12:
+          MCP4922_write(DAC_CS2, int(filterCutoff * DACMULT), int(filterCutoff * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 13:
+          MCP4922_write(DAC_CS2, int(filterRes * DACMULT), int(filterRes * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 14:
+          MCP4922_write(DAC_CS2, int(osc1SubLevel * DACMULT), int(osc1SubLevel * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+        case 15:
+          MCP4922_write(DAC_CS2, int(osc2TriangleLevel * DACMULT), int(osc2TriangleLevel * DACMULT));
+          delayMicroseconds(DelayForSH3);
+          break;
+      }
+      digitalWriteFast(DEMUX_EN_2, HIGH);
 
   muxOutput++;
   if (muxOutput >= DEMUXCHANNELS)
