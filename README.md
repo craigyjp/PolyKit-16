@@ -10,7 +10,8 @@ This repository contains my versions of the filter/adsr/lfo with added velocity,
 ## Key features
 
 - Digitally controlled oscillators similar in design to the Roland Juno series using dual Raspberry Pi Pico's.
-- Dual DCO with Sawtooth, PWM & Triangle waveforms individual mixing of each.
+- Dual DCO with Sawtooth, PWM, SUB oscillator & Triangle waveforms individual mixing of each.
+- Digital Noise source for White or Pink noise mix.
 - Multipole filters based on the Oberheim Matrix 12. 
 - Dual LFOs for PWM and main synth, main LFO 16 waveforms, PWM LFO Sinewave only.
 - 16 voice polyphonic dual DCOs per voice.
