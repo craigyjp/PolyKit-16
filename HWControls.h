@@ -137,31 +137,55 @@ ADC *adc = new ADC();
 
 // 595 outputs
 
-#define FILTERA 0
-#define FILTERB 1
-#define FILTERC 2
-#define FILTER_POLE 3
-#define FILTER_EG_INV 4
-#define FILTER_VELOCITY 5
-#define AMP_VELOCITY 6
-#define LFO_ALT 7
+#define FILTERA_UPPER 0
+#define FILTERB_UPPER 1
+#define FILTERC_UPPER 2
+#define FILTER_POLE_UPPER 3
+#define FILTER_EG_INV_UPPER 4
+#define FILTER_VELOCITY_UPPER 5
+#define AMP_VELOCITY_UPPER 6
+#define LFO_ALT_UPPER 7
 
-#define CHORUS1_OUT 8 
-#define CHORUS2_OUT 9
-#define FILTER_MODE_BIT0 10
-#define FILTER_MODE_BIT1 11
-#define AMP_MODE_BIT0 12
-#define AMP_MODE_BIT1 13
-#define FILTER_LIN_LOG 14
-#define AMP_LIN_LOG 15
+#define CHORUS1_OUT_UPPER 8 
+#define CHORUS2_OUT_UPPER 9
+#define FILTER_MODE_BIT0_UPPER 10
+#define FILTER_MODE_BIT1_UPPER 11
+#define AMP_MODE_BIT0_UPPER 12
+#define AMP_MODE_BIT1_UPPER 13
+#define FILTER_LIN_LOG_UPPER 14
+#define AMP_LIN_LOG_UPPER 15
 
-#define OCT1A 16
-#define OCT1B 17
-#define OCT2A 18
-#define OCT2B 19
-#define FILTER_KEYTRACK 20
+#define OCT1A_UPPER 16
+#define OCT1B_UPPER 17
+#define OCT2A_UPPER 18
+#define OCT2B_UPPER 19
+#define FILTER_KEYTRACK_UPPER 20
+#define UPPER1 21
 
-#define UPPER_CHORUS1_OUT 32 
+#define FILTERA_LOWER 24
+#define FILTERB_LOWER 25
+#define FILTERC_LOWER 26
+#define FILTER_POLE_LOWER 27
+#define FILTER_EG_INV_LOWER 28
+#define FILTER_VELOCITY_LOWER 29
+#define AMP_VELOCITY_LOWER 30
+#define LFO_ALT_LOWER 31
+
+#define CHORUS1_OUT_LOWER 32 
+#define CHORUS2_OUT_LOWER 33
+#define FILTER_MODE_BIT0_LOWER 34
+#define FILTER_MODE_BIT1_LOWER 35
+#define AMP_MODE_BIT0_LOWER 36
+#define AMP_MODE_BIT1_LOWER 37
+#define FILTER_LIN_LOG_LOWER 38
+#define AMP_LIN_LOG_LOWER 39
+
+#define OCT1A_LOWER 40
+#define OCT1B_LOWER 41
+#define OCT2A_LOWER 42
+#define OCT2B_LOWER 43
+#define FILTER_KEYTRACK_LOWER 44
+#define UPPER2 45
 
 // 595 LEDs
 
@@ -215,9 +239,6 @@ ADC *adc = new ADC();
 
 static byte muxInput = 0;
 static byte muxOutput = 0;
-static byte muxOutput1 = 0;
-static byte muxOutput2 = 0;
-static byte whichmux = 0;
 
 static int mux1ValuesPrev[MUXCHANNELS] = {};
 static int mux2ValuesPrev[MUXCHANNELS] = {};
