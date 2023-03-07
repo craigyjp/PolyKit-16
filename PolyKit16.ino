@@ -71,6 +71,11 @@ int voiceToReturn = -1;        //Initialise
 long earliestTime = millis();  //For voice allocation - initialise to now
 unsigned long buttonDebounce = 0;
 
+int oldfilterLogLinU;
+int oldfilterLogLinL;
+int oldampLogLinU;
+int oldampLogLinL;
+
 // create a global shift register object
 // parameters: <number of shift registers> (data pin, clock pin, latch pin)
 ShiftRegister74HC595<2> sr(23, 22, 21);
@@ -147,9 +152,13 @@ void setup() {
   //Read Encoder Direction from EEPROM
   encCW = getEncoderDir();
   filterLogLinU = getFilterEnvU();
+  oldfilterLogLinU = filterLogLinU;
   filterLogLinL = getFilterEnvL();
+  oldfilterLogLinL = filterLogLinL;
   ampLogLinU = getAmpEnvU();
+  oldampLogLinU = ampLogLinU;
   ampLogLinL = getAmpEnvL();
+  oldampLogLinL = ampLogLinL;
   patchNoU = getLastPatchU();
   patchNoL = getLastPatchL();
   upperSW = 1;
@@ -1150,23 +1159,29 @@ void updatechorus2(boolean announce) {
 }
 
 void updateFilterEnv(boolean announce) {
-  if (filterLogLin == 0) {
-    srp.set(FILTER_LIN_LOG_UPPER, HIGH);
-    srp.set(FILTER_LIN_LOG_LOWER, HIGH);
-  } else {
-    srp.set(FILTER_LIN_LOG_UPPER, LOW);
-    srp.set(FILTER_LIN_LOG_LOWER, LOW);
-  }
+    if (filterLogLinU == 0) {
+      srp.set(FILTER_LIN_LOG_UPPER, HIGH);
+    } else {
+      srp.set(FILTER_LIN_LOG_UPPER, LOW);
+    }
+    if (filterLogLinL == 0) {
+      srp.set(FILTER_LIN_LOG_LOWER, HIGH);
+    } else {
+      srp.set(FILTER_LIN_LOG_LOWER, LOW);
+    }
 }
 
 void updateAmpEnv(boolean announce) {
-  if (ampLogLin == 0) {
-    srp.set(AMP_LIN_LOG_UPPER, HIGH);
-    srp.set(AMP_LIN_LOG_LOWER, HIGH);
-  } else {
-    srp.set(AMP_LIN_LOG_UPPER, LOW);
-    srp.set(AMP_LIN_LOG_LOWER, LOW);
-  }
+    if (ampLogLinU == 0) {
+      srp.set(AMP_LIN_LOG_UPPER, LOW);
+    } else {
+      srp.set(AMP_LIN_LOG_UPPER, HIGH);
+    }
+    if (ampLogLinL == 0) {
+      srp.set(AMP_LIN_LOG_LOWER, LOW);
+    } else {
+      srp.set(AMP_LIN_LOG_LOWER, HIGH);
+    }
 }
 
 void updateMonoMulti(boolean announce) {
@@ -1908,8 +1923,8 @@ void setCurrentPatchData(String data[]) {
     chorus1U = data[46].toInt();
     chorus2U = data[47].toInt();
     monoMultiU = data[48].toInt();
-    modWheelLevel = data[49].toFloat();
-    PitchBendLevel = data[50].toFloat();
+    modWheelLevelU = data[49].toFloat();
+    PitchBendLevelU = data[50].toFloat();
     linLog = data[51].toInt();
     oct1AU = data[52].toFloat();
     oct1BU = data[53].toFloat();
@@ -1919,9 +1934,9 @@ void setCurrentPatchData(String data[]) {
     oldampDecayU = data[57].toFloat();
     oldampSustainU = data[58].toFloat();
     oldampReleaseU = data[59].toFloat();
-    AfterTouchDest = data[60].toInt();
-    filterLogLin = data[61].toInt();
-    ampLogLin = data[62].toInt();
+    AfterTouchDestU = data[60].toInt();
+    filterLogLinU = data[61].toInt();
+    ampLogLinU = data[62].toInt();
     osc2TriangleLevelU = data[63].toFloat();
     osc1SubLevelU = data[64].toFloat();
 
@@ -1967,9 +1982,9 @@ void setCurrentPatchData(String data[]) {
     glideSWL = data[36].toInt();
     keytrackL = data[37].toFloat();
     filterPoleSWL = data[38].toInt();
-    filterLoop = data[39].toInt();
-    filterEGinv = data[40].toInt();
-    filterVel = data[41].toInt();
+    filterLoopL = data[39].toInt();
+    filterEGinvL = data[40].toInt();
+    filterVelL = data[41].toInt();
     vcaLoopL = data[42].toInt();
     vcaVelL = data[43].toInt();
     vcaGateL = data[44].toInt();
@@ -1977,9 +1992,9 @@ void setCurrentPatchData(String data[]) {
     chorus1L = data[46].toInt();
     chorus2L = data[47].toInt();
     monoMultiL = data[48].toInt();
-    modWheelLevel = data[49].toFloat();
-    PitchBendLevel = data[50].toFloat();
-    linLog = data[51].toInt();
+    modWheelLevelL = data[49].toFloat();
+    PitchBendLevelL = data[50].toFloat();
+    linLogL = data[51].toInt();
     oct1AL = data[52].toFloat();
     oct1BL = data[53].toFloat();
     oct2AL = data[54].toFloat();
@@ -1988,9 +2003,9 @@ void setCurrentPatchData(String data[]) {
     oldampDecayL = data[57].toFloat();
     oldampSustainL = data[58].toFloat();
     oldampReleaseL = data[59].toFloat();
-    AfterTouchDest = data[60].toInt();
-    filterLogLin = data[61].toInt();
-    ampLogLin = data[62].toInt();
+    AfterTouchDestL = data[60].toInt();
+    filterLogLinL = data[61].toInt();
+    ampLogLinL = data[62].toInt();
     osc2TriangleLevelL = data[63].toFloat();
     osc1SubLevelL = data[64].toFloat();
 
@@ -2433,6 +2448,29 @@ void writeDemux() {
   digitalWriteFast(DEMUX_3, muxOutput & B1000);
 }
 
+void checkEeprom() {
+
+  if (oldfilterLogLinU != filterLogLinU) {
+    updateFilterEnv(0);
+    oldfilterLogLinU = filterLogLinU;
+  }
+
+  if (oldfilterLogLinL != filterLogLinL) {
+    updateFilterEnv(0);
+    oldfilterLogLinL = filterLogLinL;
+  }
+
+  if (oldampLogLinU != ampLogLinU) {
+    updateAmpEnv(0);
+    oldampLogLinU = ampLogLinU;
+  }
+
+  if (oldampLogLinL != ampLogLinL) {
+    updateAmpEnv(0);
+    oldampLogLinL = ampLogLinL;
+  }
+}
+
 void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
 
   // to check if a specific button was pressed
@@ -2826,6 +2864,7 @@ void checkEncoder() {
 void loop() {
   octoswitch.update();
   checkSwitches();
+  checkEeprom();
   writeDemux();
   checkMux();
   checkEncoder();
