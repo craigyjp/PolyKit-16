@@ -1,13 +1,17 @@
 #include <EEPROM.h>
 
 #define EEPROM_MIDI_CH 0
-#define EEPROM_AFTERTOUCH 1
-//#define EEPROM_PITCHBEND 2
-#define EEPROM_MODWHEEL_DEPTH 3
+
 #define EEPROM_ENCODER_DIR 2
-#define EEPROM_LAST_PATCH 5
-#define EEPROM_FILTERENV 6
-#define EEPROM_AMPENV 7
+#define EEPROM_MODWHEEL_DEPTH 3
+#define EEPROM_FILTERENV_U 4
+#define EEPROM_FILTERENV_L 5
+#define EEPROM_AMPENV_U 6
+#define EEPROM_AMPENV_L 7
+#define EEPROM_LAST_PATCHU 8
+#define EEPROM_LAST_PATCHL 9
+#define EEPROM_AFTERTOUCH_U 10
+#define EEPROM_AFTERTOUCH_L 11
 
 int getMIDIChannel() {
   byte midiChannel = EEPROM.read(EEPROM_MIDI_CH);
@@ -20,17 +24,28 @@ void storeMidiChannel(byte channel)
   EEPROM.update(EEPROM_MIDI_CH, channel);
 }
 
-float getAfterTouch() {
- byte AfterTouchDest = EEPROM.read(EEPROM_AFTERTOUCH);
- if (AfterTouchDest == 0) return 0;
- if (AfterTouchDest == 1) return 1;
- return AfterTouchDest; //If EEPROM has no key tracking stored
+float getAfterTouchU() {
+ byte AfterTouchDestU = EEPROM.read(EEPROM_AFTERTOUCH_U);
+ if (AfterTouchDestU == 0) return 0;
+ if (AfterTouchDestU == 1) return 1;
+ return AfterTouchDestU; //If EEPROM has no key tracking stored
 }
 
+float getAfterTouchL() {
+ byte AfterTouchDestL = EEPROM.read(EEPROM_AFTERTOUCH_L);
+ if (AfterTouchDestL == 0) return 0;
+ if (AfterTouchDestL == 1) return 1;
+ return AfterTouchDestL; //If EEPROM has no key tracking stored
+}
 
-void storeAfterTouch(byte AfterTouchDest)
+void storeAfterTouchU(byte AfterTouchDestU)
 {
- EEPROM.update(EEPROM_AFTERTOUCH, AfterTouchDest);
+ EEPROM.update(EEPROM_AFTERTOUCH_U, AfterTouchDestU);
+}
+
+void storeAfterTouchL(byte AfterTouchDestL)
+{
+ EEPROM.update(EEPROM_AFTERTOUCH_L, AfterTouchDestL);
 }
 
 //int getPitchBendRange() {
@@ -67,37 +82,68 @@ void storeEncoderDir(byte encoderDir)
   EEPROM.update(EEPROM_ENCODER_DIR, encoderDir);
 }
 
-boolean getFilterEnv() {
-  byte fenv = EEPROM.read(EEPROM_FILTERENV); 
+boolean getFilterEnvU() {
+  byte fenv = EEPROM.read(EEPROM_FILTERENV_U); 
   if (fenv < 0 || fenv > 1)return true;
   return fenv == 0 ? false : true;
 }
 
-void storeFilterEnv(byte filterLogLin)
-{
-  EEPROM.update(EEPROM_FILTERENV, filterLogLin);
-  //updateFilterEnv();
+boolean getFilterEnvL() {
+  byte fenv = EEPROM.read(EEPROM_FILTERENV_L); 
+  if (fenv < 0 || fenv > 1)return true;
+  return fenv == 0 ? false : true;
 }
 
-boolean getAmpEnv() {
-  byte aenv = EEPROM.read(EEPROM_AMPENV); 
+void storeFilterEnvU(byte filterLogLinU)
+{
+  EEPROM.update(EEPROM_FILTERENV_U, filterLogLinU);
+}
+
+void storeFilterEnvL(byte filterLogLinL)
+{
+  EEPROM.update(EEPROM_FILTERENV_L, filterLogLinL);
+}
+
+boolean getAmpEnvU() {
+  byte aenv = EEPROM.read(EEPROM_AMPENV_U); 
   if (aenv < 0 || aenv > 1)return true;
   return aenv == 0 ? false : true;
 }
 
-void storeAmpEnv(byte ampLogLin)
-{
-  EEPROM.update(EEPROM_AMPENV, ampLogLin);
-  //updateAmpEnv();
+boolean getAmpEnvL() {
+  byte aenv = EEPROM.read(EEPROM_AMPENV_L); 
+  if (aenv < 0 || aenv > 1)return true;
+  return aenv == 0 ? false : true;
 }
 
-int getLastPatch() {
-  int lastPatchNumber = EEPROM.read(EEPROM_LAST_PATCH);
-  if (lastPatchNumber < 1 || lastPatchNumber > 999) lastPatchNumber = 1;
-  return lastPatchNumber;
+void storeAmpEnvU(byte ampLogLinU)
+{
+  EEPROM.update(EEPROM_AMPENV_U, ampLogLinU);
 }
 
-void storeLastPatch(int lastPatchNumber)
+void storeAmpEnvL(byte ampLogLinL)
 {
-  EEPROM.update(EEPROM_LAST_PATCH, lastPatchNumber);
+  EEPROM.update(EEPROM_AMPENV_L, ampLogLinL);
+}
+
+int getLastPatchU() {
+  int lastPatchNumberU = EEPROM.read(EEPROM_LAST_PATCHU);
+  if (lastPatchNumberU < 1 || lastPatchNumberU > 999) lastPatchNumberU = 1;
+  return lastPatchNumberU;
+}
+
+int getLastPatchL() {
+  int lastPatchNumberL = EEPROM.read(EEPROM_LAST_PATCHL);
+  if (lastPatchNumberL < 1 || lastPatchNumberL > 999) lastPatchNumberL = 1;
+  return lastPatchNumberL;
+}
+
+void storeLastPatchU(int lastPatchNumber)
+{ 
+EEPROM.update(EEPROM_LAST_PATCHU, lastPatchNumber);
+}
+
+void storeLastPatchL(int lastPatchNumber)
+{
+EEPROM.update(EEPROM_LAST_PATCHL, lastPatchNumber);
 }

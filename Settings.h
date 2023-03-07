@@ -1,4 +1,4 @@
-#define SETTINGSOPTIONSNO 6
+#define SETTINGSOPTIONSNO 9
 #define SETTINGSVALUESNO 18  //Maximum number of settings option values needed
 int settingsValueIndex = 0;  //currently selected settings option value index
 
@@ -10,21 +10,27 @@ struct SettingsOption {
 };
 
 void settingsMIDICh(char *value);
-void settingsAfterTouch(char *value);
+void settingsAfterTouchU(char *value);
+void settingsAfterTouchL(char *value);
 //void settingsPitchBend(char * value);
 void settingsModWheelDepth(char *value);
 void settingsEncoderDir(char *value);
-void settingsFilterEnv(char *value);
-void settingsAmpEnv(char *value);
+void settingsFilterEnvU(char *value);
+void settingsFilterEnvL(char *value);
+void settingsAmpEnvU(char *value);
+void settingsAmpEnvL(char *value);
 void settingsHandler(char *s, void (*f)(char *));
 
 int currentIndexMIDICh();
-int currentIndexAfterTouch();
+int currentIndexAfterTouchU();
+int currentIndexAfterTouchL();
 //int currentIndexPitchBend();
 int currentIndexModWheelDepth();
 int currentIndexEncoderDir();
-int currentIndexFilterEnv();
-int currentIndexAmpEnv();
+int currentIndexFilterEnvU();
+int currentIndexFilterEnvL();
+int currentIndexAmpEnvU();
+int currentIndexAmpEnvL();
 int getCurrentIndex(int (*f)());
 
 
@@ -37,12 +43,20 @@ void settingsMIDICh(char *value) {
   storeMidiChannel(midiChannel);
 }
 
-void settingsAfterTouch(char *value) {
-  if (strcmp(value, "Off") == 0) AfterTouchDest = 0;
-  if (strcmp(value, "DCO Mod") == 0) AfterTouchDest = 1;
-  if (strcmp(value, "CutOff Freq") == 0) AfterTouchDest = 2;
-  if (strcmp(value, "VCF Mod") == 0) AfterTouchDest = 3;
-  storeAfterTouch(AfterTouchDest);
+void settingsAfterTouchU(char *value) {
+  if (strcmp(value, "Off") == 0) AfterTouchDestU = 0;
+  if (strcmp(value, "DCO Mod") == 0) AfterTouchDestU = 1;
+  if (strcmp(value, "CutOff Freq") == 0) AfterTouchDestU = 2;
+  if (strcmp(value, "VCF Mod") == 0) AfterTouchDestU = 3;
+  storeAfterTouchU(AfterTouchDestU);
+}
+
+void settingsAfterTouchL(char *value) {
+  if (strcmp(value, "Off") == 0) AfterTouchDestL = 0;
+  if (strcmp(value, "DCO Mod") == 0) AfterTouchDestL = 1;
+  if (strcmp(value, "CutOff Freq") == 0) AfterTouchDestL = 2;
+  if (strcmp(value, "VCF Mod") == 0) AfterTouchDestL = 3;
+  storeAfterTouchL(AfterTouchDestL);
 }
 
 //
@@ -65,24 +79,40 @@ void settingsEncoderDir(char *value) {
   storeEncoderDir(encCW ? 1 : 0);
 }
 
-void settingsFilterEnv(char *value) {
+void settingsFilterEnvU(char *value) {
   if (strcmp(value, "Log") == 0) {
-    filterLogLin = true;
+    filterLogLinU = true;
   } else {
-    filterLogLin = false;
+    filterLogLinU = false;
   }
-  storeFilterEnv(filterLogLin ? 1 : 0);
-  
+  storeFilterEnvU(filterLogLinU ? 1 : 0);
 }
 
-void settingsAmpEnv(char *value) {
+void settingsFilterEnvL(char *value) {
   if (strcmp(value, "Log") == 0) {
-    ampLogLin = true;
+    filterLogLinL = true;
   } else {
-    ampLogLin = false;
+    filterLogLinL = false;
   }
-  storeAmpEnv(ampLogLin ? 1 : 0);
-  
+  storeFilterEnvL(filterLogLinL ? 1 : 0); 
+}
+
+void settingsAmpEnvU(char *value) {
+  if (strcmp(value, "Log") == 0) {
+    ampLogLinU = true;
+  } else {
+    ampLogLinU = false;
+  }
+  storeAmpEnvU(ampLogLinU ? 1 : 0);
+}
+
+void settingsAmpEnvL(char *value) {
+  if (strcmp(value, "Log") == 0) {
+    ampLogLinL = true;
+  } else {
+    ampLogLinL = false;
+  }
+  storeAmpEnvL(ampLogLinL ? 1 : 0);
 }
 
 //Takes a pointer to a specific method for the settings option and invokes it.
@@ -94,8 +124,12 @@ int currentIndexMIDICh() {
   return getMIDIChannel();
 }
 
-int currentIndexAfterTouch() {
-  return getAfterTouch();
+int currentIndexAfterTouchU() {
+  return getAfterTouchU();
+}
+
+int currentIndexAfterTouchL() {
+  return getAfterTouchL();
 }
 
 //
@@ -111,12 +145,20 @@ int currentIndexEncoderDir() {
   return getEncoderDir() ? 0 : 1;
 }
 
-int currentIndexFilterEnv() {
-  return getFilterEnv() ? 0 : 1;
+int currentIndexFilterEnvU() {
+  return getFilterEnvU() ? 0 : 1;
 }
 
-int currentIndexAmpEnv() {
-  return getAmpEnv() ? 0 : 1;
+int currentIndexFilterEnvL() {
+  return getFilterEnvL() ? 0 : 1;
+}
+
+int currentIndexAmpEnvU() {
+  return getAmpEnvU() ? 0 : 1;
+}
+
+int currentIndexAmpEnvL() {
+  return getAmpEnvL() ? 0 : 1;
 }
 
 //Takes a pointer to a specific method for the current settings option value and invokes it.
@@ -129,10 +171,13 @@ CircularBuffer<SettingsOption, SETTINGSOPTIONSNO> settingsOptions;
 // add settings to the circular buffer
 void setUpSettings() {
   settingsOptions.push(SettingsOption{ "MIDI Ch.", { "All", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", '\0' }, settingsMIDICh, currentIndexMIDICh });
-  settingsOptions.push(SettingsOption{ "AfterTouch.", { "Off", "DCO Mod", "CutOff Freq", "VCF Mod", '\0' }, settingsAfterTouch, currentIndexAfterTouch });
+  settingsOptions.push(SettingsOption{ "AfterTouch U", { "Off", "DCO Mod", "CutOff Freq", "VCF Mod", '\0' }, settingsAfterTouchU, currentIndexAfterTouchU });
+  settingsOptions.push(SettingsOption{ "AfterTouch L", { "Off", "DCO Mod", "CutOff Freq", "VCF Mod", '\0' }, settingsAfterTouchL, currentIndexAfterTouchL });
   //  settingsOptions.push(SettingsOption{"Pitch Bend", {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", '\0'}, settingsPitchBend, currentIndexPitchBend});
   settingsOptions.push(SettingsOption{ "MW Depth", { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", '\0' }, settingsModWheelDepth, currentIndexModWheelDepth });
   settingsOptions.push(SettingsOption{ "Encoder", { "Type 1", "Type 2", '\0' }, settingsEncoderDir, currentIndexEncoderDir });
-  settingsOptions.push(SettingsOption{ "Filter Env", { "Log", "Lin", '\0' }, settingsFilterEnv, currentIndexFilterEnv });
-  settingsOptions.push(SettingsOption{ "Amplifier Env", { "Log", "Lin", '\0' }, settingsAmpEnv, currentIndexAmpEnv });
+  settingsOptions.push(SettingsOption{ "Filter Env U", { "Log", "Lin", '\0' }, settingsFilterEnvU, currentIndexFilterEnvU });
+  settingsOptions.push(SettingsOption{ "Filter Env L", { "Log", "Lin", '\0' }, settingsFilterEnvL, currentIndexFilterEnvL });
+  settingsOptions.push(SettingsOption{ "Amp Env U", { "Log", "Lin", '\0' }, settingsAmpEnvU, currentIndexAmpEnvU });
+  settingsOptions.push(SettingsOption{ "Amp Env L", { "Log", "Lin", '\0' }, settingsAmpEnvL, currentIndexAmpEnvL });
 }

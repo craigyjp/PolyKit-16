@@ -5,7 +5,7 @@ String patchNameL = INITPATCHNAME;
 String patchName = INITPATCHNAME;
 
 boolean encCW = true;//This is to set the encoder to increment when turned CW - Settings Option
-
+boolean announce = true;
 // polykit parameters in order of mux
 
 float pwLFO = 0;
@@ -196,9 +196,15 @@ float keytrackL = 0;
 float keytrackstr = 0;
 
 int PitchBendLevel = 0;
+int PitchBendLevelU = 0;
+int PitchBendLevelL = 0;
 int PitchBendLevelstr = 0; // for display
 int modWheelDepth = 0;
+int modWheelDepthU = 0;
+int modWheelDepthL = 0;
 float modWheelLevel = 0;
+float modWheelLevelU = 0;
+float modWheelLevelL = 0;
 float modWheelLevelstr = 0;
 
 int glideSW = 0;
@@ -223,6 +229,8 @@ int lfoAlt = 0;
 int lfoAltU = 0;
 int lfoAltL = 0;
 int monoMulti = 0;
+int monoMultiU = 0;
+int monoMultiL = 0;
 int filterPoleSWU = 0;
 int filterPoleSWL = 0;
 int filterPoleSW = 0;
@@ -244,7 +252,13 @@ int ampLogLinU = 0;
 int ampLogLinL = 0;
 
 int linLog = 0;
+int linLogU = 0;
+int linLogL = 0;
 float afterTouch = 0;
+float afterTouchU = 0;
+float afterTouchL = 0;
 int AfterTouchDest = 0;
+int AfterTouchDestU = 0;
+int AfterTouchDestL = 0;
 
 int returnvalue = 0;

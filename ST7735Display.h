@@ -97,7 +97,6 @@ void renderCurrentPatchPage() {
   tft.setTextColor(ST7735_WHITE);
   tft.println(currentPatchNameU);
 
-  //tft.fillScreen(ST7735_BLACK);
   tft.setFont(&FreeSansBold18pt7b);
   tft.setCursor(5, 97);
   tft.setTextColor(ST7735_YELLOW);
@@ -110,7 +109,6 @@ void renderCurrentPatchPage() {
 
   tft.setTextColor(ST7735_BLACK);
   tft.setFont(&Org_01);
-
   tft.drawFastHLine(10, 65, tft.width() - 20, ST7735_RED);
   tft.setFont(&FreeSans12pt7b);
   tft.setTextColor(ST7735_YELLOW);
@@ -119,59 +117,91 @@ void renderCurrentPatchPage() {
   tft.println(currentPatchNameL);
 }
 
-void renderPulseWidth(float value) {
-  tft.drawFastHLine(108, 74, 15 + (value * 13), ST7735_CYAN);
-  tft.drawFastVLine(123 + (value * 13), 74, 20, ST7735_CYAN);
-  tft.drawFastHLine(123 + (value * 13), 94, 16 - (value * 13), ST7735_CYAN);
-  if (value < 0) {
-    tft.drawFastVLine(108, 74, 21, ST7735_CYAN);
-  } else {
-    tft.drawFastVLine(138, 74, 21, ST7735_CYAN);
-  }
-}
-
-void renderVarTriangle(float value) {
-  tft.drawLine(110, 94, 123 + (value * 13), 74, ST7735_CYAN);
-  tft.drawLine(123 + (value * 13), 74, 136, 94, ST7735_CYAN);
-}
-
 void renderEnv(float att, float dec, float sus, float rel) {
-  tft.drawLine(100, 94, 100 + (att * 60), 74, ST7735_CYAN);
-  tft.drawLine(100 + (att * 60), 74.0, 100 + ((att + dec) * 60), 94 - (sus / 52), ST7735_CYAN);
-  tft.drawFastHLine(100 + ((att + dec) * 60), 94 - (sus / 52), 40 - ((att + dec) * 60), ST7735_CYAN);
-  tft.drawLine(139, 94 - (sus / 52), 139 + (rel * 60), 94, ST7735_CYAN);
-  //  tft.drawLine(100, 94, 100 + (att * 15), 74, ST7735_CYAN);
-  //  tft.drawLine(100 + (att * 15), 74.0, 100 + ((att + dec) * 15), 94 - (sus / 52), ST7735_CYAN);
-  //  tft.drawFastHLine(100 + ((att + dec) * 15 ), 94 - (sus / 52), 40 - ((att + dec) * 15), ST7735_CYAN);
-  //  tft.drawLine(139, 94 - (sus / 52), 139 + (rel * 15), 94, ST7735_CYAN);
+  if (upperSW) {
+    tft.drawLine(100, 94, 100 + (att * 60), 74, ST7735_CYAN);
+    tft.drawLine(100 + (att * 60), 74.0, 100 + ((att + dec) * 60), 94 - (sus / 52), ST7735_CYAN);
+    tft.drawFastHLine(100 + ((att + dec) * 60), 94 - (sus / 52), 40 - ((att + dec) * 60), ST7735_CYAN);
+    tft.drawLine(139, 94 - (sus / 52), 139 + (rel * 60), 94, ST7735_CYAN);
+  } else {
+    tft.drawLine(100, 94, 100 + (att * 60), 74, ST7735_CYAN);
+    tft.drawLine(100 + (att * 60), 74.0, 100 + ((att + dec) * 60), 94 - (sus / 52), ST7735_CYAN);
+    tft.drawFastHLine(100 + ((att + dec) * 60), 94 - (sus / 52), 40 - ((att + dec) * 60), ST7735_CYAN);
+    tft.drawLine(139, 94 - (sus / 52), 139 + (rel * 60), 94, ST7735_CYAN);
+  }
 }
 
 void renderCurrentParameterPage() {
   switch (state) {
     case PARAMETER:
-      tft.fillScreen(ST7735_BLACK);
-      tft.setFont(&FreeSans12pt7b);
-      tft.setCursor(0, 53);
-      tft.setTextColor(ST7735_YELLOW);
-      tft.setTextSize(1);
-      tft.println(currentParameter);
-      tft.drawFastHLine(10, 62, tft.width() - 20, ST7735_RED);
-      tft.setCursor(1, 90);
-      tft.setTextColor(ST7735_WHITE);
-      tft.println(currentValue);
-      switch (paramType) {
-        case PULSE:
-          renderPulseWidth(currentFloatValue);
-          break;
-        case VAR_TRI:
-          renderVarTriangle(currentFloatValue);
-          break;
-        case FILTER_ENV:
-          renderEnv(filterAttack * 0.0001, filterDecay * 0.0001, filterSustain, filterRelease * 0.0001);
-          break;
-        case AMP_ENV:
-          renderEnv(ampAttack * 0.0001, ampDecay * 0.0001, ampSustain, ampRelease * 0.0001);
-          break;
+      if (upperSW) {
+        tft.fillScreen(ST7735_BLACK);
+        tft.setFont(&FreeSans12pt7b);
+        tft.setCursor(0, 29);
+        tft.setTextColor(ST7735_YELLOW);
+        tft.setTextSize(1);
+        tft.println(currentParameter);
+        tft.drawFastHLine(10, 65, tft.width() - 20, ST7735_RED);
+        tft.setCursor(1, 57);
+        tft.setTextColor(ST7735_WHITE);
+        tft.println(currentValue);
+        // lower patch
+        tft.setFont(&FreeSansBold18pt7b);
+        tft.setCursor(5, 97);
+        tft.setTextColor(ST7735_YELLOW);
+        tft.setTextSize(1);
+        tft.println(currentPgmNumL);
+        tft.setCursor(80, 87);
+        tft.setFont(&FreeSans12pt7b);
+        tft.setTextSize(1);
+        tft.println("Lower");
+        tft.setFont(&FreeSans12pt7b);
+        tft.setTextColor(ST7735_YELLOW);
+        tft.setCursor(1, 125);
+        tft.setTextColor(ST7735_WHITE);
+        tft.println(currentPatchNameL);
+        switch (paramType) {
+          case FILTER_ENV:
+            renderEnv(filterAttackU * 0.0001, filterDecayU * 0.0001, filterSustainU, filterReleaseU * 0.0001);
+            break;
+          case AMP_ENV:
+            renderEnv(ampAttackU * 0.0001, ampDecayU * 0.0001, ampSustainU, ampReleaseU * 0.0001);
+            break;
+        }
+      } else {
+        tft.fillScreen(ST7735_BLACK);
+        tft.setFont(&FreeSans12pt7b);
+        tft.setCursor(0, 97);
+        tft.setTextColor(ST7735_YELLOW);
+        tft.setTextSize(1);
+        tft.println(currentParameter);
+        tft.drawFastHLine(10, 65, tft.width() - 20, ST7735_RED);
+        tft.setCursor(1, 125);
+        tft.setTextColor(ST7735_WHITE);
+        tft.println(currentValue);
+        // upper patch
+        tft.setFont(&FreeSansBold18pt7b);
+        tft.setCursor(5, 29);
+        tft.setTextColor(ST7735_YELLOW);
+        tft.setTextSize(1);
+        tft.println(currentPgmNumU);
+        tft.setCursor(80, 19);
+        tft.setFont(&FreeSans12pt7b);
+        tft.setTextSize(1);
+        tft.println("Upper");
+        tft.setFont(&FreeSans12pt7b);
+        tft.setTextColor(ST7735_YELLOW);
+        tft.setCursor(1, 57);
+        tft.setTextColor(ST7735_WHITE);
+        tft.println(currentPatchNameU);
+        switch (paramType) {
+          case FILTER_ENV:
+            renderEnv(filterAttackL * 0.0001, filterDecayL * 0.0001, filterSustainL, filterReleaseL * 0.0001);
+            break;
+          case AMP_ENV:
+            renderEnv(ampAttackL * 0.0001, ampDecayL * 0.0001, ampSustainL, ampReleaseL * 0.0001);
+            break;
+        }
       }
       break;
   }
