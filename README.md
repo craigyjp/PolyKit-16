@@ -15,13 +15,15 @@ This repository contains my versions of the filter/adsr/lfo with added velocity,
 - Multipole filters based on the Oberheim Matrix 12. 
 - Dual LFOs for PWM and main synth, main LFO 16 waveforms, PWM LFO Sinewave only.
 - 16 voice polyphonic dual DCOs per voice.
+- Whole, Dual and Split modes of operation
 - Aftertouch control over DCO LFO depth, filter LFO depth or filter cutoff.
 - Log and lin envelopes.
 - Looping envelopes.
 - Velocity sensitivity for filters and amplifiers.
 - Analogue chorus similar to Juno 60.
 - 999 memory locations to store patches.
-- MIDI in/out/thru - channels 1-10 only.
+- MIDI in/out/thru - channels 1-16
+- USB MIDI
 
 - How it sounds...
 
@@ -29,7 +31,7 @@ https://youtu.be/yFFuoJo9930
 
 ## Things to fix/improve
 
-- MIDI channel should be set by the programmer, currently the midi router on the rear can change the midi channel.
+- Initial startup can cause issues in stack more and 32 foot mode, need to fix
 
 ## The source of the inspiration for these modifications and acknowledgements
 
@@ -51,4 +53,4 @@ https://github.com/craigyjp/Pico-DCO-DAC
 
 https://github.com/craigyjp/3x3-Midi-Merge-Arduino-Mega
 
-TC Electronics June-60 Chorus
+TC Electronics June-60 Chorus V2
