@@ -50,6 +50,36 @@ unsigned int state = PARAMETER;
 
 boolean cardStatus = false;
 
+struct VoiceAndNote {
+  int note;
+  int velocity;
+  long timeOn;
+};
+
+struct VoiceAndNote voices[NO_OF_VOICES] = {
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 },
+  { -1, -1, 0 }
+};
+
+boolean voiceOn[NO_OF_VOICES] = { false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false };
+int prevNote = 0;  //Initialised to middle value
+bool notes[88] = { 0 }, initial_loop = 1;
+int8_t noteOrder[80] = { 0 }, orderIndx = { 0 };
+
 //USB HOST MIDI Class Compliant
 USBHost myusb;
 USBHub hub1(myusb);
@@ -123,6 +153,9 @@ void setup() {
   usbMIDI.setHandleControlChange(myControlChange);
   usbMIDI.setHandleProgramChange(myProgramChange);
   usbMIDI.setHandleAfterTouchChannel(myAfterTouch);
+  usbMIDI.setHandlePitchChange(DinHandlePitchBend);
+  usbMIDI.setHandleNoteOn(DinHandleNoteOn);
+  usbMIDI.setHandleNoteOff(DinHandleNoteOff);
   Serial.println("USB Client MIDI Listening");
 
   //MIDI 5 Pin DIN
@@ -130,6 +163,9 @@ void setup() {
   MIDI.setHandleControlChange(myControlChange);
   MIDI.setHandleProgramChange(myProgramChange);
   MIDI.setHandleAfterTouchChannel(myAfterTouch);
+  MIDI.setHandlePitchBend(DinHandlePitchBend);
+  MIDI.setHandleNoteOn(DinHandleNoteOn);
+  MIDI.setHandleNoteOff(DinHandleNoteOff);
   MIDI.turnThruOn(midi::Thru::Mode::Off);
   Serial.println("MIDI In DIN Listening");
 
@@ -139,10 +175,17 @@ void setup() {
   if (AfterTouchDestU < 0 || AfterTouchDestU > 3) {
     storeAfterTouchU(0);
   }
+
   AfterTouchDestL = getAfterTouchL();
   if (AfterTouchDestL < 0 || AfterTouchDestL > 3) {
     storeAfterTouchL(0);
   }
+
+  splitPoint = getSplitPoint();
+  if (splitPoint < 36 || splitPoint > 72) {
+    storeSplitPoint(48);
+  }
+
   //Read Pitch Bend Range from EEPROM
   //pitchBendRange = getPitchBendRange();
 
@@ -165,6 +208,7 @@ void setup() {
   recallPatch(patchNoU);
   upperSW = 0;
   recallPatch(patchNoL);  //Load first patch
+  updatewholemode();
 
   //  reinitialiseToPanel();
 }
@@ -182,6 +226,287 @@ void setup() {
 //   digitalWrite(dacpin, HIGH);
 //   SPI.endTransaction();
 // }
+
+void DinHandleNoteOn(byte channel, byte note, byte velocity) {
+  if (wholemode) {
+    //Check for out of range notes
+    if (note < 0 || note > 127) return;
+    switch (getVoiceNo(-1)) {
+      case 1:
+        voices[0].note = note;
+        voices[0].velocity = velocity;
+        voices[0].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 1);
+        voiceOn[0] = true;
+        break;
+      case 2:
+        voices[1].note = note;
+        voices[1].velocity = velocity;
+        voices[1].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 2);
+        voiceOn[1] = true;
+        break;
+      case 3:
+        voices[2].note = note;
+        voices[2].velocity = velocity;
+        voices[2].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 1);
+        voiceOn[2] = true;
+        break;
+      case 4:
+        voices[3].note = note;
+        voices[3].velocity = velocity;
+        voices[3].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 2);
+        voiceOn[3] = true;
+        break;
+      case 5:
+        voices[4].note = note;
+        voices[4].velocity = velocity;
+        voices[4].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 1);
+        voiceOn[4] = true;
+        break;
+      case 6:
+        voices[5].note = note;
+        voices[5].velocity = velocity;
+        voices[5].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 2);
+        voiceOn[5] = true;
+        break;
+      case 7:
+        voices[6].note = note;
+        voices[6].velocity = velocity;
+        voices[6].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 1);
+        voiceOn[6] = true;
+        break;
+      case 8:
+        voices[7].note = note;
+        voices[7].velocity = velocity;
+        voices[7].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 2);
+        voiceOn[7] = true;
+        break;
+      case 9:
+        voices[8].note = note;
+        voices[8].velocity = velocity;
+        voices[8].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 1);
+        voiceOn[8] = true;
+        break;
+      case 10:
+        voices[9].note = note;
+        voices[9].velocity = velocity;
+        voices[9].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 2);
+        voiceOn[9] = true;
+        break;
+      case 11:
+        voices[10].note = note;
+        voices[10].velocity = velocity;
+        voices[10].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 1);
+        voiceOn[10] = true;
+        break;
+      case 12:
+        voices[11].note = note;
+        voices[11].velocity = velocity;
+        voices[11].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 2);
+        voiceOn[11] = true;
+        break;
+      case 13:
+        voices[12].note = note;
+        voices[12].velocity = velocity;
+        voices[12].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 1);
+        voiceOn[12] = true;
+        break;
+      case 14:
+        voices[13].note = note;
+        voices[13].velocity = velocity;
+        voices[13].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 2);
+        voiceOn[13] = true;
+        break;
+      case 15:
+        voices[14].note = note;
+        voices[14].velocity = velocity;
+        voices[14].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 1);
+        voiceOn[14] = true;
+        break;
+      case 16:
+        voices[15].note = note;
+        voices[15].velocity = velocity;
+        voices[15].timeOn = millis();
+        MIDI.sendNoteOn(note, velocity, 2);
+        voiceOn[15] = true;
+        break;
+    }
+  }
+  if (dualmode) {
+    MIDI.sendNoteOn(note, velocity, 1);
+    MIDI.sendNoteOn(note, velocity, 2);
+  }
+  if (splitmode) {
+    if (note < splitPoint) {
+      MIDI.sendNoteOn(note, velocity, 1);
+    } else {
+      MIDI.sendNoteOn(note, velocity, 2);
+    }
+  }
+}
+
+void DinHandleNoteOff(byte channel, byte note, byte velocity) {
+  if (wholemode) {
+    switch (getVoiceNo(note)) {
+      case 1:
+        MIDI.sendNoteOff(note, velocity, 1);
+        voices[0].note = -1;
+        voiceOn[0] = false;
+        break;
+      case 2:
+        MIDI.sendNoteOff(note, velocity, 2);
+        voices[1].note = -1;
+        voiceOn[1] = false;
+        break;
+      case 3:
+        MIDI.sendNoteOff(note, velocity, 1);
+        voices[2].note = -1;
+        voiceOn[2] = false;
+        break;
+      case 4:
+        MIDI.sendNoteOff(note, velocity, 2);
+        voices[3].note = -1;
+        voiceOn[3] = false;
+        break;
+      case 5:
+        MIDI.sendNoteOff(note, velocity, 1);
+        voices[4].note = -1;
+        voiceOn[4] = false;
+        break;
+      case 6:
+        MIDI.sendNoteOff(note, velocity, 2);
+        voices[5].note = -1;
+        voiceOn[5] = false;
+        break;
+      case 7:
+        MIDI.sendNoteOff(note, velocity, 1);
+        voices[6].note = -1;
+        voiceOn[6] = false;
+        break;
+      case 8:
+        MIDI.sendNoteOff(note, velocity, 2);
+        voices[7].note = -1;
+        voiceOn[7] = false;
+        break;
+      case 9:
+        MIDI.sendNoteOff(note, velocity, 1);
+        voices[8].note = -1;
+        voiceOn[8] = false;
+        break;
+      case 10:
+        MIDI.sendNoteOff(note, velocity, 2);
+        voices[9].note = -1;
+        voiceOn[9] = false;
+        break;
+      case 11:
+        MIDI.sendNoteOff(note, velocity, 1);
+        voices[10].note = -1;
+        voiceOn[10] = false;
+        break;
+      case 12:
+        MIDI.sendNoteOff(note, velocity, 2);
+        voices[11].note = -1;
+        voiceOn[11] = false;
+        break;
+      case 13:
+        MIDI.sendNoteOff(note, velocity, 1);
+        voices[12].note = -1;
+        voiceOn[12] = false;
+        break;
+      case 14:
+        MIDI.sendNoteOff(note, velocity, 2);
+        voices[13].note = -1;
+        voiceOn[13] = false;
+        break;
+      case 15:
+        MIDI.sendNoteOff(note, velocity, 1);
+        voices[14].note = -1;
+        voiceOn[14] = false;
+        break;
+      case 16:
+        MIDI.sendNoteOff(note, velocity, 2);
+        voices[15].note = -1;
+        voiceOn[15] = false;
+        break;
+    }
+  }
+  if (dualmode) {
+    MIDI.sendNoteOff(note, velocity, 1);
+    MIDI.sendNoteOff(note, velocity, 2);
+  }
+  if (splitmode) {
+    if (note < splitPoint) {
+      MIDI.sendNoteOff(note, velocity, 1);
+    } else {
+      MIDI.sendNoteOff(note, velocity, 2);
+    }
+  }
+}
+
+int getVoiceNo(int note) {
+  voiceToReturn = -1;       //Initialise to 'null'
+  earliestTime = millis();  //Initialise to now
+  if (note == -1) {
+    //NoteOn() - Get the oldest free voice (recent voices may be still on release stage)
+    for (int i = 0; i < NO_OF_VOICES; i++) {
+      if (voices[i].note == -1) {
+        if (voices[i].timeOn < earliestTime) {
+          earliestTime = voices[i].timeOn;
+          voiceToReturn = i;
+        }
+      }
+    }
+    if (voiceToReturn == -1) {
+      //No free voices, need to steal oldest sounding voice
+      earliestTime = millis();  //Reinitialise
+      for (int i = 0; i < NO_OF_VOICES; i++) {
+        if (voices[i].timeOn < earliestTime) {
+          earliestTime = voices[i].timeOn;
+          voiceToReturn = i;
+        }
+      }
+    }
+    return voiceToReturn + 1;
+  } else {
+    //NoteOff() - Get voice number from note
+    for (int i = 0; i < NO_OF_VOICES; i++) {
+      if (voices[i].note == note) {
+        return i + 1;
+      }
+    }
+  }
+  //Shouldn't get here, return voice 1
+  return 1;
+}
+
+void DinHandlePitchBend(byte channel, byte pitch) {
+  if (wholemode) {
+    MIDI.sendPitchBend(pitch, 1);
+    MIDI.sendPitchBend(pitch, 2);
+  }
+  if (dualmode) {
+    MIDI.sendPitchBend(pitch, 1);
+    MIDI.sendPitchBend(pitch, 2);
+  }
+  if (splitmode) {
+    MIDI.sendPitchBend(pitch, 1);
+    MIDI.sendPitchBend(pitch, 2);
+  }
+}
 
 void allNotesOff() {
 }
@@ -1075,15 +1400,52 @@ void updatelfoAlt(boolean announce) {
 }
 
 void updateupperLower() {
-  if (upperSW == 0) {
-    sr.set(UPPER_LED, LOW);  // LED off
-    srp.set(UPPER2, HIGH);
-    setAllButtons();
+  if (!wholemode) {
+    if (upperSW) {
+      // upper mode upperSW will be true
+      sr.set(UPPER_LED, HIGH);  // LED off
+      srp.set(UPPER2, LOW);
+      setAllButtons();
+    } else {
+      // lower mode upperSW will be false
+      sr.set(UPPER_LED, LOW);  // LED off
+      srp.set(UPPER2, HIGH);
+      setAllButtons();
+    }
   } else {
-    sr.set(UPPER_LED, HIGH);  // LED off
-    srp.set(UPPER2, LOW);
-    setAllButtons();
+    upperSW = 0;
   }
+}
+
+void updatewholemode() {
+  showCurrentParameterPage("Mode", String("Whole"));
+  sr.set(WHOLE_LED, HIGH);  // LED off
+  sr.set(DUAL_LED, LOW);    // LED off
+  sr.set(SPLIT_LED, LOW);   // LED off
+  sr.set(UPPER_LED, LOW);   // LED off
+  srp.set(UPPER2, HIGH);
+  upperSW = 0;
+  setAllButtons();
+  dualmode = 0;
+  splitmode = 0;
+}
+
+void updatedualmode() {
+  showCurrentParameterPage("Mode", String("Dual"));
+  sr.set(DUAL_LED, HIGH);  // LED off
+  sr.set(WHOLE_LED, LOW);  // LED off
+  sr.set(SPLIT_LED, LOW);  // LED off
+  wholemode = 0;
+  splitmode = 0;
+}
+
+void updatesplitmode() {
+  showCurrentParameterPage("Mode", String("Split"));
+  sr.set(SPLIT_LED, HIGH);  // LED off
+  sr.set(WHOLE_LED, LOW);   // LED off
+  sr.set(DUAL_LED, LOW);    // LED off
+  wholemode = 0;
+  dualmode = 0;
 }
 
 void updatechorus1(boolean announce) {
@@ -1159,29 +1521,29 @@ void updatechorus2(boolean announce) {
 }
 
 void updateFilterEnv(boolean announce) {
-    if (filterLogLinU == 0) {
-      srp.set(FILTER_LIN_LOG_UPPER, HIGH);
-    } else {
-      srp.set(FILTER_LIN_LOG_UPPER, LOW);
-    }
-    if (filterLogLinL == 0) {
-      srp.set(FILTER_LIN_LOG_LOWER, HIGH);
-    } else {
-      srp.set(FILTER_LIN_LOG_LOWER, LOW);
-    }
+  if (filterLogLinU == 0) {
+    srp.set(FILTER_LIN_LOG_UPPER, HIGH);
+  } else {
+    srp.set(FILTER_LIN_LOG_UPPER, LOW);
+  }
+  if (filterLogLinL == 0) {
+    srp.set(FILTER_LIN_LOG_LOWER, HIGH);
+  } else {
+    srp.set(FILTER_LIN_LOG_LOWER, LOW);
+  }
 }
 
 void updateAmpEnv(boolean announce) {
-    if (ampLogLinU == 0) {
-      srp.set(AMP_LIN_LOG_UPPER, LOW);
-    } else {
-      srp.set(AMP_LIN_LOG_UPPER, HIGH);
-    }
-    if (ampLogLinL == 0) {
-      srp.set(AMP_LIN_LOG_LOWER, LOW);
-    } else {
-      srp.set(AMP_LIN_LOG_LOWER, HIGH);
-    }
+  if (ampLogLinU == 0) {
+    srp.set(AMP_LIN_LOG_UPPER, LOW);
+  } else {
+    srp.set(AMP_LIN_LOG_UPPER, HIGH);
+  }
+  if (ampLogLinL == 0) {
+    srp.set(AMP_LIN_LOG_LOWER, LOW);
+  } else {
+    srp.set(AMP_LIN_LOG_LOWER, HIGH);
+  }
 }
 
 void updateMonoMulti(boolean announce) {
@@ -1696,28 +2058,32 @@ void myControlChange(byte channel, byte control, int value) {
       updatechorus2(1);
       break;
 
+    case CCwholemode:
+      wholemode = 1;
+      updatewholemode();
+      break;
+
+    case CCdualmode:
+      dualmode = 1;
+      updatedualmode();
+      break;
+
+    case CCsplitmode:
+      splitmode = 1;
+      updatesplitmode();
+      break;
+
+
     case CCmonoMulti:
       value > 0 ? monoMulti = 1 : monoMulti = 0;
       updateMonoMulti(1);
       break;
 
-    case CCPBDepth:
-      PitchBendLevel = value;
-      PitchBendLevelstr = PITCHBEND[value / midioutfrig];  // for display
-      updatePitchBend();
-      break;
-
-    case CCPitchBend:
-      PitchBendLevel = value;
-      PitchBendLevelstr = PITCHBEND[value / midioutfrig];  // for display
-      updatePitchBend();
-      break;
-
-    case CCMWDepth:
-      PitchBendLevel = value;
-      PitchBendLevelstr = PITCHBEND[value / midioutfrig];  // for display
-      //updatePitchBend();
-      break;
+      // case CCPBDepth:
+      //   PitchBendLevel = value;
+      //   PitchBendLevelstr = PITCHBEND[value / midioutfrig];  // for display
+      //   updatePitchBend();
+      //   break;
 
     case CClfoAlt:
       if (upperSW) {
@@ -1735,75 +2101,65 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CCmodwheel:
       switch (modWheelDepth) {
-        //   case 1:
-        //     modWheelLevel = ((value) / 5);
-        //     fmDepth = (int(modWheelLevel));
-        //     //          Serial.print("ModWheel Depth ");
-        //     //          Serial.println(modWheelLevel);
-        //     break;
+        case 1:
+          modWheelLevel = ((value) / 5);
+          fmDepthU = (int(modWheelLevel * 32.24));
+          fmDepthL = (int(modWheelLevel * 32.24));
+          break;
 
-        //   case 2:
-        //     modWheelLevel = ((value) / 4);
-        //     fmDepth = (int(modWheelLevel));
-        //     //          Serial.print("ModWheel Depth ");
-        //     //          Serial.println(modWheelLevel);
-        //     break;
+        case 2:
+          modWheelLevel = ((value) / 4);
+          fmDepthU = (int(modWheelLevel * 32.24));
+          fmDepthL = (int(modWheelLevel * 32.24));
+          break;
 
-        //   case 3:
-        //     modWheelLevel = ((value) / 3.5);
-        //     fmDepth = (int(modWheelLevel));
-        //     //          Serial.print("ModWheel Depth ");
-        //     //          Serial.println(modWheelLevel);
-        //     break;
+        case 3:
+          modWheelLevel = ((value) / 3.5);
+          fmDepthU = (int(modWheelLevel * 32.24));
+          fmDepthL = (int(modWheelLevel * 32.24));
+          break;
 
-        //   case 4:
-        //     modWheelLevel = ((value) / 3);
-        //     fmDepth = (int(modWheelLevel));
-        //     //          Serial.print("ModWheel Depth ");
-        //     //          Serial.println(modWheelLevel);
-        //     break;
+        case 4:
+          modWheelLevel = ((value) / 3);
+          fmDepthU = (int(modWheelLevel * 32.24));
+          fmDepthL = (int(modWheelLevel * 32.24));
+          break;
 
-        //   case 5:
-        //     modWheelLevel = ((value) / 2.5);
-        //     fmDepth = (int(modWheelLevel));
-        //     //          Serial.print("ModWheel Depth ");
-        //     //          Serial.println(modWheelLevel);
-        //     break;
+        case 5:
+          modWheelLevel = ((value) / 2.5);
+          fmDepthU = (int(modWheelLevel * 32.24));
+          fmDepthL = (int(modWheelLevel * 32.24));
+          break;
 
-        //   case 6:
-        //     modWheelLevel = ((value) / 2);
-        //     fmDepth = (int(modWheelLevel));
-        //     //          Serial.print("ModWheel Depth ");
-        //     //          Serial.println(modWheelLevel);
-        //     break;
+        case 6:
+          modWheelLevel = ((value) / 2);
+          fmDepthU = (int(modWheelLevel * 32.24));
+          fmDepthL = (int(modWheelLevel * 32.24));
+          break;
 
-        //   case 7:
-        //     modWheelLevel = ((value) / 1.75);
-        //     fmDepth = (int(modWheelLevel));
-        //     //          Serial.print("ModWheel Depth ");
-        //     //          Serial.println(modWheelLevel);
-        //     break;
+        case 7:
+          modWheelLevel = ((value) / 1.75);
+          fmDepthU = (int(modWheelLevel * 32.24));
+          fmDepthL = (int(modWheelLevel * 32.24));
+          break;
 
-        //   case 8:
-        //     modWheelLevel = ((value) / 1.5);
-        //     fmDepth = (int(modWheelLevel));
-        //     //          Serial.print("ModWheel Depth ");
-        //     //          Serial.println(modWheelLevel);
-        //     break;
+        case 8:
+          modWheelLevel = ((value) / 1.5);
+          fmDepthU = (int(modWheelLevel * 32.24));
+          fmDepthL = (int(modWheelLevel * 32.24));
+          break;
 
-        //   case 9:
-        //     modWheelLevel = ((value) / 1.25);
-        //     fmDepth = (int(modWheelLevel));
-        //     //          Serial.print("ModWheel Depth ");
-        //     //          Serial.println(modWheelLevel);
-        //     break;
+        case 9:
+          modWheelLevel = ((value) / 1.25);
+          fmDepthU = (int(modWheelLevel * 32.24));
+          fmDepthL = (int(modWheelLevel * 32.24));
+          break;
 
-        //   case 10:
-        //     modWheelLevel = (value);
-        //     fmDepth = (int(modWheelLevel));
-        //     //          Serial.print("ModWheel Depth ");
-        //     //          Serial.println(modWheelLevel);
-        //     break;
+        case 10:
+          modWheelLevel = (value);
+          fmDepthU = (int(modWheelLevel * 32.24));
+          fmDepthL = (int(modWheelLevel * 32.24));
+          break;
       }
       break;
 
@@ -1823,14 +2179,14 @@ void myProgramChange(byte channel, byte program) {
 }
 
 void myAfterTouch(byte channel, byte value) {
-  afterTouch = (value * 8);
+  afterTouch = int(value * 32.24);
   switch (AfterTouchDestU) {
     case 1:
       fmDepthU = (int(afterTouch));
       break;
     case 2:
-      filterCutoffU = (filterCutoffU + (int(afterTouch)));
-      if (int(afterTouch) <= 8) {
+      filterCutoffU = (filterCutoffU + afterTouch);
+      if (afterTouch <= 65) {
         filterCutoffU = oldfilterCutoffU;
       }
       break;
@@ -1843,8 +2199,8 @@ void myAfterTouch(byte channel, byte value) {
       fmDepthL = (int(afterTouch));
       break;
     case 2:
-      filterCutoffL = (filterCutoffL + (int(afterTouch)));
-      if (int(afterTouch) <= 8) {
+      filterCutoffL = (filterCutoffL + afterTouch);
+      if (afterTouch <= 65) {
         filterCutoffL = oldfilterCutoffL;
       }
       break;
@@ -1866,8 +2222,10 @@ void recallPatch(int patchNo) {
     patchFile.close();
     if (upperSW) {
       storeLastPatchU(patchNoU);
+      upperpatchtag = patchNoU;
     } else {
       storeLastPatchL(patchNoL);
+      lowerpatchtag = patchNoL;
     }
   }
 }
@@ -2073,15 +2431,12 @@ void checkMux() {
 
   if (mux1Read > (mux1ValuesPrev[muxInput] + QUANTISE_FACTOR) || mux1Read < (mux1ValuesPrev[muxInput] - QUANTISE_FACTOR)) {
     mux1ValuesPrev[muxInput] = mux1Read;
-    //    mux1Read = (mux1Read >> 3); //Change range to 0-127
     switch (muxInput) {
       case MUX1_osc1PW:
         midiCCOut(CCosc1PW, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc1PW, mux1Read);
         break;
-      case MUX1_MWDepth:
-        midiCCOut(CCMWDepth, mux1Read / midioutfrig);
-        myControlChange(midiChannel, CCMWDepth, mux1Read);
+      case MUX1_spare0:
         break;
       case MUX1_osc2PWM:
         midiCCOut(CCosc2PWM, mux1Read / midioutfrig);
@@ -2091,9 +2446,7 @@ void checkMux() {
         midiCCOut(CCosc2PW, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc2PW, mux1Read);
         break;
-      case MUX1_PBDepth:
-        midiCCOut(CCPBDepth, mux1Read / midioutfrig);
-        myControlChange(midiChannel, CCPBDepth, mux1Read);
+      case MUX1_spare4:
         break;
       case MUX1_osc1PWM:
         midiCCOut(CCosc1PWM, mux1Read / midioutfrig);
@@ -2144,7 +2497,6 @@ void checkMux() {
 
   if (mux2Read > (mux2ValuesPrev[muxInput] + QUANTISE_FACTOR) || mux2Read < (mux2ValuesPrev[muxInput] - QUANTISE_FACTOR)) {
     mux2ValuesPrev[muxInput] = mux2Read;
-    //mux2Read = (mux2Read >> 1); //Change range to 0-127
     switch (muxInput) {
       case MUX2_osc2TriangleLevel:
         midiCCOut(CCosc2TriangleLevel, mux2Read / midioutfrig);
@@ -2215,7 +2567,6 @@ void checkMux() {
 
   if (mux3Read > (mux3ValuesPrev[muxInput] + QUANTISE_FACTOR) || mux3Read < (mux3ValuesPrev[muxInput] - QUANTISE_FACTOR)) {
     mux3ValuesPrev[muxInput] = mux3Read;
-    //mux3Read = (mux3Read >> 1); //Change range to 0-127
     switch (muxInput) {
       case MUX3_balance:
         midiCCOut(CCbalance, mux3Read / midioutfrig);
@@ -2534,6 +2885,21 @@ void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
     upperSW = !upperSW;
     myControlChange(midiChannel, CCupperSW, upperSW);
   }
+
+  if (btnIndex == WHOLE_SW && btnType == ROX_PRESSED) {
+    wholemode = !wholemode;
+    myControlChange(midiChannel, CCwholemode, wholemode);
+  }
+
+  if (btnIndex == DUAL_SW && btnType == ROX_PRESSED) {
+    dualmode = !dualmode;
+    myControlChange(midiChannel, CCdualmode, dualmode);
+  }
+
+  if (btnIndex == SPLIT_SW && btnType == ROX_PRESSED) {
+    splitmode = !splitmode;
+    myControlChange(midiChannel, CCsplitmode, splitmode);
+  }
 }
 
 void checkSwitches() {
@@ -2787,8 +3153,17 @@ void checkEncoder() {
           recallPatch(patchNoU);
         } else {
           patches.push(patches.shift());
-          patchNoL = patches.first().patchNo;
-          recallPatch(patchNoL);
+          if (wholemode) {
+            patchNoL = patches.first().patchNo;
+            patchNoU = patches.first().patchNo;
+            upperSW = 1;
+            recallPatch(patchNoU);
+            upperSW = 0;
+            recallPatch(patchNoL);
+          } else {
+            patchNoL = patches.first().patchNo;
+            recallPatch(patchNoL);
+          }
         }
         state = PARAMETER;
         break;
@@ -2827,8 +3202,17 @@ void checkEncoder() {
           recallPatch(patchNoU);
         } else {
           patches.unshift(patches.pop());
-          patchNoL = patches.first().patchNo;
-          recallPatch(patchNoL);
+          if (wholemode) {
+            patchNoL = patches.first().patchNo;
+            patchNoU = patches.first().patchNo;
+            upperSW = 1;
+            recallPatch(patchNoU);
+            upperSW = 0;
+            recallPatch(patchNoL);
+          } else {
+            patchNoL = patches.first().patchNo;
+            recallPatch(patchNoL);
+          }
         }
         state = PARAMETER;
         break;

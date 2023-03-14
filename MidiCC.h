@@ -21,6 +21,9 @@
 #define   CCfilterPoleSW 24//Off/On
 #define   CCkeyTrack 30//Off/On
 #define   CCupperSW 31
+#define   CCwholemode 32
+#define   CCdualmode 33
+#define   CCsplitmode 34
 #define   CCmonoMulti 37
 #define   CCfilterType 39
 #define   CCvcaLoop 41
@@ -44,10 +47,8 @@
 #define   CCosc1SubLevel 62
 #define   CCLFODelay 63
 #define   CCglideSW 65
-#define   CCPBDepth 66
 #define   CCMWDepth 67
 #define   CCAmpvelo 68
-#define   CCPitchBend 69
 #define   CCosc2Detune 71
 #define   CCfilterCutoff 74
 #define   CClfoAlt 76

@@ -12,6 +12,7 @@
 #define EEPROM_LAST_PATCHL 9
 #define EEPROM_AFTERTOUCH_U 10
 #define EEPROM_AFTERTOUCH_L 11
+#define EEPROM_SPLITPOINT 12
 
 int getMIDIChannel() {
   byte midiChannel = EEPROM.read(EEPROM_MIDI_CH);
@@ -22,6 +23,16 @@ int getMIDIChannel() {
 void storeMidiChannel(byte channel)
 {
   EEPROM.update(EEPROM_MIDI_CH, channel);
+}
+
+int getSplitPoint() {
+  byte splitpoint = EEPROM.read(EEPROM_SPLITPOINT);
+  return splitpoint;
+}
+
+void storeSplitPoint(byte splitpoint)
+{
+  EEPROM.update(EEPROM_SPLITPOINT, splitpoint);
 }
 
 float getAfterTouchU() {

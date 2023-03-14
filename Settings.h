@@ -10,6 +10,7 @@ struct SettingsOption {
 };
 
 void settingsMIDICh(char *value);
+//void settingsSplitPoint(char *value);
 void settingsAfterTouchU(char *value);
 void settingsAfterTouchL(char *value);
 //void settingsPitchBend(char * value);
@@ -22,6 +23,7 @@ void settingsAmpEnvL(char *value);
 void settingsHandler(char *s, void (*f)(char *));
 
 int currentIndexMIDICh();
+//int currentIndexSplitPoint();
 int currentIndexAfterTouchU();
 int currentIndexAfterTouchL();
 //int currentIndexPitchBend();
@@ -41,6 +43,11 @@ void settingsMIDICh(char *value) {
     midiChannel = atoi(value);
   }
   storeMidiChannel(midiChannel);
+}
+
+void settingsSplitPoint(char *value) {
+    splitPoint = atoi(value);
+  storeSplitPoint(splitPoint);
 }
 
 void settingsAfterTouchU(char *value) {
@@ -124,6 +131,10 @@ int currentIndexMIDICh() {
   return getMIDIChannel();
 }
 
+int currentIndexSplitPoint() {
+  return getSplitPoint();
+}
+
 int currentIndexAfterTouchU() {
   return getAfterTouchU();
 }
@@ -171,6 +182,7 @@ CircularBuffer<SettingsOption, SETTINGSOPTIONSNO> settingsOptions;
 // add settings to the circular buffer
 void setUpSettings() {
   settingsOptions.push(SettingsOption{ "MIDI Ch.", { "All", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", '\0' }, settingsMIDICh, currentIndexMIDICh });
+  //settingsOptions.push(SettingsOption{ "Split Point", { "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", '\0' }, settingsSplitPoint, currentIndexSplitPoint });
   settingsOptions.push(SettingsOption{ "AfterTouch U", { "Off", "DCO Mod", "CutOff Freq", "VCF Mod", '\0' }, settingsAfterTouchU, currentIndexAfterTouchU });
   settingsOptions.push(SettingsOption{ "AfterTouch L", { "Off", "DCO Mod", "CutOff Freq", "VCF Mod", '\0' }, settingsAfterTouchL, currentIndexAfterTouchL });
   //  settingsOptions.push(SettingsOption{"Pitch Bend", {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", '\0'}, settingsPitchBend, currentIndexPitchBend});

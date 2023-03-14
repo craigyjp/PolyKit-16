@@ -3,6 +3,9 @@ byte midiChannel = MIDI_CHANNEL_OMNI;//(EEPROM)
 String patchNameU = INITPATCHNAME;
 String patchNameL = INITPATCHNAME;
 String patchName = INITPATCHNAME;
+int upperpatchtag = 0;
+int lowerpatchtag = 1;
+byte splitPoint = 0;
 
 boolean encCW = true;//This is to set the encoder to increment when turned CW - Settings Option
 boolean announce = true;
@@ -260,5 +263,9 @@ float afterTouchL = 0;
 int AfterTouchDest = 0;
 int AfterTouchDestU = 0;
 int AfterTouchDestL = 0;
+
+int wholemode = 1;
+int dualmode = 0;
+int splitmode = 0;
 
 int returnvalue = 0;

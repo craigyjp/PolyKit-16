@@ -35,11 +35,11 @@ ADC *adc = new ADC();
 #define DAC_CS2 37
 
 //Mux 1 Connections
-#define MUX1_PBDepth 0 			// 2V
+#define MUX1_spare0 0 			// 2V
 #define MUX1_pwLFO 1   			// 5V
 #define MUX1_osc2PW 2			// 12V
 #define MUX1_osc1PW 3			// 12V
-#define MUX1_MWDepth 4			// 2V
+#define MUX1_spare4 4			// 2V
 #define MUX1_fmDepth 5			// 2V
 #define MUX1_osc2PWM 6			// 2V
 #define MUX1_osc1PWM 7  		// 2V
@@ -53,7 +53,7 @@ ADC *adc = new ADC();
 #define MUX1_osc2SawLevel 14		// 2V
 #define MUX1_glideTime 15		// MIDI CC
 
-//Mux 3 Connections
+//Mux 2 Connections
 #define MUX2_filterType 0		// 5V switches
 #define MUX2_LFOWaveform 1		// 5V
 #define MUX2_LFODelay 2			// ? software
@@ -72,6 +72,7 @@ ADC *adc = new ADC();
 #define MUX2_keyTrack 14		// 2V
 #define MUX2_filterLFO 15		// 5V
 
+//Mux 3 Connections
 #define MUX3_volumeControl 0		// 2V
 #define MUX3_balance 1			// 2V
 #define MUX3_ampSustain 2		// 5V
@@ -192,17 +193,20 @@ ADC *adc = new ADC();
 #define CHORUS1_LED 0 
 #define CHORUS2_LED 1
 #define GLIDE_LED 2
-#define VCALOOP_LED 3
-#define VCAGATE_LED 4
+#define VCAGATE_LED 3
+#define VCALOOP_LED 4
 #define VCAVEL_LED 5
 #define LFO_ALT_LED 6 
 #define FILTERPOLE_LED 7
 
 #define FILTERLOOP_LED 8
-#define FILTERINV_LED 9
-#define FILTERVEL_LED 10
+#define FILTERVEL_LED 9
+#define FILTERINV_LED 10
 #define UPPER_LED 11
 #define SAVE_LED 12
+#define WHOLE_LED 13
+#define DUAL_LED 14
+#define SPLIT_LED 15
 
 //Switches
 // roxmux 74HC165
@@ -210,16 +214,20 @@ ADC *adc = new ADC();
 #define CHORUS1_SW 0
 #define CHORUS2_SW 1
 #define GLIDE_SW 2
-#define VCALOOP_SW 3
-#define VCAGATE_SW 4
+#define VCAGATE_SW 3
+#define VCALOOP_SW 4
 #define VCAVEL_SW 5
 #define LFO_ALT_SW 6
 #define FILTERPOLE_SW 7
 
 #define FILTERLOOP_SW 8
-#define FILTERINV_SW 9
-#define FILTERVEL_SW 10
+#define FILTERVEL_SW 9
+#define FILTERINV_SW 10
 #define UPPER_SW 11
+
+#define WHOLE_SW 14
+#define DUAL_SW 15
+#define SPLIT_SW 13
 
 // System Switches etc
 

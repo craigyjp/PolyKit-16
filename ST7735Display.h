@@ -40,7 +40,7 @@ char *currentSettingsValue = "";
 int currentSettingsPart = SETTINGS;
 int paramType = PARAMETER;
 
-boolean voiceOn[NO_OF_VOICES] = { false };
+//boolean voiceOn[NO_OF_VOICES] = { false };
 boolean MIDIClkSignal = false;
 
 unsigned long timer = 0;
@@ -75,6 +75,30 @@ void renderBootUpPage() {
 }
 
 void renderCurrentPatchPage() {
+  if (wholemode)
+  {
+  tft.fillScreen(ST7735_BLACK);
+
+  tft.setFont(&FreeSansBold18pt7b);
+  tft.setCursor(5, 97);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.setTextSize(1);
+  tft.println(currentPgmNumL);
+  tft.setCursor(80, 87);
+  tft.setFont(&FreeSans12pt7b);
+  tft.setTextSize(1);
+  tft.println("Whole");
+
+  tft.setTextColor(ST7735_BLACK);
+  tft.setFont(&Org_01);
+  tft.drawFastHLine(10, 63, tft.width() - 20, ST7735_RED);
+  tft.setFont(&FreeSans12pt7b);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.setCursor(1, 122);
+  tft.setTextColor(ST7735_WHITE);
+  tft.println(currentPatchNameL);
+
+  } else {
 
   tft.fillScreen(ST7735_BLACK);
   tft.setFont(&FreeSansBold18pt7b);
@@ -90,10 +114,10 @@ void renderCurrentPatchPage() {
   tft.setTextColor(ST7735_BLACK);
   tft.setFont(&Org_01);
 
-  tft.drawFastHLine(10, 65, tft.width() - 20, ST7735_RED);
+  tft.drawFastHLine(10, 63, tft.width() - 20, ST7735_RED);
   tft.setFont(&FreeSans12pt7b);
   tft.setTextColor(ST7735_YELLOW);
-  tft.setCursor(1, 57);
+  tft.setCursor(1, 55);
   tft.setTextColor(ST7735_WHITE);
   tft.println(currentPatchNameU);
 
@@ -109,12 +133,13 @@ void renderCurrentPatchPage() {
 
   tft.setTextColor(ST7735_BLACK);
   tft.setFont(&Org_01);
-  tft.drawFastHLine(10, 65, tft.width() - 20, ST7735_RED);
+  tft.drawFastHLine(10, 63, tft.width() - 20, ST7735_RED);
   tft.setFont(&FreeSans12pt7b);
   tft.setTextColor(ST7735_YELLOW);
-  tft.setCursor(1, 125);
+  tft.setCursor(1, 122);
   tft.setTextColor(ST7735_WHITE);
   tft.println(currentPatchNameL);
+  }
 }
 
 void renderEnv(float att, float dec, float sus, float rel) {
@@ -141,8 +166,8 @@ void renderCurrentParameterPage() {
         tft.setTextColor(ST7735_YELLOW);
         tft.setTextSize(1);
         tft.println(currentParameter);
-        tft.drawFastHLine(10, 65, tft.width() - 20, ST7735_RED);
-        tft.setCursor(1, 57);
+        tft.drawFastHLine(10, 63, tft.width() - 20, ST7735_RED);
+        tft.setCursor(1, 55);
         tft.setTextColor(ST7735_WHITE);
         tft.println(currentValue);
         // lower patch
@@ -157,7 +182,7 @@ void renderCurrentParameterPage() {
         tft.println("Lower");
         tft.setFont(&FreeSans12pt7b);
         tft.setTextColor(ST7735_YELLOW);
-        tft.setCursor(1, 125);
+        tft.setCursor(1, 122);
         tft.setTextColor(ST7735_WHITE);
         tft.println(currentPatchNameL);
         switch (paramType) {
@@ -175,8 +200,8 @@ void renderCurrentParameterPage() {
         tft.setTextColor(ST7735_YELLOW);
         tft.setTextSize(1);
         tft.println(currentParameter);
-        tft.drawFastHLine(10, 65, tft.width() - 20, ST7735_RED);
-        tft.setCursor(1, 125);
+        tft.drawFastHLine(10, 63, tft.width() - 20, ST7735_RED);
+        tft.setCursor(1, 122);
         tft.setTextColor(ST7735_WHITE);
         tft.println(currentValue);
         // upper patch
@@ -191,7 +216,7 @@ void renderCurrentParameterPage() {
         tft.println("Upper");
         tft.setFont(&FreeSans12pt7b);
         tft.setTextColor(ST7735_YELLOW);
-        tft.setCursor(1, 57);
+        tft.setCursor(1, 55);
         tft.setTextColor(ST7735_WHITE);
         tft.println(currentPatchNameU);
         switch (paramType) {
