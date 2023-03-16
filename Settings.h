@@ -1,4 +1,4 @@
-#define SETTINGSOPTIONSNO 9
+#define SETTINGSOPTIONSNO 11
 #define SETTINGSVALUESNO 18  //Maximum number of settings option values needed
 int settingsValueIndex = 0;  //currently selected settings option value index
 
@@ -20,6 +20,8 @@ void settingsFilterEnvU(char *value);
 void settingsFilterEnvL(char *value);
 void settingsAmpEnvU(char *value);
 void settingsAmpEnvL(char *value);
+void settingsKeyTrackU(char *value);
+void settingsKeyTrackL(char *value);
 void settingsHandler(char *s, void (*f)(char *));
 
 int currentIndexMIDICh();
@@ -33,6 +35,8 @@ int currentIndexFilterEnvU();
 int currentIndexFilterEnvL();
 int currentIndexAmpEnvU();
 int currentIndexAmpEnvL();
+int currentIndexKeyTrackU();
+int currentIndexKeyTrackL();
 int getCurrentIndex(int (*f)());
 
 
@@ -122,6 +126,18 @@ void settingsAmpEnvL(char *value) {
   storeAmpEnvL(ampLogLinL ? 1 : 0);
 }
 
+void settingsKeyTrackU(char *value) {
+  if (strcmp(value, "Off") == 0) keyTrackSWU = 0;
+  if (strcmp(value, "On") == 0) keyTrackSWU = 1;
+  storeKeyTrackU(keyTrackSWU);
+}
+
+void settingsKeyTrackL(char *value) {
+  if (strcmp(value, "Off") == 0) keyTrackSWL = 0;
+  if (strcmp(value, "On") == 0) keyTrackSWL = 1;
+  storeKeyTrackL(keyTrackSWL);
+}
+
 //Takes a pointer to a specific method for the settings option and invokes it.
 void settingsHandler(char *s, void (*f)(char *)) {
   f(s);
@@ -172,6 +188,14 @@ int currentIndexAmpEnvL() {
   return getAmpEnvL() ? 0 : 1;
 }
 
+int currentIndexKeyTrackU() {
+  return getKeyTrackU();
+}
+
+int currentIndexKeyTrackL() {
+  return getKeyTrackL();
+}
+
 //Takes a pointer to a specific method for the current settings option value and invokes it.
 int getCurrentIndex(int (*f)()) {
   return f();
@@ -192,4 +216,6 @@ void setUpSettings() {
   settingsOptions.push(SettingsOption{ "Filter Env L", { "Log", "Lin", '\0' }, settingsFilterEnvL, currentIndexFilterEnvL });
   settingsOptions.push(SettingsOption{ "Amp Env U", { "Log", "Lin", '\0' }, settingsAmpEnvU, currentIndexAmpEnvU });
   settingsOptions.push(SettingsOption{ "Amp Env L", { "Log", "Lin", '\0' }, settingsAmpEnvL, currentIndexAmpEnvL });
+  settingsOptions.push(SettingsOption{ "Keytrack U", { "Off", "On", '\0' }, settingsKeyTrackU, currentIndexKeyTrackU });
+  settingsOptions.push(SettingsOption{ "Keytrack L", { "Off", "On", '\0' }, settingsKeyTrackL, currentIndexKeyTrackL });
 }

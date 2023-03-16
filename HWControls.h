@@ -17,8 +17,6 @@ ADC *adc = new ADC();
 #define MUX1_S A0
 #define MUX2_S A1
 #define MUX3_S A2
-#define MUX4_S A3
-#define MUX5_S A4
 
 #define DEMUX_0 36
 #define DEMUX_1 35

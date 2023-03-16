@@ -13,6 +13,8 @@
 #define EEPROM_AFTERTOUCH_U 10
 #define EEPROM_AFTERTOUCH_L 11
 #define EEPROM_SPLITPOINT 12
+#define EEPROM_KEYTRACK_U 13
+#define EEPROM_KEYTRACK_L 14
 
 int getMIDIChannel() {
   byte midiChannel = EEPROM.read(EEPROM_MIDI_CH);
@@ -135,6 +137,28 @@ void storeAmpEnvU(byte ampLogLinU)
 void storeAmpEnvL(byte ampLogLinL)
 {
   EEPROM.update(EEPROM_AMPENV_L, ampLogLinL);
+}
+
+boolean getKeyTrackU() {
+  byte keyTrackSWU = EEPROM.read(EEPROM_KEYTRACK_U); 
+  if (keyTrackSWU < 0 || keyTrackSWU > 1)return true;
+  return keyTrackSWU == 0 ? false : true;
+}
+
+boolean getKeyTrackL() {
+  byte keyTrackSWL = EEPROM.read(EEPROM_KEYTRACK_L); 
+  if (keyTrackSWL < 0 || keyTrackSWL > 1)return true;
+  return keyTrackSWL == 0 ? false : true;
+}
+
+void storeKeyTrackU(byte keyTrackSWU)
+{
+  EEPROM.update(EEPROM_KEYTRACK_U, keyTrackSWU);
+}
+
+void storeKeyTrackL(byte keyTrackSWL)
+{
+  EEPROM.update(EEPROM_KEYTRACK_L, keyTrackSWL);
 }
 
 int getLastPatchU() {

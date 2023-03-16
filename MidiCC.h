@@ -25,6 +25,7 @@
 #define   CCdualmode 33
 #define   CCsplitmode 34
 #define   CCmonoMulti 37
+#define   CCkeyTrackSW 38
 #define   CCfilterType 39
 #define   CCvcaLoop 41
 #define   CCvcaVel 42

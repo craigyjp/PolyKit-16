@@ -197,6 +197,9 @@ float keytrack = 0;
 float keytrackU = 0;
 float keytrackL = 0;
 float keytrackstr = 0;
+int keyTrackSW = 0;
+int keyTrackSWU = 0;
+int keyTrackSWL = 0;
 
 int PitchBendLevel = 0;
 int PitchBendLevelU = 0;
@@ -247,6 +250,7 @@ int filterEGinv = 0;
 int filterEGinvU = 0;
 int filterEGinvL = 0;
 int upperSW = 0;
+int oldupperSW = 0;
 int filterLogLin = 0;
 int filterLogLinU = 0;
 int filterLogLinL = 0;
