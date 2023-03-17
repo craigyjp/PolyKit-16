@@ -1670,6 +1670,9 @@ void myControlChange(byte channel, byte control, int value) {
         pwLFOU = value;
       } else {
         pwLFOL = value;
+        if (wholemode) {
+          pwLFOU = value;
+        }
       }
       pwLFOstr = value / midioutfrig;  // for display
       updatepwLFO();
@@ -1680,6 +1683,9 @@ void myControlChange(byte channel, byte control, int value) {
         fmDepthU = value;
       } else {
         fmDepthL = value;
+        if (wholemode) {
+          fmDepthU = value;
+        }
       }
       fmDepthstr = value / midioutfrig;
       updatefmDepth();
@@ -1690,6 +1696,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc2PWU = value;
       } else {
         osc2PWL = value;
+        if (wholemode) {
+          osc2PWU = value;
+        }
       }
       osc2PWstr = PULSEWIDTH[value / midioutfrig];
       updateosc2PW();
@@ -1700,6 +1709,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc2PWMU = value;
       } else {
         osc2PWML = value;
+        if (wholemode) {
+          osc2PWMU = value;
+        }
       }
       osc2PWMstr = value / midioutfrig;
       updateosc2PWM();
@@ -1710,6 +1722,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc1PWU = value;
       } else {
         osc1PWL = value;
+        if (wholemode) {
+          osc1PWU = value;
+        }
       }
       osc1PWstr = PULSEWIDTH[value / midioutfrig];
       updateosc1PW();
@@ -1720,6 +1735,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc1PWMU = value;
       } else {
         osc1PWML = value;
+        if (wholemode) {
+          osc1PWMU = value;
+        }
       }
       osc1PWMstr = value / midioutfrig;
       updateosc1PWM();
@@ -1730,6 +1748,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc1RangeU = value;
       } else {
         osc1RangeL = value;
+        if (wholemode) {
+          osc1RangeU = value;
+        }
       }
       osc1Rangestr = value / midioutfrig;
       updateosc1Range(1);
@@ -1740,6 +1761,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc2RangeU = value;
       } else {
         osc2RangeL = value;
+        if (wholemode) {
+          osc2RangeU = value;
+        }
       }
       osc2Rangestr = value / midioutfrig;
       updateosc2Range(1);
@@ -1750,6 +1774,9 @@ void myControlChange(byte channel, byte control, int value) {
         stackU = value;
       } else {
         stackL = value;
+        if (wholemode) {
+          stackU = value;
+        }
       }
       stackstr = int(value / 8);
       updatestack();
@@ -1760,6 +1787,9 @@ void myControlChange(byte channel, byte control, int value) {
         glideTimeU = value;
       } else {
         glideTimeL = value;
+        if (wholemode) {
+          glideTimeU = value;
+        }
       }
       glideTimestr = LINEAR[value / midioutfrig];
       updateglideTime();
@@ -1770,6 +1800,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc2DetuneU = value;
       } else {
         osc2DetuneL = value;
+        if (wholemode) {
+          osc2DetuneU = value;
+        }
       }
       osc2Detunestr = PULSEWIDTH[value / midioutfrig];
       updateosc2Detune();
@@ -1780,6 +1813,9 @@ void myControlChange(byte channel, byte control, int value) {
         noiseLevelU = value;
       } else {
         noiseLevelL = value;
+        if (wholemode) {
+          noiseLevelU = value;
+        }
       }
       noiseLevelstr = LINEARCENTREZERO[value / midioutfrig];
       updatenoiseLevel();
@@ -1790,6 +1826,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc2SawLevelU = value;
       } else {
         osc2SawLevelL = value;
+        if (wholemode) {
+          osc2SawLevelU = value;
+        }
       }
       osc2SawLevelstr = value / midioutfrig;  // for display
       updateOsc2SawLevel();
@@ -1800,6 +1839,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc1SawLevelU = value;
       } else {
         osc1SawLevelL = value;
+        if (wholemode) {
+          osc1SawLevelU = value;
+        }
       }
       osc1SawLevelstr = value / midioutfrig;  // for display
       updateOsc1SawLevel();
@@ -1810,6 +1852,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc2PulseLevelU = value;
       } else {
         osc2PulseLevelL = value;
+        if (wholemode) {
+          osc2PulseLevelU = value;
+        }
       }
       osc2PulseLevelstr = value / midioutfrig;  // for display
       updateosc2PulseLevel();
@@ -1820,6 +1865,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc1PulseLevelU = value;
       } else {
         osc1PulseLevelL = value;
+        if (wholemode) {
+          osc1PulseLevelU = value;
+        }
       }
       osc1PulseLevelstr = value / midioutfrig;  // for display
       updateOsc1PulseLevel();
@@ -1830,6 +1878,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc2TriangleLevelU = value;
       } else {
         osc2TriangleLevelL = value;
+        if (wholemode) {
+          osc2TriangleLevelU = value;
+        }
       }
       osc2TriangleLevelstr = value / midioutfrig;  // for display
       updateosc2TriangleLevel();
@@ -1840,6 +1891,9 @@ void myControlChange(byte channel, byte control, int value) {
         osc1SubLevelU = value;
       } else {
         osc1SubLevelL = value;
+        if (wholemode) {
+          osc1SubLevelU = value;
+        }
       }
       osc1SubLevelstr = value / midioutfrig;  // for display
       updateOsc1SubLevel();
@@ -1850,6 +1904,9 @@ void myControlChange(byte channel, byte control, int value) {
         LFODelayU = value;
       } else {
         LFODelayL = value;
+        if (wholemode) {
+          LFODelayU = value;
+        }
       }
       LFODelaystr = value / midioutfrig;  // for display
       updateLFODelay();
@@ -1860,6 +1917,9 @@ void myControlChange(byte channel, byte control, int value) {
         filterCutoffU = value;
       } else {
         filterCutoffL = value;
+        if (wholemode) {
+          filterCutoffU = value;
+        }
       }
       filterCutoffstr = FILTERCUTOFF[value / midioutfrig];
       updateFilterCutoff();
@@ -1870,6 +1930,9 @@ void myControlChange(byte channel, byte control, int value) {
         filterLFOU = value;
       } else {
         filterLFOL = value;
+        if (wholemode) {
+          filterLFOU = value;
+        }
       }
       filterLFOstr = value / midioutfrig;
       updatefilterLFO();
@@ -1880,6 +1943,9 @@ void myControlChange(byte channel, byte control, int value) {
         filterResU = value;
       } else {
         filterResL = value;
+        if (wholemode) {
+          filterResU = value;
+        }
       }
       filterResstr = int(value / midioutfrig);
       updatefilterRes();
@@ -1887,9 +1953,12 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CCfilterType:
       if (upperSW) {
-        filterTypeU = value;
+        filterResU = value;
       } else {
         filterTypeL = value;
+        if (wholemode) {
+          filterResU = value;
+        }
       }
       filterTypestr = value / midioutfrig;
       updateFilterType(1);
@@ -1900,6 +1969,9 @@ void myControlChange(byte channel, byte control, int value) {
         filterEGlevelU = value;
       } else {
         filterEGlevelL = value;
+        if (wholemode) {
+          filterEGlevelU = value;
+        }
       }
       filterEGlevelstr = int(value / midioutfrig);
       updatefilterEGlevel();
@@ -1910,6 +1982,9 @@ void myControlChange(byte channel, byte control, int value) {
         LFORateU = value;
       } else {
         LFORateL = value;
+        if (wholemode) {
+          LFORateU = value;
+        }
       }
       LFORatestr = LFOTEMPO[value / midioutfrig];  // for display
       updateLFORate();
@@ -1920,6 +1995,9 @@ void myControlChange(byte channel, byte control, int value) {
         LFOWaveformU = value;
       } else {
         LFOWaveformL = value;
+        if (wholemode) {
+          LFOWaveformU = value;
+        }
       }
       LFOWaveformstr = value;
       updateStratusLFOWaveform();
@@ -1930,6 +2008,9 @@ void myControlChange(byte channel, byte control, int value) {
         filterAttackU = value;
       } else {
         filterAttackL = value;
+        if (wholemode) {
+          filterAttackU = value;
+        }
       }
       filterAttackstr = ENVTIMES[value / midioutfrig];
       updatefilterAttack();
@@ -1940,6 +2021,9 @@ void myControlChange(byte channel, byte control, int value) {
         filterDecayU = value;
       } else {
         filterDecayL = value;
+        if (wholemode) {
+          filterDecayU = value;
+        }
       }
       filterDecaystr = ENVTIMES[value / midioutfrig];
       updatefilterDecay();
@@ -1950,6 +2034,9 @@ void myControlChange(byte channel, byte control, int value) {
         filterSustainU = value;
       } else {
         filterSustainL = value;
+        if (wholemode) {
+          filterSustainU = value;
+        }
       }
       filterSustainstr = LINEAR_FILTERMIXERSTR[value / midioutfrig];
       updatefilterSustain();
@@ -1960,6 +2047,9 @@ void myControlChange(byte channel, byte control, int value) {
         filterReleaseU = value;
       } else {
         filterReleaseL = value;
+        if (wholemode) {
+          filterReleaseU = value;
+        }
       }
       filterReleasestr = ENVTIMES[value / midioutfrig];
       updatefilterRelease();
@@ -1972,6 +2062,10 @@ void myControlChange(byte channel, byte control, int value) {
       } else {
         ampAttackL = value;
         oldampAttackL = value;
+        if (wholemode) {
+          ampAttackU = value;
+          oldampAttackU = value;
+        }
       }
       ampAttackstr = ENVTIMES[value / midioutfrig];
       updateampAttack();
@@ -1984,6 +2078,10 @@ void myControlChange(byte channel, byte control, int value) {
       } else {
         ampDecayL = value;
         oldampDecayL = value;
+        if (wholemode) {
+          ampDecayU = value;
+          oldampDecayU = value;
+        }
       }
       ampDecaystr = ENVTIMES[value / midioutfrig];
       updateampDecay();
@@ -1996,6 +2094,10 @@ void myControlChange(byte channel, byte control, int value) {
       } else {
         ampSustainL = value;
         oldampSustainL = value;
+        if (wholemode) {
+          ampSustainU = value;
+          oldampSustainU = value;
+        }
       }
       ampSustainstr = LINEAR_FILTERMIXERSTR[value / midioutfrig];
       updateampSustain();
@@ -2008,6 +2110,10 @@ void myControlChange(byte channel, byte control, int value) {
       } else {
         ampReleaseL = value;
         oldampReleaseL = value;
+        if (wholemode) {
+          ampReleaseU = value;
+          oldampReleaseU = value;
+        }
       }
       ampReleasestr = ENVTIMES[value / midioutfrig];
       updateampRelease();
@@ -2018,6 +2124,9 @@ void myControlChange(byte channel, byte control, int value) {
         volumeControlU = value;
       } else {
         volumeControlL = value;
+        if (wholemode) {
+          volumeControlU = value;
+        }
       }
       volumeControlstr = value / midioutfrig;
       updatevolumeControl();
@@ -2028,6 +2137,9 @@ void myControlChange(byte channel, byte control, int value) {
         keytrackU = value;
       } else {
         keytrackL = value;
+        if (wholemode) {
+          keytrackU = value;
+        }
       }
       keytrackstr = value / midioutfrig;
       updatekeytrack();
@@ -2039,6 +2151,9 @@ void myControlChange(byte channel, byte control, int value) {
         balanceU = value;
       } else {
         balanceL = value;
+        if (wholemode) {
+          balanceU = value;
+        }
       }
       balance = value;
       balancestr = value / midioutfrig;
