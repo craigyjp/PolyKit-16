@@ -209,6 +209,8 @@ void setup() {
   keyTrackSWL = getKeyTrackL();
   oldkeyTrackSWL = keyTrackSWL;
 
+  //setupDisplay();
+
   // reset oscillators before startup
   // volume to 0
   digitalWriteFast(DEMUX_0, HIGH);
@@ -619,18 +621,30 @@ void updateosc1Range(boolean announce) {
       }
       srp.set(OCT1A_LOWER, LOW);
       srp.set(OCT1B_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(OCT1A_UPPER, LOW);
+        srp.set(OCT1B_UPPER, HIGH);
+      }
     } else if (osc1Rangestr < 100 && osc1Rangestr > 33) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("16"));
       }
       srp.set(OCT1A_LOWER, HIGH);
       srp.set(OCT1B_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(OCT1A_UPPER, HIGH);
+        srp.set(OCT1B_UPPER, HIGH);
+      }
     } else {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("32"));
       }
       srp.set(OCT1A_LOWER, HIGH);
       srp.set(OCT1B_LOWER, LOW);
+      if (wholemode) {
+        srp.set(OCT1A_UPPER, HIGH);
+        srp.set(OCT1B_UPPER, LOW);
+      }
     }
   }
 }
@@ -663,18 +677,30 @@ void updateosc2Range(boolean announce) {
       }
       srp.set(OCT2A_LOWER, LOW);
       srp.set(OCT2B_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(OCT2A_UPPER, LOW);
+        srp.set(OCT2B_UPPER, HIGH);
+      }
     } else if (osc2Rangestr < 100 && osc2Rangestr > 33) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("16"));
       }
       srp.set(OCT2A_LOWER, HIGH);
       srp.set(OCT2B_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(OCT2A_UPPER, HIGH);
+        srp.set(OCT2B_UPPER, HIGH);
+      }
     } else {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("32"));
       }
       srp.set(OCT2A_LOWER, HIGH);
       srp.set(OCT2B_LOWER, LOW);
+      if (wholemode) {
+        srp.set(OCT2A_UPPER, HIGH);
+        srp.set(OCT2B_UPPER, LOW);
+      }
     }
   }
 }
@@ -879,6 +905,11 @@ void updateFilterType(boolean announce) {
       srp.set(FILTERA_LOWER, LOW);
       srp.set(FILTERB_LOWER, LOW);
       srp.set(FILTERC_LOWER, LOW);
+      if (wholemode) {
+        srp.set(FILTERA_UPPER, LOW);
+        srp.set(FILTERB_UPPER, LOW);
+        srp.set(FILTERC_UPPER, LOW);
+      }
 
     } else if (filterTypestr > 12 && filterTypestr < 22) {
       if (filterPoleSWL == 1) {
@@ -893,6 +924,11 @@ void updateFilterType(boolean announce) {
       srp.set(FILTERA_LOWER, HIGH);
       srp.set(FILTERB_LOWER, LOW);
       srp.set(FILTERC_LOWER, LOW);
+      if (wholemode) {
+        srp.set(FILTERA_UPPER, HIGH);
+        srp.set(FILTERB_UPPER, LOW);
+        srp.set(FILTERC_UPPER, LOW);
+      }
 
     } else if (filterTypestr > 22 && filterTypestr < 44) {
       if (filterPoleSWL == 1) {
@@ -907,6 +943,11 @@ void updateFilterType(boolean announce) {
       srp.set(FILTERA_LOWER, LOW);
       srp.set(FILTERB_LOWER, HIGH);
       srp.set(FILTERC_LOWER, LOW);
+      if (wholemode) {
+        srp.set(FILTERA_UPPER, LOW);
+        srp.set(FILTERB_UPPER, HIGH);
+        srp.set(FILTERC_UPPER, LOW);
+      }
 
     } else if (filterTypestr > 44 && filterTypestr < 66) {
       if (filterPoleSWL == 1) {
@@ -921,6 +962,11 @@ void updateFilterType(boolean announce) {
       srp.set(FILTERA_LOWER, HIGH);
       srp.set(FILTERB_LOWER, HIGH);
       srp.set(FILTERC_LOWER, LOW);
+      if (wholemode) {
+        srp.set(FILTERA_UPPER, HIGH);
+        srp.set(FILTERB_UPPER, HIGH);
+        srp.set(FILTERC_UPPER, LOW);
+      }
 
     } else if (filterTypestr > 66 && filterTypestr < 88) {
       if (filterPoleSWL == 1) {
@@ -935,6 +981,11 @@ void updateFilterType(boolean announce) {
       srp.set(FILTERA_LOWER, LOW);
       srp.set(FILTERB_LOWER, LOW);
       srp.set(FILTERC_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(FILTERA_UPPER, LOW);
+        srp.set(FILTERB_UPPER, LOW);
+        srp.set(FILTERC_UPPER, HIGH);
+      }
 
     } else if (filterTypestr > 88 && filterTypestr < 105) {
       if (filterPoleSWL == 1) {
@@ -949,6 +1000,11 @@ void updateFilterType(boolean announce) {
       srp.set(FILTERA_LOWER, HIGH);
       srp.set(FILTERB_LOWER, LOW);
       srp.set(FILTERC_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(FILTERA_UPPER, HIGH);
+        srp.set(FILTERB_UPPER, LOW);
+        srp.set(FILTERC_UPPER, HIGH);
+      }
 
     } else if (filterTypestr > 105 && filterTypestr < 120) {
       if (filterPoleSWL == 1) {
@@ -963,6 +1019,11 @@ void updateFilterType(boolean announce) {
       srp.set(FILTERA_LOWER, LOW);
       srp.set(FILTERB_LOWER, HIGH);
       srp.set(FILTERC_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(FILTERA_UPPER, LOW);
+        srp.set(FILTERB_UPPER, HIGH);
+        srp.set(FILTERC_UPPER, HIGH);
+      }
 
     } else {
       if (filterPoleSWL == 1) {
@@ -977,6 +1038,11 @@ void updateFilterType(boolean announce) {
       srp.set(FILTERA_LOWER, HIGH);
       srp.set(FILTERB_LOWER, HIGH);
       srp.set(FILTERC_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(FILTERA_UPPER, HIGH);
+        srp.set(FILTERB_UPPER, HIGH);
+        srp.set(FILTERC_UPPER, HIGH);
+      }
     }
   }
 }
@@ -1169,6 +1235,9 @@ void updatefilterPoleSwitch(boolean announce) {
       }
       sr.set(FILTERPOLE_LED, HIGH);
       srp.set(FILTER_POLE_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(FILTER_POLE_UPPER, HIGH);
+      }
       midiCCOut(CCfilterPoleSW, 127);
     } else {
       if (announce) {
@@ -1176,6 +1245,9 @@ void updatefilterPoleSwitch(boolean announce) {
       }
       sr.set(FILTERPOLE_LED, LOW);
       srp.set(FILTER_POLE_LOWER, LOW);
+      if (wholemode) {
+        srp.set(FILTER_POLE_UPPER, LOW);
+      }
       midiCCOut(CCfilterPoleSW, 1);
     }
   }
@@ -1208,6 +1280,10 @@ void updatefilterLoop(boolean announce) {
       sr.set(FILTERLOOP_LED, HIGH);  // LED on
       srp.set(FILTER_MODE_BIT0_LOWER, HIGH);
       srp.set(FILTER_MODE_BIT1_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(FILTER_MODE_BIT0_UPPER, HIGH);
+        srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
+      }
       midiCCOut(CCfilterLoop, 127);
     } else {
       if (announce) {
@@ -1216,6 +1292,10 @@ void updatefilterLoop(boolean announce) {
       sr.set(FILTERLOOP_LED, LOW);  // LED off
       srp.set(FILTER_MODE_BIT0_LOWER, LOW);
       srp.set(FILTER_MODE_BIT1_LOWER, LOW);
+      if (wholemode) {
+        srp.set(FILTER_MODE_BIT0_UPPER, LOW);
+        srp.set(FILTER_MODE_BIT1_UPPER, LOW);
+      }
       midiCCOut(CCfilterLoop, 1);
     }
   }
@@ -1245,6 +1325,9 @@ void updatefilterEGinv(boolean announce) {
       }
       sr.set(FILTERINV_LED, LOW);  // LED off
       srp.set(FILTER_EG_INV_LOWER, LOW);
+      if (wholemode) {
+        srp.set(FILTER_EG_INV_UPPER, LOW);
+      }
       midiCCOut(CCfilterEGinv, 1);
     } else {
       if (announce) {
@@ -1252,6 +1335,9 @@ void updatefilterEGinv(boolean announce) {
       }
       sr.set(FILTERINV_LED, HIGH);  // LED on
       srp.set(FILTER_EG_INV_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(FILTER_EG_INV_UPPER, HIGH);
+      }
       midiCCOut(CCfilterEGinv, 127);
     }
   }
@@ -1281,6 +1367,9 @@ void updatefilterVel(boolean announce) {
       }
       sr.set(FILTERVEL_LED, LOW);  // LED off
       srp.set(FILTER_VELOCITY_LOWER, LOW);
+      if (wholemode) {
+        srp.set(FILTER_VELOCITY_UPPER, LOW);
+      }
       midiCCOut(CCfilterVel, 1);
     } else {
       if (announce) {
@@ -1288,6 +1377,9 @@ void updatefilterVel(boolean announce) {
       }
       sr.set(FILTERVEL_LED, HIGH);  // LED on
       srp.set(FILTER_VELOCITY_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(FILTER_VELOCITY_UPPER, HIGH);
+      }
       midiCCOut(CCfilterVel, 127);
     }
   }
@@ -1320,6 +1412,10 @@ void updatevcaLoop(boolean announce) {
       sr.set(VCALOOP_LED, HIGH);  // LED on
       srp.set(AMP_MODE_BIT0_LOWER, HIGH);
       srp.set(AMP_MODE_BIT1_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(AMP_MODE_BIT0_UPPER, HIGH);
+        srp.set(AMP_MODE_BIT1_UPPER, HIGH);
+      }
       midiCCOut(CCvcaLoop, 127);
     } else {
       if (announce) {
@@ -1328,6 +1424,10 @@ void updatevcaLoop(boolean announce) {
       sr.set(VCALOOP_LED, LOW);  // LED off
       srp.set(AMP_MODE_BIT0_LOWER, LOW);
       srp.set(AMP_MODE_BIT1_LOWER, LOW);
+      if (wholemode) {
+        srp.set(AMP_MODE_BIT0_UPPER, LOW);
+        srp.set(AMP_MODE_BIT1_UPPER, LOW);
+      }
       midiCCOut(CCvcaLoop, 1);
     }
   }
@@ -1357,6 +1457,9 @@ void updatevcaVel(boolean announce) {
       }
       sr.set(VCAVEL_LED, LOW);  // LED off
       srp.set(AMP_VELOCITY_LOWER, LOW);
+      if (wholemode) {
+        srp.set(AMP_VELOCITY_UPPER, LOW);
+      }
       midiCCOut(CCvcaVel, 1);
     } else {
       if (announce) {
@@ -1364,10 +1467,14 @@ void updatevcaVel(boolean announce) {
       }
       sr.set(VCAVEL_LED, HIGH);  // LED on
       srp.set(AMP_VELOCITY_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(AMP_VELOCITY_UPPER, HIGH);
+      }
       midiCCOut(CCvcaVel, 127);
     }
   }
 }
+
 
 void updatevcaGate(boolean announce) {
   if (upperSW) {
@@ -1403,8 +1510,13 @@ void updatevcaGate(boolean announce) {
       ampDecayL = oldampDecayL;
       ampSustainL = oldampSustainL;
       ampReleaseL = oldampReleaseL;
+      if (wholemode) {
+        ampAttackU = oldampAttackU;
+        ampDecayU = oldampDecayU;
+        ampSustainU = oldampSustainU;
+        ampReleaseU = oldampReleaseU;
+      }
       midiCCOut(CCvcaGate, 1);
-
     } else {
       if (announce) {
         showCurrentParameterPage("VCA Gate", "On");
@@ -1414,6 +1526,12 @@ void updatevcaGate(boolean announce) {
       ampDecayL = 0;
       ampSustainL = 1023;
       ampReleaseL = 0;
+      if (wholemode) {
+        ampAttackU = 0;
+        ampDecayU = 0;
+        ampSustainU = 1023;
+        ampReleaseU = 0;
+      }
       midiCCOut(CCvcaGate, 127);
     }
   }
@@ -1443,6 +1561,9 @@ void updatelfoAlt(boolean announce) {
       }
       sr.set(LFO_ALT_LED, LOW);  // LED off
       srp.set(LFO_ALT_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(LFO_ALT_UPPER, HIGH);
+      }
       midiCCOut(CClfoAlt, 1);
     } else {
       if (announce) {
@@ -1450,6 +1571,9 @@ void updatelfoAlt(boolean announce) {
       }
       sr.set(LFO_ALT_LED, HIGH);  // LED on
       srp.set(LFO_ALT_LOWER, LOW);
+      if (wholemode) {
+        srp.set(LFO_ALT_UPPER, LOW);
+      }
       midiCCOut(CClfoAlt, 127);
     }
   }
@@ -1467,9 +1591,15 @@ void updatekeyTrackSW(boolean announce) {
   } else {
     if (keyTrackSWL == 0) {
       srp.set(FILTER_KEYTRACK_LOWER, LOW);
+      if (wholemode) {
+        srp.set(FILTER_KEYTRACK_UPPER, LOW);
+      }
       midiCCOut(CCkeyTrackSW, 1);
     } else {
       srp.set(FILTER_KEYTRACK_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(FILTER_KEYTRACK_UPPER, HIGH);
+      }
       midiCCOut(CCkeyTrackSW, 127);
     }
   }
@@ -1529,14 +1659,15 @@ void updatesplitmode() {
 
 void updatechorus1(boolean announce) {
   if (upperSW) {
-    if (chorus1U == 0) {
+    if (!chorus1U) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("Off"));
       }
       sr.set(CHORUS1_LED, LOW);  // LED off
       srp.set(CHORUS1_OUT_UPPER, LOW);
       midiCCOut(CCchorus1, 1);
-    } else {
+    }
+    if (chorus1U) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("On"));
       }
@@ -1544,20 +1675,29 @@ void updatechorus1(boolean announce) {
       srp.set(CHORUS1_OUT_UPPER, HIGH);
       midiCCOut(CCchorus1, 127);
     }
-  } else {
-    if (chorus1L == 0) {
+  }
+  if (!upperSW) {
+    if (!chorus1L) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("Off"));
       }
       sr.set(CHORUS1_LED, LOW);  // LED off
       srp.set(CHORUS1_OUT_LOWER, LOW);
+      if (wholemode) {
+        srp.set(CHORUS1_OUT_UPPER, LOW);
+      }
       midiCCOut(CCchorus1, 1);
-    } else {
+    }
+    if (chorus1L) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("On"));
       }
       sr.set(CHORUS1_LED, HIGH);  // LED on
       srp.set(CHORUS1_OUT_LOWER, HIGH);
+
+      if (wholemode) {
+        srp.set(CHORUS1_OUT_UPPER, HIGH);
+      }
       midiCCOut(CCchorus1, 127);
     }
   }
@@ -1565,14 +1705,15 @@ void updatechorus1(boolean announce) {
 
 void updatechorus2(boolean announce) {
   if (upperSW) {
-    if (chorus2U == 0) {
+    if (!chorus2U) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("Off"));
       }
       sr.set(CHORUS2_LED, LOW);  // LED off
       srp.set(CHORUS2_OUT_UPPER, LOW);
       midiCCOut(CCchorus2, 1);
-    } else {
+    }
+    if (chorus2U) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("On"));
       }
@@ -1580,20 +1721,28 @@ void updatechorus2(boolean announce) {
       srp.set(CHORUS2_OUT_UPPER, HIGH);
       midiCCOut(CCchorus2, 127);
     }
-  } else {
-    if (chorus2L == 0) {
+  }
+  if (!upperSW) {
+    if (!chorus2L) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("Off"));
       }
       sr.set(CHORUS2_LED, LOW);  // LED off
       srp.set(CHORUS2_OUT_LOWER, LOW);
+      if (wholemode) {
+        srp.set(CHORUS2_OUT_UPPER, LOW);
+      }
       midiCCOut(CCchorus2, 1);
-    } else {
+    }
+    if (chorus2L) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("On"));
       }
       sr.set(CHORUS2_LED, HIGH);  // LED on
       srp.set(CHORUS2_OUT_LOWER, HIGH);
+      if (wholemode) {
+        srp.set(CHORUS2_OUT_UPPER, HIGH);
+      }
       midiCCOut(CCchorus2, 127);
     }
   }
@@ -1607,8 +1756,14 @@ void updateFilterEnv(boolean announce) {
   }
   if (filterLogLinL == 0) {
     srp.set(FILTER_LIN_LOG_LOWER, HIGH);
+    if (wholemode) {
+      srp.set(FILTER_LIN_LOG_UPPER, HIGH);
+    }
   } else {
     srp.set(FILTER_LIN_LOG_LOWER, LOW);
+    if (wholemode) {
+      srp.set(FILTER_LIN_LOG_UPPER, LOW);
+    }
   }
 }
 
@@ -1620,8 +1775,14 @@ void updateAmpEnv(boolean announce) {
   }
   if (ampLogLinL == 0) {
     srp.set(AMP_LIN_LOG_LOWER, LOW);
+    if (wholemode) {
+      srp.set(AMP_LIN_LOG_UPPER, LOW);
+    }
   } else {
     srp.set(AMP_LIN_LOG_LOWER, HIGH);
+    if (wholemode) {
+      srp.set(AMP_LIN_LOG_UPPER, HIGH);
+    }
   }
 }
 
@@ -1663,7 +1824,6 @@ void updatePatchname() {
 
 void myControlChange(byte channel, byte control, int value) {
 
-  //  Serial.println("MIDI: " + String(control) + " : " + String(value));
   switch (control) {
     case CCpwLFO:
       if (upperSW) {
@@ -2164,90 +2324,90 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CCglideSW:
       if (upperSW) {
-        value > 0 ? glideSWU = 1 : glideSWU = 0;
+        glideSWU = !glideSWU;
       } else {
-        value > 0 ? glideSWL = 1 : glideSWL = 0;
+        glideSWL = !glideSWL;
       }
       updateglideSW(1);
       break;
 
     case CCfilterPoleSW:
       if (upperSW) {
-        value > 0 ? filterPoleSWU = 1 : filterPoleSWU = 0;
+        filterPoleSWU = !filterPoleSWU;
       } else {
-        value > 0 ? filterPoleSWL = 1 : filterPoleSWL = 0;
+        filterPoleSWL = !filterPoleSWL;
       }
       updatefilterPoleSwitch(1);
       break;
 
     case CCfilterVel:
       if (upperSW) {
-        value > 0 ? filterVelU = 1 : filterVelU = 0;
+        filterVelU = !filterVelU;
       } else {
-        value > 0 ? filterVelL = 1 : filterVelL = 0;
+        filterVelL = !filterVelL;
       }
       updatefilterVel(1);
       break;
 
     case CCfilterEGinv:
       if (upperSW) {
-        value > 0 ? filterEGinvU = 1 : filterEGinvU = 0;
+        filterEGinvU = !filterEGinvU;
       } else {
-        value > 0 ? filterEGinvL = 1 : filterEGinvL = 0;
+        filterEGinvL = !filterEGinvL;
       }
       updatefilterEGinv(1);
       break;
 
     case CCfilterLoop:
       if (upperSW) {
-        value > 0 ? filterLoopU = 1 : filterLoopU = 0;
+        filterLoopU = !filterLoopU;
       } else {
-        value > 0 ? filterLoopL = 1 : filterLoopL = 0;
+        filterLoopL = !filterLoopL;
       }
       updatefilterLoop(1);
       break;
 
     case CCvcaLoop:
       if (upperSW) {
-        value > 0 ? vcaLoopU = 1 : vcaLoopU = 0;
+        vcaLoopU = !vcaLoopU;
       } else {
-        value > 0 ? vcaLoopL = 1 : vcaLoopL = 0;
+        vcaLoopL = !vcaLoopL;
       }
       updatevcaLoop(1);
       break;
 
     case CCvcaVel:
       if (upperSW) {
-        value > 0 ? vcaVelU = 1 : vcaVelU = 0;
+        vcaVelU = !vcaVelU;
       } else {
-        value > 0 ? vcaVelL = 1 : vcaVelL = 0;
+        vcaVelL = !vcaVelL;
       }
       updatevcaVel(1);
       break;
 
     case CCvcaGate:
       if (upperSW) {
-        value > 0 ? vcaGateU = 1 : vcaGateU = 0;
+        vcaGateU = !vcaGateU;
       } else {
-        value > 0 ? vcaGateL = 1 : vcaGateL = 0;
+        vcaGateL = !vcaGateL;
       }
       updatevcaGate(1);
       break;
 
     case CCchorus1:
       if (upperSW) {
-        value > 0 ? chorus1U = 1 : chorus1U = 0;
+        chorus1U = !chorus1U;
       } else {
-        value > 0 ? chorus1L = 1 : chorus1L = 0;
+        chorus1L = !chorus1L;
       }
       updatechorus1(1);
       break;
 
     case CCchorus2:
       if (upperSW) {
-        value > 0 ? chorus2U = 1 : chorus2U = 0;
+        chorus2U = !chorus2U;
       } else {
-        value > 0 ? chorus2L = 1 : chorus2L = 0;
+        chorus2L = !chorus2L;
       }
       updatechorus2(1);
       break;
@@ -2637,10 +2797,32 @@ void setCurrentPatchData(String data[]) {
     }
   }
 
+  if (wholemode) {
+    //Switches
+    oldupperSW = upperSW;
+    for (upperSW = 0; upperSW < 2; upperSW++) {
+      updatefilterPoleSwitch(0);
+      updatefilterLoop(0);
+      updatefilterEGinv(0);
+      updatefilterVel(0);
+      updatevcaLoop(0);
+      updatevcaVel(0);
+      updatevcaGate(0);
+      updatelfoAlt(0);
+      updatechorus1(0);
+      updatechorus2(0);
+      updateosc1Range(0);
+      updateosc2Range(0);
+      updateFilterType(0);
+      updateMonoMulti(0);
+      updateFilterEnv(0);
+      updateAmpEnv(0);
+      updateglideSW(0);
+      updatekeyTrackSW(0);
+    }
+    upperSW = oldupperSW;
 
-  //Switches
-  oldupperSW = upperSW;
-  for (upperSW = 0; upperSW < 2; upperSW++) {
+  } else {
     updatefilterPoleSwitch(0);
     updatefilterLoop(0);
     updatefilterEGinv(0);
@@ -2660,7 +2842,6 @@ void setCurrentPatchData(String data[]) {
     updateglideSW(0);
     updatekeyTrackSW(0);
   }
-  upperSW = oldupperSW;
 
   //Patchname
   updatePatchname();
@@ -3426,14 +3607,10 @@ void checkEncoder() {
         if (upperSW) {
           patches.push(patches.shift());
           patchNoU = patches.first().patchNo;
-          Serial.print("Recalling Upper ");
-          Serial.println(patchNoU);
           recallPatch(patchNoU);
         } else {
           patches.push(patches.shift());
           patchNoL = patches.first().patchNo;
-          Serial.print("Recalling Lower ");
-          Serial.println(patchNoL);
           recallPatch(patchNoL);
         }
         state = PARAMETER;
@@ -3470,14 +3647,10 @@ void checkEncoder() {
         if (upperSW) {
           patches.unshift(patches.pop());
           patchNoU = patches.first().patchNo;
-          Serial.print("Recalling Upper ");
-          Serial.println(patchNoU);
           recallPatch(patchNoU);
         } else {
           patches.unshift(patches.pop());
           patchNoL = patches.first().patchNo;
-          Serial.print("Recalling Lower ");
-          Serial.println(patchNoL);
           recallPatch(patchNoL);
         }
         state = PARAMETER;
