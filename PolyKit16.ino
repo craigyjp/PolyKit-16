@@ -110,7 +110,7 @@ int oldkeyTrackSWL;
 
 // create a global shift register object
 // parameters: <number of shift registers> (data pin, clock pin, latch pin)
-ShiftRegister74HC595<2> sr(23, 22, 21);
+ShiftRegister74HC595<3> sr(23, 22, 21);
 ShiftRegister74HC595<6> srp(20, 19, 41);
 
 #define OCTO_TOTAL 2
@@ -761,8 +761,8 @@ void updateOsc1SubLevel() {
   showCurrentParameterPage("OSC1 Sub", int(osc1SubLevelstr));
 }
 
-void updatebalance() {
-  showCurrentParameterPage("Layer Balance", int(balancestr));
+void updateamDepth() {
+  showCurrentParameterPage("AM Depth", int(amDepthstr));
 }
 
 void updateFilterCutoff() {
@@ -1176,37 +1176,37 @@ void updateglideSW(boolean announce) {
     if (glideSWU == 0) {
       if (announce) {
         showCurrentParameterPage("Glide", "Off");
+        midiCCOut(CCglideSW, 1);
+        delay(1);
+        midiCCOut(CCglideTime, 0);
       }
       sr.set(GLIDE_LED, LOW);  // LED off
-      midiCCOut(CCglideSW, 1);
-      delay(1);
-      midiCCOut(CCglideTime, 0);
     } else {
       if (announce) {
         showCurrentParameterPage("Glide", "On");
+        midiCCOut(CCglideTime, int(glideTime / 8));
+        delay(1);
+        midiCCOut(CCglideSW, 127);
       }
       sr.set(GLIDE_LED, HIGH);  // LED on
-      midiCCOut(CCglideTime, int(glideTime / 8));
-      delay(1);
-      midiCCOut(CCglideSW, 127);
     }
   } else {
     if (glideSWL == 0) {
       if (announce) {
         showCurrentParameterPage("Glide", "Off");
+        midiCCOut(CCglideSW, 1);
+        delay(1);
+        midiCCOut(CCglideTime, 0);
       }
       sr.set(GLIDE_LED, LOW);  // LED off
-      midiCCOut(CCglideSW, 1);
-      delay(1);
-      midiCCOut(CCglideTime, 0);
     } else {
       if (announce) {
         showCurrentParameterPage("Glide", "On");
+        midiCCOut(CCglideTime, int(glideTime / 8));
+        delay(1);
+        midiCCOut(CCglideSW, 127);
       }
       sr.set(GLIDE_LED, HIGH);  // LED on
-      midiCCOut(CCglideTime, int(glideTime / 8));
-      delay(1);
-      midiCCOut(CCglideSW, 127);
     }
   }
 }
@@ -1216,39 +1216,39 @@ void updatefilterPoleSwitch(boolean announce) {
     if (filterPoleSWU == 1) {
       if (announce) {
         showCurrentParameterPage("VCF Pole", "On");
+        midiCCOut(CCfilterPoleSW, 127);
       }
       sr.set(FILTERPOLE_LED, HIGH);
       srp.set(FILTER_POLE_UPPER, HIGH);
-      midiCCOut(CCfilterPoleSW, 127);
     } else {
       if (announce) {
         showCurrentParameterPage("VCF Pole", "Off");
+        midiCCOut(CCfilterPoleSW, 1);
       }
       sr.set(FILTERPOLE_LED, LOW);
       srp.set(FILTER_POLE_UPPER, LOW);
-      midiCCOut(CCfilterPoleSW, 1);
     }
   } else {
     if (filterPoleSWL == 1) {
       if (announce) {
         showCurrentParameterPage("VCF Pole", "On");
+        midiCCOut(CCfilterPoleSW, 127);
       }
       sr.set(FILTERPOLE_LED, HIGH);
       srp.set(FILTER_POLE_LOWER, HIGH);
       if (wholemode) {
         srp.set(FILTER_POLE_UPPER, HIGH);
       }
-      midiCCOut(CCfilterPoleSW, 127);
     } else {
       if (announce) {
         showCurrentParameterPage("VCF Pole", "Off");
+        midiCCOut(CCfilterPoleSW, 1);
       }
       sr.set(FILTERPOLE_LED, LOW);
       srp.set(FILTER_POLE_LOWER, LOW);
       if (wholemode) {
         srp.set(FILTER_POLE_UPPER, LOW);
       }
-      midiCCOut(CCfilterPoleSW, 1);
     }
   }
 }
@@ -1257,88 +1257,148 @@ void updatefilterLoop(boolean announce) {
   if (upperSW) {
     if (filterLoopU == 1) {
       if (announce) {
-        showCurrentParameterPage("VCF EG Loop", "On");
+        showCurrentParameterPage("VCF Key Loop", "On");
+        midiCCOut(CCfilterLoop, 127);
       }
-      sr.set(FILTERLOOP_LED, HIGH);  // LED on
-      srp.set(FILTER_MODE_BIT0_UPPER, HIGH);
+      sr.set(FILTERLOOP_LED, LOW);  // LED on
+      sr.set(FILTERLOOP_DOUBLE_LED, HIGH);
+      srp.set(FILTER_MODE_BIT0_UPPER, LOW);
       srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
-      midiCCOut(CCfilterLoop, 127);
     } else {
       if (announce) {
-        showCurrentParameterPage("VCF EG Loop", "Off");
+        showCurrentParameterPage("VCF Key Loop", "Off");
+        midiCCOut(CCfilterLoop, 1);
       }
-      sr.set(FILTERLOOP_LED, LOW);  // LED off
+      sr.set(FILTERLOOP_LED, HIGH);  // LED off
+      sr.set(FILTERLOOP_DOUBLE_LED, HIGH);
       srp.set(FILTER_MODE_BIT0_UPPER, LOW);
       srp.set(FILTER_MODE_BIT1_UPPER, LOW);
-      midiCCOut(CCfilterLoop, 1);
     }
   } else {
     if (filterLoopL == 1) {
       if (announce) {
-        showCurrentParameterPage("VCF EG Loop", "On");
+        showCurrentParameterPage("VCF Key Loop", "On");
+        midiCCOut(CCfilterLoop, 127);
       }
-      sr.set(FILTERLOOP_LED, HIGH);  // LED on
-      srp.set(FILTER_MODE_BIT0_LOWER, HIGH);
+      sr.set(FILTERLOOP_LED, LOW);  // LED on
+      sr.set(FILTERLOOP_DOUBLE_LED, HIGH);
+      srp.set(FILTER_MODE_BIT0_LOWER, LOW);
       srp.set(FILTER_MODE_BIT1_LOWER, HIGH);
       if (wholemode) {
-        srp.set(FILTER_MODE_BIT0_UPPER, HIGH);
+        srp.set(FILTER_MODE_BIT0_UPPER, LOW);
         srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
       }
-      midiCCOut(CCfilterLoop, 127);
     } else {
       if (announce) {
-        showCurrentParameterPage("VCF EG Loop", "Off");
+        showCurrentParameterPage("VCF Key Loop", "Off");
+        midiCCOut(CCfilterLoop, 1);
       }
-      sr.set(FILTERLOOP_LED, LOW);  // LED off
+      sr.set(FILTERLOOP_LED, HIGH);  // LED off
+      sr.set(FILTERLOOP_DOUBLE_LED, HIGH);
       srp.set(FILTER_MODE_BIT0_LOWER, LOW);
       srp.set(FILTER_MODE_BIT1_LOWER, LOW);
       if (wholemode) {
         srp.set(FILTER_MODE_BIT0_UPPER, LOW);
         srp.set(FILTER_MODE_BIT1_UPPER, LOW);
       }
-      midiCCOut(CCfilterLoop, 1);
     }
   }
 }
+
+// void updatefilterdoubleLoop(boolean announce) {
+//   if (upperSW) {
+//     if (!filterLoopU) {
+//       if (filterdoubleLoopU == 1) {
+//         if (announce) {
+//           showCurrentParameterPage("VCF LFO Loop", "On");
+//         }
+//         sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
+//         sr.set(FILTERLOOP_LED, HIGH);        // led off
+//         srp.set(FILTER_MODE_BIT0_UPPER, HIGH);
+//         srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
+//         midiCCOut(CCfilterDoubleLoop, 127);
+//       } else {
+//         if (announce) {
+//           showCurrentParameterPage("VCF LFO Loop", "Off");
+//         }
+//         sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  //led off
+//         sr.set(FILTERLOOP_LED, HIGH);         // led off
+//         srp.set(FILTER_MODE_BIT0_UPPER, LOW);
+//         srp.set(FILTER_MODE_BIT1_UPPER, LOW);
+//         midiCCOut(CCfilterDoubleLoop, 1);
+//       }
+//     }
+//   } else {
+//     if (!filterLoopL) {
+//       if (filterdoubleLoopL == 1) {
+//         if (announce) {
+//           showCurrentParameterPage("VCF LFO Loop", "On");
+//         }
+//         sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
+//         sr.set(FILTERLOOP_LED, HIGH);        // led off
+//         srp.set(FILTER_MODE_BIT0_LOWER, HIGH);
+//         srp.set(FILTER_MODE_BIT1_LOWER, HIGH);
+//         if (wholemode) {
+//           srp.set(FILTER_MODE_BIT0_UPPER, HIGH);
+//           srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
+//         }
+//         midiCCOut(CCfilterDoubleLoop, 127);
+//       } else {
+//         if (announce) {
+//           showCurrentParameterPage("VCF LFO Loop", "Off");
+//         }
+//         sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED off
+//         sr.set(FILTERLOOP_LED, HIGH);         // led off
+//         srp.set(FILTER_MODE_BIT0_LOWER, LOW);
+//         srp.set(FILTER_MODE_BIT1_LOWER, LOW);
+//         if (wholemode) {
+//           srp.set(FILTER_MODE_BIT0_UPPER, LOW);
+//           srp.set(FILTER_MODE_BIT1_UPPER, LOW);
+//         }
+//         midiCCOut(CCfilterDoubleLoop, 1);
+//       }
+//     }
+//   }
+// }
 
 void updatefilterEGinv(boolean announce) {
   if (upperSW) {
     if (filterEGinvU == 0) {
       if (announce) {
         showCurrentParameterPage("Filter Env", "Positive");
+        midiCCOut(CCfilterEGinv, 1);
       }
       sr.set(FILTERINV_LED, LOW);  // LED off
       srp.set(FILTER_EG_INV_UPPER, LOW);
-      midiCCOut(CCfilterEGinv, 1);
     } else {
       if (announce) {
         showCurrentParameterPage("Filter Env", "Negative");
+        midiCCOut(CCfilterEGinv, 127);
       }
       sr.set(FILTERINV_LED, HIGH);  // LED on
       srp.set(FILTER_EG_INV_UPPER, HIGH);
-      midiCCOut(CCfilterEGinv, 127);
     }
   } else {
     if (filterEGinvL == 0) {
       if (announce) {
         showCurrentParameterPage("Filter Env", "Positive");
+        midiCCOut(CCfilterEGinv, 1);
       }
       sr.set(FILTERINV_LED, LOW);  // LED off
       srp.set(FILTER_EG_INV_LOWER, LOW);
       if (wholemode) {
         srp.set(FILTER_EG_INV_UPPER, LOW);
       }
-      midiCCOut(CCfilterEGinv, 1);
     } else {
       if (announce) {
         showCurrentParameterPage("Filter Env", "Negative");
+        midiCCOut(CCfilterEGinv, 127);
       }
       sr.set(FILTERINV_LED, HIGH);  // LED on
       srp.set(FILTER_EG_INV_LOWER, HIGH);
       if (wholemode) {
         srp.set(FILTER_EG_INV_UPPER, HIGH);
       }
-      midiCCOut(CCfilterEGinv, 127);
     }
   }
 }
@@ -1348,39 +1408,39 @@ void updatefilterVel(boolean announce) {
     if (filterVelU == 0) {
       if (announce) {
         showCurrentParameterPage("VCF Velocity", "Off");
+        midiCCOut(CCfilterVel, 1);
       }
       sr.set(FILTERVEL_LED, LOW);  // LED off
       srp.set(FILTER_VELOCITY_UPPER, LOW);
-      midiCCOut(CCfilterVel, 1);
     } else {
       if (announce) {
         showCurrentParameterPage("VCF Velocity", "On");
+        midiCCOut(CCfilterVel, 127);
       }
       sr.set(FILTERVEL_LED, HIGH);  // LED on
       srp.set(FILTER_VELOCITY_UPPER, HIGH);
-      midiCCOut(CCfilterVel, 127);
     }
   } else {
     if (filterVelL == 0) {
       if (announce) {
         showCurrentParameterPage("VCF Velocity", "Off");
+        midiCCOut(CCfilterVel, 1);
       }
       sr.set(FILTERVEL_LED, LOW);  // LED off
       srp.set(FILTER_VELOCITY_LOWER, LOW);
       if (wholemode) {
         srp.set(FILTER_VELOCITY_UPPER, LOW);
       }
-      midiCCOut(CCfilterVel, 1);
     } else {
       if (announce) {
         showCurrentParameterPage("VCF Velocity", "On");
+        midiCCOut(CCfilterVel, 127);
       }
       sr.set(FILTERVEL_LED, HIGH);  // LED on
       srp.set(FILTER_VELOCITY_LOWER, HIGH);
       if (wholemode) {
         srp.set(FILTER_VELOCITY_UPPER, HIGH);
       }
-      midiCCOut(CCfilterVel, 127);
     }
   }
 }
@@ -1389,88 +1449,148 @@ void updatevcaLoop(boolean announce) {
   if (upperSW) {
     if (vcaLoopU == 1) {
       if (announce) {
-        showCurrentParameterPage("VCA EG Loop", "On");
+        showCurrentParameterPage("VCA Key Loop", "On");
+        midiCCOut(CCvcaLoop, 127);
       }
-      sr.set(VCALOOP_LED, HIGH);  // LED on
-      srp.set(AMP_MODE_BIT0_UPPER, HIGH);
+      sr.set(VCALOOP_LED, LOW);
+      sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
+      srp.set(AMP_MODE_BIT0_UPPER, LOW);
       srp.set(AMP_MODE_BIT1_UPPER, HIGH);
-      midiCCOut(CCvcaLoop, 127);
     } else {
       if (announce) {
-        showCurrentParameterPage("VCA EG Loop", "Off");
+        showCurrentParameterPage("VCA Key Loop", "Off");
+        midiCCOut(CCvcaLoop, 1);
       }
-      sr.set(VCALOOP_LED, LOW);  // LED off
+      sr.set(VCALOOP_LED, HIGH);         // LED off
+      sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
       srp.set(AMP_MODE_BIT0_UPPER, LOW);
       srp.set(AMP_MODE_BIT1_UPPER, LOW);
-      midiCCOut(CCvcaLoop, 1);
     }
   } else {
     if (vcaLoopL == 1) {
       if (announce) {
-        showCurrentParameterPage("VCA EG Loop", "On");
+        showCurrentParameterPage("VCA Key Loop", "On");
+        midiCCOut(CCvcaLoop, 127);
       }
-      sr.set(VCALOOP_LED, HIGH);  // LED on
-      srp.set(AMP_MODE_BIT0_LOWER, HIGH);
+      sr.set(VCALOOP_LED, LOW);          // LED on
+      sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
+      srp.set(AMP_MODE_BIT0_LOWER, LOW);
       srp.set(AMP_MODE_BIT1_LOWER, HIGH);
       if (wholemode) {
-        srp.set(AMP_MODE_BIT0_UPPER, HIGH);
+        srp.set(AMP_MODE_BIT0_UPPER, LOW);
         srp.set(AMP_MODE_BIT1_UPPER, HIGH);
       }
-      midiCCOut(CCvcaLoop, 127);
     } else {
       if (announce) {
-        showCurrentParameterPage("VCA EG Loop", "Off");
+        showCurrentParameterPage("VCA Key Loop", "Off");
+        midiCCOut(CCvcaLoop, 1);
       }
-      sr.set(VCALOOP_LED, LOW);  // LED off
+      sr.set(VCALOOP_LED, HIGH);         // LED off
+      sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
       srp.set(AMP_MODE_BIT0_LOWER, LOW);
       srp.set(AMP_MODE_BIT1_LOWER, LOW);
       if (wholemode) {
         srp.set(AMP_MODE_BIT0_UPPER, LOW);
         srp.set(AMP_MODE_BIT1_UPPER, LOW);
       }
-      midiCCOut(CCvcaLoop, 1);
     }
   }
 }
+
+// void updatevcadoubleLoop(boolean announce) {
+//   if (upperSW) {
+//     if (!vcaLoopU) {
+//       if (vcadoubleLoopU == 1) {
+//         if (announce) {
+//           showCurrentParameterPage("VCA LFO Loop", "On");
+//         }
+//         sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
+//         sr.set(VCALOOP_LED, HIGH);
+//         srp.set(AMP_MODE_BIT0_UPPER, HIGH);
+//         srp.set(AMP_MODE_BIT1_UPPER, HIGH);
+//         midiCCOut(CCvcaDoubleLoop, 127);
+//       } else {
+//         if (announce) {
+//           showCurrentParameterPage("VCA LFO Loop", "Off");
+//         }
+//         sr.set(VCALOOP_DOUBLE_LED, HIGH);
+//         sr.set(VCALOOP_LED, HIGH);
+//         srp.set(AMP_MODE_BIT0_UPPER, LOW);
+//         srp.set(AMP_MODE_BIT1_UPPER, LOW);
+//         midiCCOut(CCvcaDoubleLoop, 1);
+//       }
+//     }
+//   } else {
+//     if (!vcaLoopL) {
+//       if (vcadoubleLoopL == 1) {
+//         if (announce) {
+//           showCurrentParameterPage("VCA LFO Loop", "On");
+//         }
+//         sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
+//         sr.set(VCALOOP_LED, HIGH);
+//         srp.set(AMP_MODE_BIT0_LOWER, HIGH);
+//         srp.set(AMP_MODE_BIT1_LOWER, HIGH);
+//         if (wholemode) {
+//           srp.set(AMP_MODE_BIT0_UPPER, HIGH);
+//           srp.set(AMP_MODE_BIT1_UPPER, HIGH);
+//         }
+//         midiCCOut(CCvcaDoubleLoop, 127);
+//       } else {
+//         if (announce) {
+//           showCurrentParameterPage("VCA LFO Loop", "Off");
+//         }
+//         sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED off
+//         sr.set(VCALOOP_LED, HIGH);         // led off
+//         srp.set(AMP_MODE_BIT0_LOWER, LOW);
+//         srp.set(AMP_MODE_BIT1_LOWER, LOW);
+//         if (wholemode) {
+//           srp.set(AMP_MODE_BIT0_UPPER, LOW);
+//           srp.set(AMP_MODE_BIT1_UPPER, LOW);
+//         }
+//         midiCCOut(CCvcaDoubleLoop, 1);
+//       }
+//     }
+//   }
+// }
 
 void updatevcaVel(boolean announce) {
   if (upperSW) {
     if (vcaVelU == 0) {
       if (announce) {
         showCurrentParameterPage("VCA Velocity", "Off");
+        midiCCOut(CCvcaVel, 1);
       }
       sr.set(VCAVEL_LED, LOW);  // LED off
       srp.set(AMP_VELOCITY_UPPER, LOW);
-      midiCCOut(CCvcaVel, 1);
     } else {
       if (announce) {
         showCurrentParameterPage("VCA Velocity", "On");
+        midiCCOut(CCvcaVel, 127);
       }
       sr.set(VCAVEL_LED, HIGH);  // LED on
       srp.set(AMP_VELOCITY_UPPER, HIGH);
-      midiCCOut(CCvcaVel, 127);
     }
   } else {
     if (vcaVelL == 0) {
       if (announce) {
         showCurrentParameterPage("VCA Velocity", "Off");
+        midiCCOut(CCvcaVel, 1);
       }
       sr.set(VCAVEL_LED, LOW);  // LED off
       srp.set(AMP_VELOCITY_LOWER, LOW);
       if (wholemode) {
         srp.set(AMP_VELOCITY_UPPER, LOW);
       }
-      midiCCOut(CCvcaVel, 1);
     } else {
       if (announce) {
         showCurrentParameterPage("VCA Velocity", "On");
+        midiCCOut(CCvcaVel, 127);
       }
       sr.set(VCAVEL_LED, HIGH);  // LED on
       srp.set(AMP_VELOCITY_LOWER, HIGH);
       if (wholemode) {
         srp.set(AMP_VELOCITY_UPPER, HIGH);
       }
-      midiCCOut(CCvcaVel, 127);
     }
   }
 }
@@ -1481,29 +1601,29 @@ void updatevcaGate(boolean announce) {
     if (vcaGateU == 0) {
       if (announce) {
         showCurrentParameterPage("VCA Gate", "Off");
+        midiCCOut(CCvcaGate, 1);
       }
       sr.set(VCAGATE_LED, LOW);  // LED off
       ampAttackU = oldampAttackU;
       ampDecayU = oldampDecayU;
       ampSustainU = oldampSustainU;
       ampReleaseU = oldampReleaseU;
-      midiCCOut(CCvcaGate, 1);
-
     } else {
       if (announce) {
         showCurrentParameterPage("VCA Gate", "On");
+        midiCCOut(CCvcaGate, 127);
       }
       sr.set(VCAGATE_LED, HIGH);  // LED on
       ampAttackU = 0;
       ampDecayU = 0;
       ampSustainU = 1023;
       ampReleaseU = 0;
-      midiCCOut(CCvcaGate, 127);
     }
   } else {
     if (vcaGateL == 0) {
       if (announce) {
         showCurrentParameterPage("VCA Gate", "Off");
+        midiCCOut(CCvcaGate, 1);
       }
       sr.set(VCAGATE_LED, LOW);  // LED off
       ampAttackL = oldampAttackL;
@@ -1516,10 +1636,10 @@ void updatevcaGate(boolean announce) {
         ampSustainU = oldampSustainU;
         ampReleaseU = oldampReleaseU;
       }
-      midiCCOut(CCvcaGate, 1);
     } else {
       if (announce) {
         showCurrentParameterPage("VCA Gate", "On");
+        midiCCOut(CCvcaGate, 127);
       }
       sr.set(VCAGATE_LED, HIGH);  // LED on
       ampAttackL = 0;
@@ -1532,7 +1652,6 @@ void updatevcaGate(boolean announce) {
         ampSustainU = 1023;
         ampReleaseU = 0;
       }
-      midiCCOut(CCvcaGate, 127);
     }
   }
 }
@@ -1542,39 +1661,39 @@ void updatelfoAlt(boolean announce) {
     if (lfoAltU == 0) {
       if (announce) {
         showCurrentParameterPage("LFO Waveform", String("Original"));
+        midiCCOut(CClfoAlt, 1);
       }
       sr.set(LFO_ALT_LED, LOW);  // LED off
       srp.set(LFO_ALT_UPPER, HIGH);
-      midiCCOut(CClfoAlt, 1);
     } else {
       if (announce) {
         showCurrentParameterPage("LFO Waveform", String("Alternate"));
+        midiCCOut(CClfoAlt, 127);
       }
       sr.set(LFO_ALT_LED, HIGH);  // LED on
       srp.set(LFO_ALT_UPPER, LOW);
-      midiCCOut(CClfoAlt, 127);
     }
   } else {
     if (lfoAltL == 0) {
       if (announce) {
         showCurrentParameterPage("LFO Waveform", String("Original"));
+        midiCCOut(CClfoAlt, 1);
       }
       sr.set(LFO_ALT_LED, LOW);  // LED off
       srp.set(LFO_ALT_LOWER, HIGH);
       if (wholemode) {
         srp.set(LFO_ALT_UPPER, HIGH);
       }
-      midiCCOut(CClfoAlt, 1);
     } else {
       if (announce) {
         showCurrentParameterPage("LFO Waveform", String("Alternate"));
+        midiCCOut(CClfoAlt, 127);
       }
       sr.set(LFO_ALT_LED, HIGH);  // LED on
       srp.set(LFO_ALT_LOWER, LOW);
       if (wholemode) {
         srp.set(LFO_ALT_UPPER, LOW);
       }
-      midiCCOut(CClfoAlt, 127);
     }
   }
 }
@@ -1583,10 +1702,10 @@ void updatekeyTrackSW(boolean announce) {
   if (upperSW) {
     if (keyTrackSWU == 0) {
       srp.set(FILTER_KEYTRACK_UPPER, LOW);
-      midiCCOut(CCkeyTrackSW, 1);
+      //midiCCOut(CCkeyTrackSW, 1);
     } else {
       srp.set(FILTER_KEYTRACK_UPPER, HIGH);
-      midiCCOut(CCkeyTrackSW, 127);
+      //midiCCOut(CCkeyTrackSW, 127);
     }
   } else {
     if (keyTrackSWL == 0) {
@@ -1594,13 +1713,13 @@ void updatekeyTrackSW(boolean announce) {
       if (wholemode) {
         srp.set(FILTER_KEYTRACK_UPPER, LOW);
       }
-      midiCCOut(CCkeyTrackSW, 1);
+      //midiCCOut(CCkeyTrackSW, 1);
     } else {
       srp.set(FILTER_KEYTRACK_LOWER, HIGH);
       if (wholemode) {
         srp.set(FILTER_KEYTRACK_UPPER, HIGH);
       }
-      midiCCOut(CCkeyTrackSW, 127);
+      //midiCCOut(CCkeyTrackSW, 127);
     }
   }
 }
@@ -1662,35 +1781,36 @@ void updatechorus1(boolean announce) {
     if (!chorus1U) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("Off"));
+        midiCCOut(CCchorus1, 1);
       }
       sr.set(CHORUS1_LED, LOW);  // LED off
       srp.set(CHORUS1_OUT_UPPER, LOW);
-      midiCCOut(CCchorus1, 1);
     }
     if (chorus1U) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("On"));
+        midiCCOut(CCchorus1, 127);
       }
       sr.set(CHORUS1_LED, HIGH);  // LED on
       srp.set(CHORUS1_OUT_UPPER, HIGH);
-      midiCCOut(CCchorus1, 127);
     }
   }
   if (!upperSW) {
     if (!chorus1L) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("Off"));
+        midiCCOut(CCchorus1, 1);
       }
       sr.set(CHORUS1_LED, LOW);  // LED off
       srp.set(CHORUS1_OUT_LOWER, LOW);
       if (wholemode) {
         srp.set(CHORUS1_OUT_UPPER, LOW);
       }
-      midiCCOut(CCchorus1, 1);
     }
     if (chorus1L) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("On"));
+        midiCCOut(CCchorus1, 127);
       }
       sr.set(CHORUS1_LED, HIGH);  // LED on
       srp.set(CHORUS1_OUT_LOWER, HIGH);
@@ -1698,7 +1818,6 @@ void updatechorus1(boolean announce) {
       if (wholemode) {
         srp.set(CHORUS1_OUT_UPPER, HIGH);
       }
-      midiCCOut(CCchorus1, 127);
     }
   }
 }
@@ -1708,42 +1827,42 @@ void updatechorus2(boolean announce) {
     if (!chorus2U) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("Off"));
+        midiCCOut(CCchorus2, 1);
       }
       sr.set(CHORUS2_LED, LOW);  // LED off
       srp.set(CHORUS2_OUT_UPPER, LOW);
-      midiCCOut(CCchorus2, 1);
     }
     if (chorus2U) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("On"));
+        midiCCOut(CCchorus2, 127);
       }
       sr.set(CHORUS2_LED, HIGH);  // LED on
       srp.set(CHORUS2_OUT_UPPER, HIGH);
-      midiCCOut(CCchorus2, 127);
     }
   }
   if (!upperSW) {
     if (!chorus2L) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("Off"));
+        midiCCOut(CCchorus2, 1);
       }
       sr.set(CHORUS2_LED, LOW);  // LED off
       srp.set(CHORUS2_OUT_LOWER, LOW);
       if (wholemode) {
         srp.set(CHORUS2_OUT_UPPER, LOW);
       }
-      midiCCOut(CCchorus2, 1);
     }
     if (chorus2L) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("On"));
+        midiCCOut(CCchorus2, 127);
       }
       sr.set(CHORUS2_LED, HIGH);  // LED on
       srp.set(CHORUS2_OUT_LOWER, HIGH);
       if (wholemode) {
         srp.set(CHORUS2_OUT_UPPER, HIGH);
       }
-      midiCCOut(CCchorus2, 127);
     }
   }
 }
@@ -2306,18 +2425,18 @@ void myControlChange(byte channel, byte control, int value) {
       break;
 
 
-    case CCbalance:
+    case CCamDepth:
       if (upperSW) {
-        balanceU = value;
+        amDepthU = value;
       } else {
-        balanceL = value;
+        amDepthL = value;
         if (wholemode) {
-          balanceU = value;
+          amDepthU = value;
         }
       }
-      balance = value;
-      balancestr = value / midioutfrig;
-      updatebalance();
+      amDepth = value;
+      amDepthstr = value / midioutfrig;
+      updateamDepth();
       break;
 
       ////////////////////////////////////////////////
@@ -2367,6 +2486,15 @@ void myControlChange(byte channel, byte control, int value) {
       updatefilterLoop(1);
       break;
 
+      // case CCfilterDoubleLoop:
+      //   if (upperSW) {
+      //     filterdoubleLoopU = !filterdoubleLoopU;
+      //   } else {
+      //     filterdoubleLoopL = !filterdoubleLoopL;
+      //   }
+      //   updatefilterdoubleLoop(1);
+      //   break;
+
     case CCvcaLoop:
       if (upperSW) {
         vcaLoopU = !vcaLoopU;
@@ -2375,6 +2503,15 @@ void myControlChange(byte channel, byte control, int value) {
       }
       updatevcaLoop(1);
       break;
+
+      // case CCvcaDoubleLoop:
+      //   if (upperSW) {
+      //     vcadoubleLoopU = !vcadoubleLoopU;
+      //   } else {
+      //     vcadoubleLoopL = !vcadoubleLoopL;
+      //   }
+      //   updatevcadoubleLoop(1);
+      //   break;
 
     case CCvcaVel:
       if (upperSW) {
@@ -2607,8 +2744,8 @@ void setCurrentPatchData(String data[]) {
     filterLFOU = data[18].toFloat();
     filterResU = data[19].toFloat();
     filterTypeU = data[20].toFloat();
-    filterAU = data[21].toFloat();
-    filterBU = data[22].toFloat();
+    filterdoubleLoopU = data[21].toFloat();
+    vcadoubleLoopU = data[22].toFloat();
     filterCU = data[23].toFloat();
     filterEGlevelU = data[24].toFloat();
     LFORateU = data[25].toFloat();
@@ -2637,7 +2774,7 @@ void setCurrentPatchData(String data[]) {
     monoMultiU = data[48].toInt();
     modWheelLevelU = data[49].toFloat();
     PitchBendLevelU = data[50].toFloat();
-    linLog = data[51].toInt();
+    amDepthU = data[51].toInt();
     oct1AU = data[52].toFloat();
     oct1BU = data[53].toFloat();
     oct2AU = data[54].toFloat();
@@ -2677,8 +2814,8 @@ void setCurrentPatchData(String data[]) {
     filterLFOL = data[18].toFloat();
     filterResL = data[19].toFloat();
     filterTypeL = data[20].toFloat();
-    filterAL = data[21].toFloat();
-    filterBL = data[22].toFloat();
+    filterdoubleLoopL = data[21].toFloat();
+    vcadoubleLoopL = data[22].toFloat();
     filterCL = data[23].toFloat();
     filterEGlevelL = data[24].toFloat();
     LFORateL = data[25].toFloat();
@@ -2707,7 +2844,7 @@ void setCurrentPatchData(String data[]) {
     monoMultiL = data[48].toInt();
     modWheelLevelL = data[49].toFloat();
     PitchBendLevelL = data[50].toFloat();
-    linLogL = data[51].toInt();
+    amDepthL = data[51].toInt();
     oct1AL = data[52].toFloat();
     oct1BL = data[53].toFloat();
     oct2AL = data[54].toFloat();
@@ -2747,8 +2884,8 @@ void setCurrentPatchData(String data[]) {
       filterLFOU = data[18].toFloat();
       filterResU = data[19].toFloat();
       filterTypeU = data[20].toFloat();
-      filterAU = data[21].toFloat();
-      filterBU = data[22].toFloat();
+      filterdoubleLoopU = data[21].toFloat();
+      vcadoubleLoopU = data[22].toFloat();
       filterCU = data[23].toFloat();
       filterEGlevelU = data[24].toFloat();
       LFORateU = data[25].toFloat();
@@ -2777,7 +2914,7 @@ void setCurrentPatchData(String data[]) {
       monoMultiU = data[48].toInt();
       modWheelLevelU = data[49].toFloat();
       PitchBendLevelU = data[50].toFloat();
-      linLog = data[51].toInt();
+      amDepthU = data[51].toInt();
       oct1AU = data[52].toFloat();
       oct1BU = data[53].toFloat();
       oct2AU = data[54].toFloat();
@@ -2803,9 +2940,11 @@ void setCurrentPatchData(String data[]) {
     for (upperSW = 0; upperSW < 2; upperSW++) {
       updatefilterPoleSwitch(0);
       updatefilterLoop(0);
+      //updatefilterdoubleLoop(0);
       updatefilterEGinv(0);
       updatefilterVel(0);
       updatevcaLoop(0);
+      //updatevcadoubleLoop(0);
       updatevcaVel(0);
       updatevcaGate(0);
       updatelfoAlt(0);
@@ -2825,9 +2964,11 @@ void setCurrentPatchData(String data[]) {
   } else {
     updatefilterPoleSwitch(0);
     updatefilterLoop(0);
+    //updatefilterdoubleLoop(0);
     updatefilterEGinv(0);
     updatefilterVel(0);
     updatevcaLoop(0);
+    //updatevcadoubleLoop(0);
     updatevcaVel(0);
     updatevcaGate(0);
     updatelfoAlt(0);
@@ -2850,9 +2991,11 @@ void setCurrentPatchData(String data[]) {
 void setAllButtons() {
   updatefilterPoleSwitch(0);
   updatefilterLoop(0);
+  //updatefilterdoubleLoop(0);
   updatefilterEGinv(0);
   updatefilterVel(0);
   updatevcaLoop(0);
+  //updatevcadoubleLoop(0);
   updatevcaVel(0);
   updatevcaGate(0);
   updatelfoAlt(0);
@@ -2863,9 +3006,9 @@ void setAllButtons() {
 
 String getCurrentPatchData() {
   if (upperSW) {
-    return patchNameU + "," + String(pwLFOU) + "," + String(fmDepthU) + "," + String(osc2PWU) + "," + String(osc2PWMU) + "," + String(osc1PWU) + "," + String(osc1PWMU) + "," + String(osc1RangeU) + "," + String(osc2RangeU) + "," + String(stackU) + "," + String(glideTimeU) + "," + String(osc2DetuneU) + "," + String(noiseLevelU) + "," + String(osc2SawLevelU) + "," + String(osc1SawLevelU) + "," + String(osc2PulseLevelU) + "," + String(osc1PulseLevelU) + "," + String(filterCutoffU) + "," + String(filterLFOU) + "," + String(filterResU) + "," + String(filterTypeU) + "," + String(filterAU) + "," + String(filterBU) + "," + String(filterCU) + "," + String(filterEGlevelU) + "," + String(LFORateU) + "," + String(LFOWaveformU) + "," + String(filterAttackU) + "," + String(filterDecayU) + "," + String(filterSustainU) + "," + String(filterReleaseU) + "," + String(ampAttackU) + "," + String(ampDecayU) + "," + String(ampSustainU) + "," + String(ampReleaseU) + "," + String(volumeControlU) + "," + String(glideSWU) + "," + String(keytrackU) + "," + String(filterPoleSWU) + "," + String(filterLoopU) + "," + String(filterEGinvU) + "," + String(filterVelU) + "," + String(vcaLoopU) + "," + String(vcaVelU) + "," + String(vcaGateU) + "," + String(lfoAltU) + "," + String(chorus1U) + "," + String(chorus2U) + "," + String(monoMultiU) + "," + String(modWheelLevelU) + "," + String(PitchBendLevelU) + "," + String(linLogU) + "," + String(oct1AU) + "," + String(oct1BU) + "," + String(oct2AU) + "," + String(oct2BU) + "," + String(oldampAttackU) + "," + String(oldampDecayU) + "," + String(oldampSustainU) + "," + String(oldampReleaseU) + "," + String(AfterTouchDestU) + "," + String(filterLogLinU) + "," + String(ampLogLinU) + "," + String(osc2TriangleLevelU) + "," + String(osc1SubLevelU) + "," + String(keyTrackSWU);
+    return patchNameU + "," + String(pwLFOU) + "," + String(fmDepthU) + "," + String(osc2PWU) + "," + String(osc2PWMU) + "," + String(osc1PWU) + "," + String(osc1PWMU) + "," + String(osc1RangeU) + "," + String(osc2RangeU) + "," + String(stackU) + "," + String(glideTimeU) + "," + String(osc2DetuneU) + "," + String(noiseLevelU) + "," + String(osc2SawLevelU) + "," + String(osc1SawLevelU) + "," + String(osc2PulseLevelU) + "," + String(osc1PulseLevelU) + "," + String(filterCutoffU) + "," + String(filterLFOU) + "," + String(filterResU) + "," + String(filterTypeU) + "," + String(filterdoubleLoopU) + "," + String(vcadoubleLoopU) + "," + String(filterCU) + "," + String(filterEGlevelU) + "," + String(LFORateU) + "," + String(LFOWaveformU) + "," + String(filterAttackU) + "," + String(filterDecayU) + "," + String(filterSustainU) + "," + String(filterReleaseU) + "," + String(ampAttackU) + "," + String(ampDecayU) + "," + String(ampSustainU) + "," + String(ampReleaseU) + "," + String(volumeControlU) + "," + String(glideSWU) + "," + String(keytrackU) + "," + String(filterPoleSWU) + "," + String(filterLoopU) + "," + String(filterEGinvU) + "," + String(filterVelU) + "," + String(vcaLoopU) + "," + String(vcaVelU) + "," + String(vcaGateU) + "," + String(lfoAltU) + "," + String(chorus1U) + "," + String(chorus2U) + "," + String(monoMultiU) + "," + String(modWheelLevelU) + "," + String(PitchBendLevelU) + "," + String(amDepthU) + "," + String(oct1AU) + "," + String(oct1BU) + "," + String(oct2AU) + "," + String(oct2BU) + "," + String(oldampAttackU) + "," + String(oldampDecayU) + "," + String(oldampSustainU) + "," + String(oldampReleaseU) + "," + String(AfterTouchDestU) + "," + String(filterLogLinU) + "," + String(ampLogLinU) + "," + String(osc2TriangleLevelU) + "," + String(osc1SubLevelU) + "," + String(keyTrackSWU);
   } else {
-    return patchNameL + "," + String(pwLFOL) + "," + String(fmDepthL) + "," + String(osc2PWL) + "," + String(osc2PWML) + "," + String(osc1PWL) + "," + String(osc1PWML) + "," + String(osc1RangeL) + "," + String(osc2RangeL) + "," + String(stackL) + "," + String(glideTimeL) + "," + String(osc2DetuneL) + "," + String(noiseLevelL) + "," + String(osc2SawLevelL) + "," + String(osc1SawLevelL) + "," + String(osc2PulseLevelL) + "," + String(osc1PulseLevelL) + "," + String(filterCutoffL) + "," + String(filterLFOL) + "," + String(filterResL) + "," + String(filterTypeL) + "," + String(filterAL) + "," + String(filterBL) + "," + String(filterCU) + "," + String(filterEGlevelL) + "," + String(LFORateL) + "," + String(LFOWaveformL) + "," + String(filterAttackL) + "," + String(filterDecayL) + "," + String(filterSustainL) + "," + String(filterReleaseL) + "," + String(ampAttackL) + "," + String(ampDecayL) + "," + String(ampSustainL) + "," + String(ampReleaseL) + "," + String(volumeControlL) + "," + String(glideSWL) + "," + String(keytrackL) + "," + String(filterPoleSWL) + "," + String(filterLoopL) + "," + String(filterEGinvL) + "," + String(filterVelL) + "," + String(vcaLoopL) + "," + String(vcaVelL) + "," + String(vcaGateL) + "," + String(lfoAltL) + "," + String(chorus1L) + "," + String(chorus2L) + "," + String(monoMultiL) + "," + String(modWheelLevelL) + "," + String(PitchBendLevelL) + "," + String(linLogL) + "," + String(oct1AL) + "," + String(oct1BL) + "," + String(oct2AL) + "," + String(oct2BL) + "," + String(oldampAttackL) + "," + String(oldampDecayL) + "," + String(oldampSustainL) + "," + String(oldampReleaseL) + "," + String(AfterTouchDestL) + "," + String(filterLogLinL) + "," + String(ampLogLinL) + "," + String(osc2TriangleLevelL) + "," + String(osc1SubLevelL) + "," + String(keyTrackSWL);
+    return patchNameL + "," + String(pwLFOL) + "," + String(fmDepthL) + "," + String(osc2PWL) + "," + String(osc2PWML) + "," + String(osc1PWL) + "," + String(osc1PWML) + "," + String(osc1RangeL) + "," + String(osc2RangeL) + "," + String(stackL) + "," + String(glideTimeL) + "," + String(osc2DetuneL) + "," + String(noiseLevelL) + "," + String(osc2SawLevelL) + "," + String(osc1SawLevelL) + "," + String(osc2PulseLevelL) + "," + String(osc1PulseLevelL) + "," + String(filterCutoffL) + "," + String(filterLFOL) + "," + String(filterResL) + "," + String(filterTypeL) + "," + String(filterdoubleLoopL) + "," + String(vcadoubleLoopL) + "," + String(filterCU) + "," + String(filterEGlevelL) + "," + String(LFORateL) + "," + String(LFOWaveformL) + "," + String(filterAttackL) + "," + String(filterDecayL) + "," + String(filterSustainL) + "," + String(filterReleaseL) + "," + String(ampAttackL) + "," + String(ampDecayL) + "," + String(ampSustainL) + "," + String(ampReleaseL) + "," + String(volumeControlL) + "," + String(glideSWL) + "," + String(keytrackL) + "," + String(filterPoleSWL) + "," + String(filterLoopL) + "," + String(filterEGinvL) + "," + String(filterVelL) + "," + String(vcaLoopL) + "," + String(vcaVelL) + "," + String(vcaGateL) + "," + String(lfoAltL) + "," + String(chorus1L) + "," + String(chorus2L) + "," + String(monoMultiL) + "," + String(modWheelLevelL) + "," + String(PitchBendLevelL) + "," + String(amDepthL) + "," + String(oct1AL) + "," + String(oct1BL) + "," + String(oct2AL) + "," + String(oct2BL) + "," + String(oldampAttackL) + "," + String(oldampDecayL) + "," + String(oldampSustainL) + "," + String(oldampReleaseL) + "," + String(AfterTouchDestL) + "," + String(filterLogLinL) + "," + String(ampLogLinL) + "," + String(osc2TriangleLevelL) + "," + String(osc1SubLevelL) + "," + String(keyTrackSWL);
   }
 }
 
@@ -3015,9 +3158,9 @@ void checkMux() {
   if (mux3Read > (mux3ValuesPrev[muxInput] + QUANTISE_FACTOR) || mux3Read < (mux3ValuesPrev[muxInput] - QUANTISE_FACTOR)) {
     mux3ValuesPrev[muxInput] = mux3Read;
     switch (muxInput) {
-      case MUX3_balance:
-        midiCCOut(CCbalance, mux3Read / midioutfrig);
-        myControlChange(midiChannel, CCbalance, mux3Read);
+      case MUX3_amDepth:
+        midiCCOut(CCamDepth, mux3Read / midioutfrig);
+        myControlChange(midiChannel, CCamDepth, mux3Read);
         break;
       case MUX3_ampSustain:
         midiCCOut(CCampSustain, mux3Read / midioutfrig);
@@ -3159,7 +3302,7 @@ void writeDemux() {
       delayMicroseconds(DelayForSH3);
       break;
     case 15:
-      MCP4922_write(DAC_CS1, int(balanceU * DACMULT), int(balanceL * DACMULT));  // use for balance
+      MCP4922_write(DAC_CS1, int(amDepthU * DACMULT), int(amDepthL * DACMULT));
       delayMicroseconds(DelayForSH3);
       break;
   }
@@ -3298,6 +3441,11 @@ void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
     myControlChange(midiChannel, CCglideSW, glideSW);
   }
 
+  // if (btnIndex == VCALOOP_SW && btnType == ROX_HELD) {
+  //   vcadoubleLoop = !vcadoubleLoop;
+  //   myControlChange(midiChannel, CCvcaDoubleLoop, vcadoubleLoop);
+  // }
+
   if (btnIndex == VCALOOP_SW && btnType == ROX_PRESSED) {
     vcaLoop = !vcaLoop;
     myControlChange(midiChannel, CCvcaLoop, vcaLoop);
@@ -3322,6 +3470,11 @@ void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
     filterPoleSW = !filterPoleSW;
     myControlChange(midiChannel, CCfilterPoleSW, filterPoleSW);
   }
+
+  // if (btnIndex == FILTERLOOP_SW && btnType == ROX_HELD) {
+  //   filterdoubleLoop = !filterdoubleLoop;
+  //   myControlChange(midiChannel, CCfilterDoubleLoop, filterdoubleLoop);
+  // }
 
   if (btnIndex == FILTERLOOP_SW && btnType == ROX_PRESSED) {
     filterLoop = !filterLoop;

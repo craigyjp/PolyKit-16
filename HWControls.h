@@ -72,7 +72,7 @@ ADC *adc = new ADC();
 
 //Mux 3 Connections
 #define MUX3_volumeControl 0		// 2V
-#define MUX3_balance 1			// 2V
+#define MUX3_amDepth 1			// 2V
 #define MUX3_ampSustain 2		// 5V
 #define MUX3_ampRelease 3		// 5V
 #define MUX3_filterRelease 4		// 5V
@@ -205,6 +205,9 @@ ADC *adc = new ADC();
 #define WHOLE_LED 13
 #define DUAL_LED 14
 #define SPLIT_LED 15
+
+#define VCALOOP_DOUBLE_LED 16
+#define FILTERLOOP_DOUBLE_LED 17
 
 //Switches
 // roxmux 74HC165

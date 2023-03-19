@@ -5,7 +5,7 @@
 #define   CCglideTime 5
 #define   CCvolumeControl 7
 
-#define   CCbalance 11
+#define   CCamDepth 11
 #define   CCstack 12
 #define   CCchorus1 13
 #define   CCchorus2 14
@@ -27,6 +27,7 @@
 #define   CCmonoMulti 37
 #define   CCkeyTrackSW 38
 #define   CCfilterType 39
+#define   CCvcaDoubleLoop 40
 #define   CCvcaLoop 41
 #define   CCvcaVel 42
 #define   CCfilterVel 43
@@ -36,6 +37,7 @@
 #define   CCfilterDecay 47
 #define   CCfilterLevel 48
 #define   CCfilterEGinv 50
+#define   CCfilterDoubleLoop 51
 #define   CCfilterLoop 52
 #define   CCfilterEGlevel 53
 #define   CCosc1Range 54
