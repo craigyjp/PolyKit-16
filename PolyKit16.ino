@@ -1729,12 +1729,12 @@ void updateupperLower() {
     if (upperSW) {
       // upper mode upperSW will be true
       sr.set(UPPER_LED, HIGH);  // LED off
-      srp.set(UPPER2, LOW);
+      //srp.set(UPPER2, LOW);
       setAllButtons();
     } else {
       // lower mode upperSW will be false
       sr.set(UPPER_LED, LOW);  // LED off
-      srp.set(UPPER2, HIGH);
+      //srp.set(UPPER2, HIGH);
       setAllButtons();
     }
   } else {
@@ -1749,7 +1749,7 @@ void updatewholemode() {
   sr.set(DUAL_LED, LOW);    // LED off
   sr.set(SPLIT_LED, LOW);   // LED off
   sr.set(UPPER_LED, LOW);   // LED off
-  srp.set(UPPER2, HIGH);
+  //srp.set(UPPER2, HIGH);
   upperSW = 0;
   setAllButtons();
   dualmode = 0;
@@ -1762,6 +1762,7 @@ void updatedualmode() {
   sr.set(DUAL_LED, HIGH);  // LED off
   sr.set(WHOLE_LED, LOW);  // LED off
   sr.set(SPLIT_LED, LOW);  // LED off
+  //srp.set(UPPER2, LOW);
   wholemode = 0;
   splitmode = 0;
 }
@@ -1772,6 +1773,7 @@ void updatesplitmode() {
   sr.set(SPLIT_LED, HIGH);  // LED off
   sr.set(WHOLE_LED, LOW);   // LED off
   sr.set(DUAL_LED, LOW);    // LED off
+  //srp.set(UPPER2, LOW);
   wholemode = 0;
   dualmode = 0;
 }
@@ -2496,11 +2498,6 @@ void myControlChange(byte channel, byte control, int value) {
       //   break;
 
     case CCvcaLoop:
-      if (upperSW) {
-        vcaLoopU = !vcaLoopU;
-      } else {
-        vcaLoopL = !vcaLoopL;
-      }
       updatevcaLoop(1);
       break;
 
@@ -3447,6 +3444,30 @@ void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
   // }
 
   if (btnIndex == VCALOOP_SW && btnType == ROX_PRESSED) {
+    // if (wholemode) {
+    //   vcaLoopU = vcaLoopL;
+    // }
+    // if (upperSW) {
+    //   Serial.println("Upper");
+    //   vcaLoopU = (vcaLoopU + 1);
+    //   if (vcaLoopU > 3) {
+    //     vcaLoopU = 1;
+    //   }
+    // } else {
+    //   Serial.println("Lower");
+    //   vcaLoopL = (vcaLoopL + 1);
+    //   if (vcaLoopL > 3) {
+    //     vcaLoopL = 1;
+    //   }
+    //   if (wholemode) {
+    //     vcaLoopU = vcaLoopL;
+    //   }
+    // }
+    // Serial.print("VCALoop Upper ");
+    // Serial.println(vcaLoopU);
+    // Serial.print("VCALoop Lower ");
+    // Serial.println(vcaLoopL);
+    // Serial.println();
     vcaLoop = !vcaLoop;
     myControlChange(midiChannel, CCvcaLoop, vcaLoop);
   }
