@@ -28,7 +28,7 @@ ADC *adc = new ADC();
 
 
 //Note DAC
-#define DACMULT 3.30
+#define DACMULT 3.20
 #define DAC_CS1 10
 #define DAC_CS2 37
 

@@ -251,9 +251,11 @@ void setup() {
   for (int i = 0; i < 8; i++) {
     int noteon = 60;
     MIDI.sendNoteOn(noteon, 64, 1);
-    MIDI.sendNoteOn(noteon, 64, 2);
     delayMicroseconds(DelayForSH3);
+    MIDI.sendNoteOn(noteon, 64, 2);
+    delay(5);
     MIDI.sendNoteOff(noteon, 64, 1);
+    delayMicroseconds(DelayForSH3);
     MIDI.sendNoteOff(noteon, 64, 2);
     noteon++;
   }
@@ -1749,7 +1751,7 @@ void updatewholemode() {
   sr.set(DUAL_LED, LOW);    // LED off
   sr.set(SPLIT_LED, LOW);   // LED off
   sr.set(UPPER_LED, LOW);   // LED off
-  //srp.set(UPPER2, HIGH);
+  srp.set(UPPER2, HIGH);
   upperSW = 0;
   setAllButtons();
   dualmode = 0;
@@ -1762,7 +1764,7 @@ void updatedualmode() {
   sr.set(DUAL_LED, HIGH);  // LED off
   sr.set(WHOLE_LED, LOW);  // LED off
   sr.set(SPLIT_LED, LOW);  // LED off
-  //srp.set(UPPER2, LOW);
+  srp.set(UPPER2, LOW);
   wholemode = 0;
   splitmode = 0;
 }
@@ -1773,7 +1775,7 @@ void updatesplitmode() {
   sr.set(SPLIT_LED, HIGH);  // LED off
   sr.set(WHOLE_LED, LOW);   // LED off
   sr.set(DUAL_LED, LOW);    // LED off
-  //srp.set(UPPER2, LOW);
+  srp.set(UPPER2, LOW);
   wholemode = 0;
   dualmode = 0;
 }
@@ -3235,144 +3237,109 @@ void MCP4922_write(const int &slavePin, const int &value1, const int &value2) {
 
 void writeDemux() {
   //DEMUX 1
-  digitalWriteFast(DEMUX_EN_1, LOW);
+  //digitalWriteFast(DEMUX_EN_1, LOW);
 
   switch (muxOutput) {
     case 0:
       MCP4922_write(DAC_CS1, int(fmDepthU * DACMULT), int(fmDepthL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(filterAttackU * DACMULT), int(filterAttackL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 1:
       MCP4922_write(DAC_CS1, int(osc2PWMU * DACMULT), int(osc2PWML * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(filterDecayU * DACMULT), int(filterDecayL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 2:
       MCP4922_write(DAC_CS1, int(osc1PWMU * DACMULT), int(osc1PWML * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(filterSustainU * DACMULT), int(filterSustainL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 3:
       MCP4922_write(DAC_CS1, int(stackU * DACMULT), int(stackL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(filterReleaseU * DACMULT), int(filterReleaseL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 4:
       MCP4922_write(DAC_CS1, int(osc2DetuneU * DACMULT), int(osc2DetuneL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(ampAttackU * DACMULT), int(ampAttackL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 5:
       MCP4922_write(DAC_CS1, int(noiseLevelU * DACMULT), int(noiseLevelL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(ampDecayU * DACMULT), int(ampDecayL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 6:
       MCP4922_write(DAC_CS1, int(filterLFOU * DACMULT), int(filterLFOL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(ampSustainU * DACMULT), int(ampSustainL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 7:
       MCP4922_write(DAC_CS1, int(volumeControlU * DACMULT), int(volumeControlL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(ampReleaseU * DACMULT), int(ampReleaseL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 8:
       MCP4922_write(DAC_CS1, int(osc1SawLevelU * DACMULT), int(osc1SawLevelL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(pwLFOU * DACMULT), int(pwLFOL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 9:
       MCP4922_write(DAC_CS1, int(osc1PulseLevelU * DACMULT), int(osc1PulseLevelL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(LFORateU * DACMULT), int(LFORateL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 10:
       MCP4922_write(DAC_CS1, int(osc2SawLevelU * DACMULT), int(osc2SawLevelL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(LFOWaveformU * DACMULT), int(LFOWaveformL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 11:
       MCP4922_write(DAC_CS1, int(osc2PulseLevelU * DACMULT), int(osc2PulseLevelL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(filterEGlevelU * DACMULT), int(filterEGlevelL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 12:
       MCP4922_write(DAC_CS1, int(keytrackU * DACMULT), int(keytrackL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(filterCutoffU * DACMULT), int(filterCutoffL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 13:
       MCP4922_write(DAC_CS1, int(osc1PWU * DACMULT), int(osc1PWL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(filterResU * DACMULT), int(filterResL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 14:
       MCP4922_write(DAC_CS1, int(osc2PWU * DACMULT), int(osc2PWL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_1, LOW);
+      MCP4922_write(DAC_CS2, int(osc1SubLevelU * DACMULT), int(osc1SubLevelL * DACMULT));
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 15:
       MCP4922_write(DAC_CS1, int(amDepthU * DACMULT), int(amDepthL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-  }
-  digitalWriteFast(DEMUX_EN_1, HIGH);
-
-  digitalWriteFast(DEMUX_EN_2, LOW);
-  switch (muxOutput) {
-
-    case 0:
-      MCP4922_write(DAC_CS2, int(filterAttackU * DACMULT), int(filterAttackL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 1:
-      MCP4922_write(DAC_CS2, int(filterDecayU * DACMULT), int(filterDecayL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 2:
-      MCP4922_write(DAC_CS2, int(filterSustainU * DACMULT), int(filterSustainL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 3:
-      MCP4922_write(DAC_CS2, int(filterReleaseU * DACMULT), int(filterReleaseL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 4:
-      MCP4922_write(DAC_CS2, int(ampAttackU * DACMULT), int(ampAttackL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 5:
-      MCP4922_write(DAC_CS2, int(ampDecayU * DACMULT), int(ampDecayL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 6:
-      MCP4922_write(DAC_CS2, int(ampSustainU * DACMULT), int(ampSustainL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 7:
-      MCP4922_write(DAC_CS2, int(ampReleaseU * DACMULT), int(ampReleaseL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 8:
-      MCP4922_write(DAC_CS2, int(pwLFOU * DACMULT), int(pwLFOL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 9:
-      MCP4922_write(DAC_CS2, int(LFORateU * DACMULT), int(LFORateL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 10:
-      MCP4922_write(DAC_CS2, int(LFOWaveformU * DACMULT), int(LFOWaveformL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 11:
-      MCP4922_write(DAC_CS2, int(filterEGlevelU * DACMULT), int(filterEGlevelL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 12:
-      MCP4922_write(DAC_CS2, int(filterCutoffU * DACMULT), int(filterCutoffL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 13:
-      MCP4922_write(DAC_CS2, int(filterResU * DACMULT), int(filterResL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 14:
-      MCP4922_write(DAC_CS2, int(osc1SubLevelU * DACMULT), int(osc1SubLevelL * DACMULT));
-      delayMicroseconds(DelayForSH3);
-      break;
-    case 15:
+      digitalWriteFast(DEMUX_EN_1, LOW);
       MCP4922_write(DAC_CS2, int(osc2TriangleLevelU * DACMULT), int(osc2TriangleLevelL * DACMULT));
-      delayMicroseconds(DelayForSH3);
+      digitalWriteFast(DEMUX_EN_2, LOW);
       break;
   }
+
+  delayMicroseconds(800);
+  digitalWriteFast(DEMUX_EN_1, HIGH);
   digitalWriteFast(DEMUX_EN_2, HIGH);
 
   muxOutput++;
