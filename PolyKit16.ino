@@ -217,18 +217,18 @@ void setup() {
   digitalWriteFast(DEMUX_1, HIGH);
   digitalWriteFast(DEMUX_2, HIGH);
   digitalWriteFast(DEMUX_3, LOW);
-  digitalWriteFast(DEMUX_EN_1, LOW);
   MCP4922_write(DAC_CS1, 0, 0);
-  delayMicroseconds(DelayForSH3);
+  digitalWriteFast(DEMUX_EN_1, LOW);
+  delayMicroseconds(800);
   // detune to 0
   digitalWriteFast(DEMUX_EN_1, HIGH);
   digitalWriteFast(DEMUX_0, HIGH);
   digitalWriteFast(DEMUX_1, HIGH);
   digitalWriteFast(DEMUX_2, LOW);
   digitalWriteFast(DEMUX_3, LOW);
-  digitalWriteFast(DEMUX_EN_1, LOW);
   MCP4922_write(DAC_CS1, 0, 0);
-  delayMicroseconds(DelayForSH3);
+  digitalWriteFast(DEMUX_EN_1, LOW);
+  delayMicroseconds(800);
   // set the mux back to 0000
   digitalWriteFast(DEMUX_EN_1, HIGH);
   digitalWriteFast(DEMUX_0, LOW);
@@ -259,7 +259,7 @@ void setup() {
     MIDI.sendNoteOff(noteon, 64, 2);
     noteon++;
   }
-  delay(5);
+  delay(200);
 
   patchNoU = getLastPatchU();
   patchNoL = getLastPatchL();
@@ -1257,111 +1257,95 @@ void updatefilterPoleSwitch(boolean announce) {
 
 void updatefilterLoop(boolean announce) {
   if (upperSW) {
-    if (filterLoopU == 1) {
-      if (announce) {
-        showCurrentParameterPage("VCF Key Loop", "On");
-        midiCCOut(CCfilterLoop, 127);
-      }
-      sr.set(FILTERLOOP_LED, LOW);  // LED on
-      sr.set(FILTERLOOP_DOUBLE_LED, HIGH);
-      srp.set(FILTER_MODE_BIT0_UPPER, LOW);
-      srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
-    } else {
-      if (announce) {
-        showCurrentParameterPage("VCF Key Loop", "Off");
-        midiCCOut(CCfilterLoop, 1);
-      }
-      sr.set(FILTERLOOP_LED, HIGH);  // LED off
-      sr.set(FILTERLOOP_DOUBLE_LED, HIGH);
-      srp.set(FILTER_MODE_BIT0_UPPER, LOW);
-      srp.set(FILTER_MODE_BIT1_UPPER, LOW);
-    }
-  } else {
-    if (filterLoopL == 1) {
-      if (announce) {
-        showCurrentParameterPage("VCF Key Loop", "On");
-        midiCCOut(CCfilterLoop, 127);
-      }
-      sr.set(FILTERLOOP_LED, LOW);  // LED on
-      sr.set(FILTERLOOP_DOUBLE_LED, HIGH);
-      srp.set(FILTER_MODE_BIT0_LOWER, LOW);
-      srp.set(FILTER_MODE_BIT1_LOWER, HIGH);
-      if (wholemode) {
+    switch (statefilterLoopU) {
+      case 1:
+        if (announce) {
+          showCurrentParameterPage("VCF Key Loop", "On");
+          midiCCOut(CCfilterLoop, 127);
+        }
+        sr.set(FILTERLOOP_LED, LOW);          // LED on
+        sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
         srp.set(FILTER_MODE_BIT0_UPPER, LOW);
         srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
-      }
-    } else {
-      if (announce) {
-        showCurrentParameterPage("VCF Key Loop", "Off");
-        midiCCOut(CCfilterLoop, 1);
-      }
-      sr.set(FILTERLOOP_LED, HIGH);  // LED off
-      sr.set(FILTERLOOP_DOUBLE_LED, HIGH);
-      srp.set(FILTER_MODE_BIT0_LOWER, LOW);
-      srp.set(FILTER_MODE_BIT1_LOWER, LOW);
-      if (wholemode) {
+        oldfilterLoop = statefilterLoopU;
+        break;
+
+      case 2:
+        if (announce) {
+          showCurrentParameterPage("VCF LFO Loop", "On");
+          midiCCOut(CCfilterDoubleLoop, 127);
+        }
+        sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
+        sr.set(FILTERLOOP_LED, HIGH);
+        srp.set(FILTER_MODE_BIT0_UPPER, HIGH);
+        srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
+        oldfilterLoop = statefilterLoopU;
+        break;
+
+      default:
+        if (announce) {
+          showCurrentParameterPage("VCF Looping", "Off");
+          midiCCOut(CCfilterLoop, 1);
+        }
+        sr.set(FILTERLOOP_LED, HIGH);         // LED off
+        sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
         srp.set(FILTER_MODE_BIT0_UPPER, LOW);
         srp.set(FILTER_MODE_BIT1_UPPER, LOW);
-      }
+        oldfilterLoop = 0;
+        break;
+    }
+  } else {
+    switch (statefilterLoopL) {
+      case 1:
+        if (announce) {
+          showCurrentParameterPage("VCF Key Loop", "On");
+          midiCCOut(CCfilterLoop, 127);
+        }
+        sr.set(FILTERLOOP_LED, LOW);          // LED on
+        sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
+        srp.set(FILTER_MODE_BIT0_LOWER, LOW);
+        srp.set(FILTER_MODE_BIT1_LOWER, HIGH);
+        if (wholemode) {
+          srp.set(FILTER_MODE_BIT0_UPPER, LOW);
+          srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
+        }
+        oldfilterLoop = statefilterLoopL;
+        break;
+
+      case 2:
+        if (announce) {
+          showCurrentParameterPage("VCF LFO Loop", "On");
+          midiCCOut(CCfilterDoubleLoop, 127);
+        }
+        sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
+        sr.set(FILTERLOOP_LED, HIGH);
+        srp.set(FILTER_MODE_BIT0_LOWER, HIGH);
+        srp.set(FILTER_MODE_BIT1_LOWER, HIGH);
+        if (wholemode) {
+          srp.set(FILTER_MODE_BIT0_UPPER, LOW);
+          srp.set(FILTER_MODE_BIT1_UPPER, LOW);
+        }
+        oldfilterLoop = statefilterLoopL;
+        break;
+
+      default:
+        if (announce) {
+          showCurrentParameterPage("VCF Looping", "Off");
+          midiCCOut(CCfilterLoop, 1);
+        }
+        sr.set(FILTERLOOP_LED, HIGH);         // LED off
+        sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
+        srp.set(FILTER_MODE_BIT0_LOWER, LOW);
+        srp.set(FILTER_MODE_BIT1_LOWER, LOW);
+        if (wholemode) {
+          srp.set(FILTER_MODE_BIT0_UPPER, LOW);
+          srp.set(FILTER_MODE_BIT1_UPPER, LOW);
+        }
+        oldfilterLoop = 0;
+        break;
     }
   }
 }
-
-// void updatefilterdoubleLoop(boolean announce) {
-//   if (upperSW) {
-//     if (!filterLoopU) {
-//       if (filterdoubleLoopU == 1) {
-//         if (announce) {
-//           showCurrentParameterPage("VCF LFO Loop", "On");
-//         }
-//         sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
-//         sr.set(FILTERLOOP_LED, HIGH);        // led off
-//         srp.set(FILTER_MODE_BIT0_UPPER, HIGH);
-//         srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
-//         midiCCOut(CCfilterDoubleLoop, 127);
-//       } else {
-//         if (announce) {
-//           showCurrentParameterPage("VCF LFO Loop", "Off");
-//         }
-//         sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  //led off
-//         sr.set(FILTERLOOP_LED, HIGH);         // led off
-//         srp.set(FILTER_MODE_BIT0_UPPER, LOW);
-//         srp.set(FILTER_MODE_BIT1_UPPER, LOW);
-//         midiCCOut(CCfilterDoubleLoop, 1);
-//       }
-//     }
-//   } else {
-//     if (!filterLoopL) {
-//       if (filterdoubleLoopL == 1) {
-//         if (announce) {
-//           showCurrentParameterPage("VCF LFO Loop", "On");
-//         }
-//         sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
-//         sr.set(FILTERLOOP_LED, HIGH);        // led off
-//         srp.set(FILTER_MODE_BIT0_LOWER, HIGH);
-//         srp.set(FILTER_MODE_BIT1_LOWER, HIGH);
-//         if (wholemode) {
-//           srp.set(FILTER_MODE_BIT0_UPPER, HIGH);
-//           srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
-//         }
-//         midiCCOut(CCfilterDoubleLoop, 127);
-//       } else {
-//         if (announce) {
-//           showCurrentParameterPage("VCF LFO Loop", "Off");
-//         }
-//         sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED off
-//         sr.set(FILTERLOOP_LED, HIGH);         // led off
-//         srp.set(FILTER_MODE_BIT0_LOWER, LOW);
-//         srp.set(FILTER_MODE_BIT1_LOWER, LOW);
-//         if (wholemode) {
-//           srp.set(FILTER_MODE_BIT0_UPPER, LOW);
-//           srp.set(FILTER_MODE_BIT1_UPPER, LOW);
-//         }
-//         midiCCOut(CCfilterDoubleLoop, 1);
-//       }
-//     }
-//   }
-// }
 
 void updatefilterEGinv(boolean announce) {
   if (upperSW) {
@@ -1449,111 +1433,95 @@ void updatefilterVel(boolean announce) {
 
 void updatevcaLoop(boolean announce) {
   if (upperSW) {
-    if (vcaLoopU == 1) {
-      if (announce) {
-        showCurrentParameterPage("VCA Key Loop", "On");
-        midiCCOut(CCvcaLoop, 127);
-      }
-      sr.set(VCALOOP_LED, LOW);
-      sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
-      srp.set(AMP_MODE_BIT0_UPPER, LOW);
-      srp.set(AMP_MODE_BIT1_UPPER, HIGH);
-    } else {
-      if (announce) {
-        showCurrentParameterPage("VCA Key Loop", "Off");
-        midiCCOut(CCvcaLoop, 1);
-      }
-      sr.set(VCALOOP_LED, HIGH);         // LED off
-      sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
-      srp.set(AMP_MODE_BIT0_UPPER, LOW);
-      srp.set(AMP_MODE_BIT1_UPPER, LOW);
-    }
-  } else {
-    if (vcaLoopL == 1) {
-      if (announce) {
-        showCurrentParameterPage("VCA Key Loop", "On");
-        midiCCOut(CCvcaLoop, 127);
-      }
-      sr.set(VCALOOP_LED, LOW);          // LED on
-      sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
-      srp.set(AMP_MODE_BIT0_LOWER, LOW);
-      srp.set(AMP_MODE_BIT1_LOWER, HIGH);
-      if (wholemode) {
+    switch (statevcaLoopU) {
+      case 1:
+        if (announce) {
+          showCurrentParameterPage("VCA Key Loop", "On");
+          midiCCOut(CCvcaLoop, 127);
+        }
+        sr.set(VCALOOP_LED, LOW);          // LED on
+        sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
         srp.set(AMP_MODE_BIT0_UPPER, LOW);
         srp.set(AMP_MODE_BIT1_UPPER, HIGH);
-      }
-    } else {
-      if (announce) {
-        showCurrentParameterPage("VCA Key Loop", "Off");
-        midiCCOut(CCvcaLoop, 1);
-      }
-      sr.set(VCALOOP_LED, HIGH);         // LED off
-      sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
-      srp.set(AMP_MODE_BIT0_LOWER, LOW);
-      srp.set(AMP_MODE_BIT1_LOWER, LOW);
-      if (wholemode) {
+        oldvcaLoop = statevcaLoopU;
+        break;
+
+      case 2:
+        if (announce) {
+          showCurrentParameterPage("VCA LFO Loop", "On");
+          midiCCOut(CCvcaDoubleLoop, 127);
+        }
+        sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
+        sr.set(VCALOOP_LED, HIGH);
+        srp.set(AMP_MODE_BIT0_UPPER, HIGH);
+        srp.set(AMP_MODE_BIT1_UPPER, HIGH);
+        oldvcaLoop = statevcaLoopU;
+        break;
+
+      default:
+        if (announce) {
+          showCurrentParameterPage("VCA Looping", "Off");
+          midiCCOut(CCvcaLoop, 1);
+        }
+        sr.set(VCALOOP_LED, HIGH);         // LED off
+        sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
         srp.set(AMP_MODE_BIT0_UPPER, LOW);
         srp.set(AMP_MODE_BIT1_UPPER, LOW);
-      }
+        oldvcaLoop = 0;
+        break;
+    }
+  } else {
+    switch (statevcaLoopL) {
+      case 1:
+        if (announce) {
+          showCurrentParameterPage("VCA Key Loop", "On");
+          midiCCOut(CCvcaLoop, 127);
+        }
+        sr.set(VCALOOP_LED, LOW);          // LED on
+        sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
+        srp.set(AMP_MODE_BIT0_LOWER, LOW);
+        srp.set(AMP_MODE_BIT1_LOWER, HIGH);
+        if (wholemode) {
+          srp.set(AMP_MODE_BIT0_UPPER, LOW);
+          srp.set(AMP_MODE_BIT1_UPPER, HIGH);
+        }
+        oldvcaLoop = statevcaLoopL;
+        break;
+
+      case 2:
+        if (announce) {
+          showCurrentParameterPage("VCA LFO Loop", "On");
+          midiCCOut(CCvcaDoubleLoop, 127);
+        }
+        sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
+        sr.set(VCALOOP_LED, HIGH);
+        srp.set(AMP_MODE_BIT0_LOWER, HIGH);
+        srp.set(AMP_MODE_BIT1_LOWER, HIGH);
+        if (wholemode) {
+          srp.set(AMP_MODE_BIT0_UPPER, LOW);
+          srp.set(AMP_MODE_BIT1_UPPER, LOW);
+        }
+        oldvcaLoop = statevcaLoopL;
+        break;
+
+      default:
+        if (announce) {
+          showCurrentParameterPage("VCA Looping", "Off");
+          midiCCOut(CCvcaLoop, 1);
+        }
+        sr.set(VCALOOP_LED, HIGH);         // LED off
+        sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
+        srp.set(AMP_MODE_BIT0_LOWER, LOW);
+        srp.set(AMP_MODE_BIT1_LOWER, LOW);
+        if (wholemode) {
+          srp.set(AMP_MODE_BIT0_UPPER, LOW);
+          srp.set(AMP_MODE_BIT1_UPPER, LOW);
+        }
+        oldvcaLoop = 0;
+        break;
     }
   }
 }
-
-// void updatevcadoubleLoop(boolean announce) {
-//   if (upperSW) {
-//     if (!vcaLoopU) {
-//       if (vcadoubleLoopU == 1) {
-//         if (announce) {
-//           showCurrentParameterPage("VCA LFO Loop", "On");
-//         }
-//         sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
-//         sr.set(VCALOOP_LED, HIGH);
-//         srp.set(AMP_MODE_BIT0_UPPER, HIGH);
-//         srp.set(AMP_MODE_BIT1_UPPER, HIGH);
-//         midiCCOut(CCvcaDoubleLoop, 127);
-//       } else {
-//         if (announce) {
-//           showCurrentParameterPage("VCA LFO Loop", "Off");
-//         }
-//         sr.set(VCALOOP_DOUBLE_LED, HIGH);
-//         sr.set(VCALOOP_LED, HIGH);
-//         srp.set(AMP_MODE_BIT0_UPPER, LOW);
-//         srp.set(AMP_MODE_BIT1_UPPER, LOW);
-//         midiCCOut(CCvcaDoubleLoop, 1);
-//       }
-//     }
-//   } else {
-//     if (!vcaLoopL) {
-//       if (vcadoubleLoopL == 1) {
-//         if (announce) {
-//           showCurrentParameterPage("VCA LFO Loop", "On");
-//         }
-//         sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
-//         sr.set(VCALOOP_LED, HIGH);
-//         srp.set(AMP_MODE_BIT0_LOWER, HIGH);
-//         srp.set(AMP_MODE_BIT1_LOWER, HIGH);
-//         if (wholemode) {
-//           srp.set(AMP_MODE_BIT0_UPPER, HIGH);
-//           srp.set(AMP_MODE_BIT1_UPPER, HIGH);
-//         }
-//         midiCCOut(CCvcaDoubleLoop, 127);
-//       } else {
-//         if (announce) {
-//           showCurrentParameterPage("VCA LFO Loop", "Off");
-//         }
-//         sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED off
-//         sr.set(VCALOOP_LED, HIGH);         // led off
-//         srp.set(AMP_MODE_BIT0_LOWER, LOW);
-//         srp.set(AMP_MODE_BIT1_LOWER, LOW);
-//         if (wholemode) {
-//           srp.set(AMP_MODE_BIT0_UPPER, LOW);
-//           srp.set(AMP_MODE_BIT1_UPPER, LOW);
-//         }
-//         midiCCOut(CCvcaDoubleLoop, 1);
-//       }
-//     }
-//   }
-// }
 
 void updatevcaVel(boolean announce) {
   if (upperSW) {
@@ -2483,9 +2451,9 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CCfilterLoop:
       if (upperSW) {
-        filterLoopU = !filterLoopU;
+        statefilterLoopU = statefilterLoop;
       } else {
-        filterLoopL = !filterLoopL;
+        statefilterLoopL = statefilterLoop;
       }
       updatefilterLoop(1);
       break;
@@ -2500,17 +2468,13 @@ void myControlChange(byte channel, byte control, int value) {
       //   break;
 
     case CCvcaLoop:
+      if (upperSW) {
+        statevcaLoopU = statevcaLoop;
+      } else {
+        statevcaLoopL = statevcaLoop;
+      }
       updatevcaLoop(1);
       break;
-
-      // case CCvcaDoubleLoop:
-      //   if (upperSW) {
-      //     vcadoubleLoopU = !vcadoubleLoopU;
-      //   } else {
-      //     vcadoubleLoopL = !vcadoubleLoopL;
-      //   }
-      //   updatevcadoubleLoop(1);
-      //   break;
 
     case CCvcaVel:
       if (upperSW) {
@@ -3405,38 +3369,14 @@ void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
     myControlChange(midiChannel, CCglideSW, glideSW);
   }
 
-  // if (btnIndex == VCALOOP_SW && btnType == ROX_HELD) {
-  //   vcadoubleLoop = !vcadoubleLoop;
-  //   myControlChange(midiChannel, CCvcaDoubleLoop, vcadoubleLoop);
-  // }
-
   if (btnIndex == VCALOOP_SW && btnType == ROX_PRESSED) {
-    // if (wholemode) {
-    //   vcaLoopU = vcaLoopL;
-    // }
-    // if (upperSW) {
-    //   Serial.println("Upper");
-    //   vcaLoopU = (vcaLoopU + 1);
-    //   if (vcaLoopU > 3) {
-    //     vcaLoopU = 1;
-    //   }
-    // } else {
-    //   Serial.println("Lower");
-    //   vcaLoopL = (vcaLoopL + 1);
-    //   if (vcaLoopL > 3) {
-    //     vcaLoopL = 1;
-    //   }
-    //   if (wholemode) {
-    //     vcaLoopU = vcaLoopL;
-    //   }
-    // }
-    // Serial.print("VCALoop Upper ");
-    // Serial.println(vcaLoopU);
-    // Serial.print("VCALoop Lower ");
-    // Serial.println(vcaLoopL);
-    // Serial.println();
-    vcaLoop = !vcaLoop;
-    myControlChange(midiChannel, CCvcaLoop, vcaLoop);
+    statevcaLoop = oldvcaLoop + 1;
+    myControlChange(midiChannel, CCvcaLoop, statevcaLoop);
+  }
+
+  if (btnIndex == FILTERLOOP_SW && btnType == ROX_PRESSED) {
+    statefilterLoop = oldfilterLoop + 1;
+    myControlChange(midiChannel, CCfilterLoop, statefilterLoop);
   }
 
   if (btnIndex == VCAGATE_SW && btnType == ROX_PRESSED) {
@@ -3457,16 +3397,6 @@ void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
   if (btnIndex == FILTERPOLE_SW && btnType == ROX_PRESSED) {
     filterPoleSW = !filterPoleSW;
     myControlChange(midiChannel, CCfilterPoleSW, filterPoleSW);
-  }
-
-  // if (btnIndex == FILTERLOOP_SW && btnType == ROX_HELD) {
-  //   filterdoubleLoop = !filterdoubleLoop;
-  //   myControlChange(midiChannel, CCfilterDoubleLoop, filterdoubleLoop);
-  // }
-
-  if (btnIndex == FILTERLOOP_SW && btnType == ROX_PRESSED) {
-    filterLoop = !filterLoop;
-    myControlChange(midiChannel, CCfilterLoop, filterLoop);
   }
 
   if (btnIndex == FILTERINV_SW && btnType == ROX_PRESSED) {
