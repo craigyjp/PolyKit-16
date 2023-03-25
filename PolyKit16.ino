@@ -1,5 +1,5 @@
 /*
-  PolyKit 16 MUX - Firmware Rev 1.0
+  PolyKit 16 MUX - Firmware Rev 1.4
 
   Includes code by:
     Dave Benn - Handling MUXs, a few other bits and original inspiration  https://www.notesandvolts.com/2019/01/teensy-synth-part-10-hardware.html
@@ -183,13 +183,16 @@ void setup() {
     storeAfterTouchL(0);
   }
 
-  splitPoint = getSplitPoint();
-  if (splitPoint < 36 || splitPoint > 72) {
-    storeSplitPoint(48);
-  }
+  newsplitPoint = getSplitPoint();
+  // oldsplitPoint = newsplitPoint;
+  // splitPoint = (newsplitPoint + 36);
+  
+
+  splitTrans = getSplitTrans();
+  setTranspose(splitTrans);
 
   //Read Pitch Bend Range from EEPROM
-  //pitchBendRange = getPitchBendRange();
+  pitchBendRange = getPitchBendRange();
 
   //Read Mod Wheel Depth from EEPROM
   modWheelDepth = getModWheelDepth();
@@ -272,19 +275,35 @@ void setup() {
   //  reinitialiseToPanel();
 }
 
-// void setVoltage(int dacpin, bool channel, bool gain, unsigned int mV) {
-//   int command = channel ? 0x9000 : 0x1000;
+void setTranspose(int splitTrans)
+{
+  switch (splitTrans) {
+    case 0:
+      lowerTranspose = -24;
+      oldsplitTrans = splitTrans;
+      break;
 
-//   command |= gain ? 0x0000 : 0x2000;
-//   command |= (mV & 0x0FFF);
+    case 1:
+      lowerTranspose = -12;
+      oldsplitTrans = splitTrans;
+      break;
 
-//   SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
-//   digitalWrite(dacpin, LOW);
-//   SPI.transfer(command >> 8);
-//   SPI.transfer(command & 0xFF);
-//   digitalWrite(dacpin, HIGH);
-//   SPI.endTransaction();
-// }
+    case 2:
+      lowerTranspose = 0;
+      oldsplitTrans = splitTrans;
+      break;
+
+    case 3:
+      lowerTranspose = 12;
+      oldsplitTrans = splitTrans;
+      break;
+
+    case 4:
+      lowerTranspose = 24;
+      oldsplitTrans = splitTrans;
+      break;
+  }
+}
 
 void DinHandleNoteOn(byte channel, byte note, byte velocity) {
   if (wholemode) {
@@ -410,8 +429,8 @@ void DinHandleNoteOn(byte channel, byte note, byte velocity) {
     MIDI.sendNoteOn(note, velocity, 2);
   }
   if (splitmode) {
-    if (note < splitPoint) {
-      MIDI.sendNoteOn(note, velocity, 1);
+    if (note < (newsplitPoint + 36) ) {
+      MIDI.sendNoteOn((note + lowerTranspose), velocity, 1);
     } else {
       MIDI.sendNoteOn(note, velocity, 2);
     }
@@ -508,8 +527,8 @@ void DinHandleNoteOff(byte channel, byte note, byte velocity) {
     MIDI.sendNoteOff(note, velocity, 2);
   }
   if (splitmode) {
-    if (note < splitPoint) {
-      MIDI.sendNoteOff(note, velocity, 1);
+    if (note < (newsplitPoint + 36)) {
+      MIDI.sendNoteOff((note + lowerTranspose) , velocity, 1);
     } else {
       MIDI.sendNoteOff(note, velocity, 2);
     }
@@ -3318,6 +3337,15 @@ void writeDemux() {
 }
 
 void checkEeprom() {
+
+  // if (oldsplitPoint != newsplitPoint) {
+  //   splitPoint = (newsplitPoint + 36);
+  //   oldsplitPoint = newsplitPoint;
+  // }
+
+  if (oldsplitTrans != splitTrans) {
+    setTranspose(splitTrans);
+  }
 
   if (oldfilterLogLinU != filterLogLinU) {
     updateFilterEnv(0);
