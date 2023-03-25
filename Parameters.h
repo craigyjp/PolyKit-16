@@ -6,6 +6,12 @@ String patchName = INITPATCHNAME;
 int upperpatchtag = 0;
 int lowerpatchtag = 1;
 byte splitPoint = 0;
+byte oldsplitPoint = 0;
+byte newsplitPoint = 0;
+byte splitTrans = 0;
+byte oldsplitTrans = 0;
+int lowerTranspose = 0;
+float keytrackingAmount = 0.5;
 
 boolean encCW = true;//This is to set the encoder to increment when turned CW - Settings Option
 boolean announce = true;
@@ -201,6 +207,7 @@ int keyTrackSW = 0;
 int keyTrackSWU = 0;
 int keyTrackSWL = 0;
 
+int pitchBendRange = 0;
 int PitchBendLevel = 0;
 int PitchBendLevelU = 0;
 int PitchBendLevelL = 0;
