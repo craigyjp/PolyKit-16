@@ -16,6 +16,8 @@
 #define EEPROM_KEYTRACK_U 13
 #define EEPROM_KEYTRACK_L 14
 #define EEPROM_PITCHBEND 15
+#define EEPROM_MONOMULTI_L 16
+#define EEPROM_MONOMULTI_U 17
 
 int getMIDIChannel() {
   byte midiChannel = EEPROM.read(EEPROM_MIDI_CH);
@@ -45,6 +47,26 @@ float getSplitTrans() {
 
 void storeSplitTrans(byte type) {
   EEPROM.update(EEPROM_SPLITTRANS, type);
+}
+
+boolean getMonoMultiL() {
+  byte monoMultiL = EEPROM.read(EEPROM_MONOMULTI_L);
+  if (monoMultiL < 0 || monoMultiL > 1) return true;
+  return monoMultiL == 0 ? false : true;
+}
+
+void storeMonoMultiL(byte monoMultiL) {
+  EEPROM.update(EEPROM_MONOMULTI_L, monoMultiL);
+}
+
+boolean getMonoMultiU() {
+  byte monoMultiU = EEPROM.read(EEPROM_MONOMULTI_U);
+  if (monoMultiU < 0 || monoMultiU > 1) return true;
+  return monoMultiU == 0 ? false : true;
+}
+
+void storeMonoMultiU(byte monoMultiU) {
+  EEPROM.update(EEPROM_MONOMULTI_U, monoMultiU);
 }
 
 float getAfterTouchU() {

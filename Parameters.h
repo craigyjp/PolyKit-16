@@ -13,6 +13,16 @@ byte oldsplitTrans = 0;
 int lowerTranspose = 0;
 float keytrackingAmount = 0.5;
 
+//Delayed LFO
+int numberOfNotes = 0;
+int oldnumberOfNotes = 0;
+unsigned long previousMillisL = 0;
+unsigned long intervalL = 1; //10 seconds
+long delaytimeL  = 0;
+unsigned long previousMillisU = 0;
+unsigned long intervalU = 1; //10 seconds
+long delaytimeU  = 0;
+
 boolean encCW = true;//This is to set the encoder to increment when turned CW - Settings Option
 boolean announce = true;
 // polykit parameters in order of mux
@@ -121,15 +131,6 @@ float filterType = 0;
 float filterTypeU = 0;
 float filterTypeL = 0;
 float filterTypestr = 0;
-float filterA = 0;
-float filterAU = 0;
-float filterAL = 0;
-float filterB = 0;
-float filterBU = 0;
-float filterBL = 0;
-float filterC = 0;
-float filterCU = 0;
-float filterCL = 0;
 float filterEGlevel = 0;
 float filterEGlevelU = 0;
 float filterEGlevelL = 0;
@@ -141,6 +142,8 @@ float LFORatestr = 0; //for display
 float LFODelay = 0;
 float LFODelayU = 0;
 float LFODelayL = 0;
+int LFODelayGoU = 0;
+int LFODelayGoL = 0;
 float LFODelaystr = 0; //for display
 String StratusLFOWaveform = "                ";
 float LFOWaveformstr = 0;
@@ -253,6 +256,8 @@ int lfoAltL = 0;
 int monoMulti = 0;
 int monoMultiU = 0;
 int monoMultiL = 0;
+int oldmonoMultiU = 0;
+int oldmonoMultiL = 0;
 int filterPoleSWU = 0;
 int filterPoleSWL = 0;
 int filterPoleSW = 0;
@@ -283,15 +288,18 @@ int ampLogLin = 0;
 int ampLogLinU = 0;
 int ampLogLinL = 0;
 
-int linLog = 0;
-int linLogU = 0;
-int linLogL = 0;
 float afterTouch = 0;
 float afterTouchU = 0;
 float afterTouchL = 0;
 int AfterTouchDest = 0;
 int AfterTouchDestU = 0;
 int AfterTouchDestL = 0;
+int oldfilterLogLinU;
+int oldfilterLogLinL;
+int oldampLogLinU;
+int oldampLogLinL;
+int oldkeyTrackSWU;
+int oldkeyTrackSWL;
 
 int wholemode = 1;
 int dualmode = 0;

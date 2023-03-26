@@ -1,4 +1,4 @@
-#define SETTINGSOPTIONSNO 14
+#define SETTINGSOPTIONSNO 16
 #define SETTINGSVALUESNO 26  //Maximum number of settings option values needed
 int settingsValueIndex = 0;  //currently selected settings option value index
 
@@ -12,6 +12,8 @@ struct SettingsOption {
 void settingsMIDICh(char *value);
 void settingsSplitPoint(char *value);
 void settingsSplitTrans(char *value);
+void settingsMonoMultiU(char *value);
+void settingsMonoMultiL(char *value);
 void settingsAfterTouchU(char *value);
 void settingsAfterTouchL(char *value);
 void settingsPitchBend(char *value);
@@ -29,6 +31,8 @@ void settingsHandler(char *s, void (*f)(char *));
 int currentIndexMIDICh();
 int currentIndexSplitPoint();
 int currentIndexSplitTrans();
+int currentIndexMonoMultiU();
+int currentIndexMonoMultiL();
 int currentIndexAfterTouchU();
 int currentIndexAfterTouchL();
 int currentIndexPitchBend();
@@ -78,6 +82,18 @@ void settingsSplitTrans(char *value) {
   if (strcmp(value, "+1 Octave") == 0) splitTrans = 3;
   if (strcmp(value, "+2 Octave") == 0) splitTrans = 4;
   storeSplitTrans(splitTrans);
+}
+
+void settingsMonoMultiU(char *value) {
+  if (strcmp(value, "Off") == 0) monoMultiU = 0;
+  if (strcmp(value, "On") == 0) monoMultiU = 1;
+  storeMonoMultiU(monoMultiU);
+}
+
+void settingsMonoMultiL(char *value) {
+  if (strcmp(value, "Off") == 0) monoMultiL = 0;
+  if (strcmp(value, "On") == 0) monoMultiL = 1;
+  storeMonoMultiL(monoMultiL);
 }
 
 void settingsMIDICh(char *value) {
@@ -189,6 +205,14 @@ int currentIndexSplitPoint() {
   return getSplitPoint();
 }
 
+int currentIndexMonoMultiU() {
+  return getMonoMultiU();
+}
+
+int currentIndexMonoMultiL() {
+  return getMonoMultiL();
+}
+
 int currentIndexAfterTouchU() {
   return getAfterTouchU();
 }
@@ -245,6 +269,8 @@ void setUpSettings() {
   settingsOptions.push(SettingsOption{ "MIDI Ch.", { "All", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", '\0' }, settingsMIDICh, currentIndexMIDICh });
   settingsOptions.push(SettingsOption{ "Split Point", { "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", '\0' }, settingsSplitPoint, currentIndexSplitPoint });
   settingsOptions.push(SettingsOption{ "Split Trans", { "-2 Octave", "-1 Octave", "Original", "+1 Octave", "+2 Octave", '\0' }, settingsSplitTrans, currentIndexSplitTrans });
+  settingsOptions.push(SettingsOption{ "Mono/Multi U", { "Off", "On", '\0' }, settingsMonoMultiU, currentIndexMonoMultiU });
+  settingsOptions.push(SettingsOption{ "Mono/Multi L", { "Off", "On", '\0' }, settingsMonoMultiL, currentIndexMonoMultiL });
   settingsOptions.push(SettingsOption{ "Pitch Bend", { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", '\0' }, settingsPitchBend, currentIndexPitchBend });
   settingsOptions.push(SettingsOption{ "MW Depth", { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", '\0' }, settingsModWheelDepth, currentIndexModWheelDepth });
   settingsOptions.push(SettingsOption{ "AfterTouch U", { "Off", "DCO Mod", "CutOff Freq", "VCF Mod", '\0' }, settingsAfterTouchU, currentIndexAfterTouchU });
