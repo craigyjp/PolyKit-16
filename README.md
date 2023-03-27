@@ -16,9 +16,9 @@ This repository contains my versions of the filter/adsr/lfo with added velocity,
 - Dual LFOs for PWM and main synth, main LFO 16 waveforms, PWM LFO Sinewave only.
 - 16 voice polyphonic dual DCOs per voice.
 - Whole, Dual and Split modes of operation
-- Aftertouch control over DCO LFO depth, filter LFO depth or filter cutoff.
+- Aftertouch control over DCO LFO depth, AM Depth, filter LFO depth or filter cutoff.
 - Log and lin envelopes.
-- Looping envelopes.
+- Gated or LFO Looping envelopes.
 - Velocity sensitivity for filters and amplifiers.
 - Analogue chorus similar to Juno 60.
 - 999 memory locations to store patches.
