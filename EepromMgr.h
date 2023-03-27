@@ -71,8 +71,7 @@ void storeMonoMultiU(byte monoMultiU) {
 
 float getAfterTouchU() {
   byte AfterTouchDestU = EEPROM.read(EEPROM_AFTERTOUCH_U);
-  if (AfterTouchDestU == 0) return 0;
-  if (AfterTouchDestU == 1) return 1;
+  if (AfterTouchDestU < 0 || AfterTouchDestU > 4) AfterTouchDestU = 0;
   return AfterTouchDestU;  //If EEPROM has no key tracking stored
 }
 
@@ -82,8 +81,7 @@ void storeAfterTouchU(byte AfterTouchDestU) {
 
 float getAfterTouchL() {
   byte AfterTouchDestL = EEPROM.read(EEPROM_AFTERTOUCH_L);
-  if (AfterTouchDestL == 0) return 0;
-  if (AfterTouchDestL == 1) return 1;
+  if (AfterTouchDestL < 0 || AfterTouchDestL > 4) AfterTouchDestL = 0;
   return AfterTouchDestL;  //If EEPROM has no key tracking stored
 }
 

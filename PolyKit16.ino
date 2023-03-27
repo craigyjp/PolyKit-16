@@ -167,14 +167,9 @@ void setup() {
 
   //Read Aftertouch from EEPROM, this can be set individually by each patch.
   AfterTouchDestU = getAfterTouchU();
-  if (AfterTouchDestU < 0 || AfterTouchDestU > 3) {
-    storeAfterTouchU(0);
-  }
-
+  oldAfterTouchDestU = AfterTouchDestU;
   AfterTouchDestL = getAfterTouchL();
-  if (AfterTouchDestL < 0 || AfterTouchDestL > 3) {
-    storeAfterTouchL(0);
-  }
+  oldAfterTouchDestL = AfterTouchDestL;
 
   newsplitPoint = getSplitPoint();
 
@@ -265,8 +260,6 @@ void setup() {
   upperSW = 0;
   recallPatch(patchNoL);  //Load first patch
   updatewholemode();
-
-  //  reinitialiseToPanel();
 }
 
 void setTranspose(int splitTrans) {
@@ -2242,10 +2235,13 @@ void myControlChange(byte channel, byte control, int value) {
     case CCfilterCutoff:
       if (upperSW) {
         filterCutoffU = value;
+        oldfilterCutoffU = value;
       } else {
         filterCutoffL = value;
+        oldfilterCutoffL = value;
         if (wholemode) {
           filterCutoffU = value;
+          oldfilterCutoffU = value;
         }
       }
       filterCutoffstr = FILTERCUTOFF[value / midioutfrig];
@@ -2621,65 +2617,66 @@ void myControlChange(byte channel, byte control, int value) {
       break;
 
     case CCmodwheel:
+      value = (value * MIDICCTOPOT);
       switch (modWheelDepth) {
         case 1:
           modWheelLevel = ((value) / 5);
-          fmDepthU = (int(modWheelLevel * 32.24));
-          fmDepthL = (int(modWheelLevel * 32.24));
+          fmDepthU = int(modWheelLevel);
+          fmDepthL = int(modWheelLevel);
           break;
 
         case 2:
           modWheelLevel = ((value) / 4);
-          fmDepthU = (int(modWheelLevel * 32.24));
-          fmDepthL = (int(modWheelLevel * 32.24));
+          fmDepthU = int(modWheelLevel);
+          fmDepthL = int(modWheelLevel);
           break;
 
         case 3:
           modWheelLevel = ((value) / 3.5);
-          fmDepthU = (int(modWheelLevel * 32.24));
-          fmDepthL = (int(modWheelLevel * 32.24));
+          fmDepthU = int(modWheelLevel);
+          fmDepthL = int(modWheelLevel);
           break;
 
         case 4:
           modWheelLevel = ((value) / 3);
-          fmDepthU = (int(modWheelLevel * 32.24));
-          fmDepthL = (int(modWheelLevel * 32.24));
+          fmDepthU = int(modWheelLevel);
+          fmDepthL = int(modWheelLevel);
           break;
 
         case 5:
           modWheelLevel = ((value) / 2.5);
-          fmDepthU = (int(modWheelLevel * 32.24));
-          fmDepthL = (int(modWheelLevel * 32.24));
+          fmDepthU = int(modWheelLevel);
+          fmDepthL = int(modWheelLevel);
           break;
 
         case 6:
           modWheelLevel = ((value) / 2);
-          fmDepthU = (int(modWheelLevel * 32.24));
-          fmDepthL = (int(modWheelLevel * 32.24));
+          fmDepthU = int(modWheelLevel);
+          fmDepthL = int(modWheelLevel);
           break;
 
         case 7:
           modWheelLevel = ((value) / 1.75);
-          fmDepthU = (int(modWheelLevel * 32.24));
-          fmDepthL = (int(modWheelLevel * 32.24));
+          fmDepthU = int(modWheelLevel);
+          fmDepthL = int(modWheelLevel);
           break;
 
         case 8:
           modWheelLevel = ((value) / 1.5);
-          fmDepthU = (int(modWheelLevel * 32.24));
-          fmDepthL = (int(modWheelLevel * 32.24));
+          fmDepthU = int(modWheelLevel);
+          fmDepthL = int(modWheelLevel);
           break;
 
         case 9:
           modWheelLevel = ((value) / 1.25);
-          fmDepthU = (int(modWheelLevel * 32.24));
-          fmDepthL = (int(modWheelLevel * 32.24));
+          fmDepthU = int(modWheelLevel);
+          fmDepthL = int(modWheelLevel);
           break;
 
         case 10:
           modWheelLevel = (value);
-          fmDepthU = (int(modWheelLevel * 32.24));
-          fmDepthL = (int(modWheelLevel * 32.24));
+          fmDepthU = int(modWheelLevel);
+          fmDepthL = int(modWheelLevel);
           break;
       }
       break;
@@ -2694,39 +2691,49 @@ void myProgramChange(byte channel, byte program) {
   state = PATCH;
   patchNo = program + 1;
   recallPatch(patchNo);
-  Serial.print("MIDI Pgm Change:");
-  Serial.println(patchNo);
   state = PARAMETER;
 }
 
 void myAfterTouch(byte channel, byte value) {
-  afterTouch = int(value * 32.24);
+  afterTouch = int(value * MIDICCTOPOT);
   switch (AfterTouchDestU) {
     case 1:
-      fmDepthU = (int(afterTouch));
+      fmDepthU = afterTouch;
       break;
     case 2:
-      filterCutoffU = (filterCutoffU + afterTouch);
-      if (afterTouch <= 65) {
+      filterCutoffU = (oldfilterCutoffU + afterTouch);
+      if (afterTouch < 10) {
         filterCutoffU = oldfilterCutoffU;
+      }
+            if (filterCutoffU > 1023) {
+        filterCutoffU = 1023;
       }
       break;
     case 3:
-      filterLFOU = (int(afterTouch));
+      filterLFOU = afterTouch;
+      break;
+    case 4:
+      amDepthU = afterTouch;
       break;
   }
   switch (AfterTouchDestL) {
     case 1:
-      fmDepthL = (int(afterTouch));
+      fmDepthL = afterTouch;
       break;
     case 2:
-      filterCutoffL = (filterCutoffL + afterTouch);
-      if (afterTouch <= 65) {
+      filterCutoffL = (oldfilterCutoffL + afterTouch);
+      if (afterTouch < 10) {
         filterCutoffL = oldfilterCutoffL;
+      }
+      if (filterCutoffL > 1023) {
+        filterCutoffL = 1023;
       }
       break;
     case 3:
-      filterLFOL = (int(afterTouch));
+      filterLFOL = afterTouch;
+      break;
+    case 4:
+      amDepthL = afterTouch;
       break;
   }
 }
@@ -2962,7 +2969,6 @@ void setCurrentPatchData(String data[]) {
       osc1SubLevelU = data[64].toFloat();
       keyTrackSWU = data[65].toInt();
       LFODelayU = data[66].toFloat();
-
 
       oldfilterCutoffU = filterCutoffU;
     }
@@ -3270,11 +3276,20 @@ void writeDemux() {
 
   switch (muxOutput) {
     case 0:
-      if (LFODelayGoL) {
+      if (LFODelayGoL && LFODelayGoU) {
         MCP4922_write(DAC_CS1, int(fmDepthU * DACMULT), int(fmDepthL * DACMULT));
         digitalWriteFast(DEMUX_EN_1, LOW);
-      } else {
-        MCP4922_write(DAC_CS1, int(0), int(0));
+      }
+      if (LFODelayGoL && !LFODelayGoU) {
+        MCP4922_write(DAC_CS1, 0, int(fmDepthL * DACMULT));
+        digitalWriteFast(DEMUX_EN_1, LOW);
+      }
+      if (!LFODelayGoL && LFODelayGoU) {
+        MCP4922_write(DAC_CS1, int(fmDepthU * DACMULT), 0);
+        digitalWriteFast(DEMUX_EN_1, LOW);
+      }
+      if (!LFODelayGoL && !LFODelayGoU) {
+        MCP4922_write(DAC_CS1, 0, 0);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
       MCP4922_write(DAC_CS2, int(filterAttackU * DACMULT), int(filterAttackL * DACMULT));
@@ -3431,6 +3446,14 @@ void checkEeprom() {
   if (oldmonoMultiL != monoMultiL) {
     updateMonoMulti(0);
     oldmonoMultiL = monoMultiL;
+  }
+
+  if (oldAfterTouchDestU != AfterTouchDestU) {
+    oldAfterTouchDestU = AfterTouchDestU;
+  }
+
+  if (oldAfterTouchDestL != AfterTouchDestL) {
+    oldAfterTouchDestL = AfterTouchDestL;
   }
 }
 

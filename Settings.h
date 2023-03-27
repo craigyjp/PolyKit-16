@@ -110,6 +110,7 @@ void settingsAfterTouchU(char *value) {
   if (strcmp(value, "DCO Mod") == 0) AfterTouchDestU = 1;
   if (strcmp(value, "CutOff Freq") == 0) AfterTouchDestU = 2;
   if (strcmp(value, "VCF Mod") == 0) AfterTouchDestU = 3;
+  if (strcmp(value, "VCA Mod") == 0) AfterTouchDestU = 4;
   storeAfterTouchU(AfterTouchDestU);
 }
 
@@ -118,6 +119,7 @@ void settingsAfterTouchL(char *value) {
   if (strcmp(value, "DCO Mod") == 0) AfterTouchDestL = 1;
   if (strcmp(value, "CutOff Freq") == 0) AfterTouchDestL = 2;
   if (strcmp(value, "VCF Mod") == 0) AfterTouchDestL = 3;
+  if (strcmp(value, "VCA Mod") == 0) AfterTouchDestL = 4;
   storeAfterTouchL(AfterTouchDestL);
 }
 
@@ -269,12 +271,12 @@ void setUpSettings() {
   settingsOptions.push(SettingsOption{ "MIDI Ch.", { "All", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", '\0' }, settingsMIDICh, currentIndexMIDICh });
   settingsOptions.push(SettingsOption{ "Split Point", { "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", '\0' }, settingsSplitPoint, currentIndexSplitPoint });
   settingsOptions.push(SettingsOption{ "Split Trans", { "-2 Octave", "-1 Octave", "Original", "+1 Octave", "+2 Octave", '\0' }, settingsSplitTrans, currentIndexSplitTrans });
-  settingsOptions.push(SettingsOption{ "Mono/Multi U", { "Off", "On", '\0' }, settingsMonoMultiU, currentIndexMonoMultiU });
-  settingsOptions.push(SettingsOption{ "Mono/Multi L", { "Off", "On", '\0' }, settingsMonoMultiL, currentIndexMonoMultiL });
   settingsOptions.push(SettingsOption{ "Pitch Bend", { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", '\0' }, settingsPitchBend, currentIndexPitchBend });
   settingsOptions.push(SettingsOption{ "MW Depth", { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", '\0' }, settingsModWheelDepth, currentIndexModWheelDepth });
-  settingsOptions.push(SettingsOption{ "AfterTouch U", { "Off", "DCO Mod", "CutOff Freq", "VCF Mod", '\0' }, settingsAfterTouchU, currentIndexAfterTouchU });
-  settingsOptions.push(SettingsOption{ "AfterTouch L", { "Off", "DCO Mod", "CutOff Freq", "VCF Mod", '\0' }, settingsAfterTouchL, currentIndexAfterTouchL });
+  settingsOptions.push(SettingsOption{ "Multi Trig U", { "Off", "On", '\0' }, settingsMonoMultiU, currentIndexMonoMultiU });
+  settingsOptions.push(SettingsOption{ "Multi Trig L", { "Off", "On", '\0' }, settingsMonoMultiL, currentIndexMonoMultiL });
+  settingsOptions.push(SettingsOption{ "AfterTouch U", { "Off", "DCO Mod", "CutOff Freq", "VCF Mod", "VCA Mod", '\0' }, settingsAfterTouchU, currentIndexAfterTouchU });
+  settingsOptions.push(SettingsOption{ "AfterTouch L", { "Off", "DCO Mod", "CutOff Freq", "VCF Mod", "VCA Mod", '\0' }, settingsAfterTouchL, currentIndexAfterTouchL });
   settingsOptions.push(SettingsOption{ "Filter Env U", { "Log", "Lin", '\0' }, settingsFilterEnvU, currentIndexFilterEnvU });
   settingsOptions.push(SettingsOption{ "Filter Env L", { "Log", "Lin", '\0' }, settingsFilterEnvL, currentIndexFilterEnvL });
   settingsOptions.push(SettingsOption{ "Amp Env U", { "Log", "Lin", '\0' }, settingsAmpEnvU, currentIndexAmpEnvU });
