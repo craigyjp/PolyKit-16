@@ -46,6 +46,19 @@
 
 unsigned int state = PARAMETER;
 
+uint32_t int_ref_on_flexible_mode = 0b00001001000010100000000000000000;  // { 0000 , 1001 , 0000 , 1010000000000000 , 0000 }
+
+uint32_t sample_data1 = 0b00000000000000000000000000000000;
+uint32_t sample_data2 = 0b00000000000000000000000000000000;
+uint32_t channel_a = 0b00000010000000000000000000000000;
+uint32_t channel_b = 0b00000010000100000000000000000000;
+uint32_t channel_c = 0b00000010001000000000000000000000;
+uint32_t channel_d = 0b00000010001100000000000000000000;
+uint32_t channel_e = 0b00000010010000000000000000000000;
+uint32_t channel_f = 0b00000010010100000000000000000000;
+uint32_t channel_g = 0b00000010011000000000000000000000;
+uint32_t channel_h = 0b00000010011100000000000000000000;
+
 #include "ST7735Display.h"
 
 boolean cardStatus = false;
@@ -124,9 +137,20 @@ void setup() {
   setUpSettings();
   setupHardware();
 
+  SPI.beginTransaction(SPISettings(2000000, MSBFIRST, SPI_MODE1));
+  digitalWrite(DAC_CS1, LOW);
+  delayMicroseconds(1);
+  SPI.transfer(int_ref_on_flexible_mode >> 24);
+  SPI.transfer(int_ref_on_flexible_mode >> 16);
+  SPI.transfer(int_ref_on_flexible_mode >> 8);
+  SPI.transfer(int_ref_on_flexible_mode);
+  digitalWrite(DAC_CS1, HIGH);
+  SPI.endTransaction();
+
+
   cardStatus = SD.begin(BUILTIN_SDCARD);
   if (cardStatus) {
-    Serial.println("SD card is connected");
+    //Serial.println("SD card is connected");
     //Get patch numbers and names from SD card
     loadPatches();
     if (patches.size() == 0) {
@@ -135,14 +159,14 @@ void setup() {
       loadPatches();
     }
   } else {
-    Serial.println("SD card is not connected or unusable");
+    //Serial.println("SD card is not connected or unusable");
     reinitialiseToPanel();
     showPatchPage("No SD", "conn'd / usable", "", "");
   }
 
   //Read MIDI Channel from EEPROM
   midiChannel = getMIDIChannel();
-  Serial.println("MIDI Ch:" + String(midiChannel) + " (0 is Omni On)");
+  //Serial.println("MIDI Ch:" + String(midiChannel) + " (0 is Omni On)");
 
   //USB Client MIDI
   usbMIDI.setHandleControlChange(myControlChange);
@@ -151,7 +175,7 @@ void setup() {
   usbMIDI.setHandlePitchChange(DinHandlePitchBend);
   usbMIDI.setHandleNoteOn(DinHandleNoteOn);
   usbMIDI.setHandleNoteOff(DinHandleNoteOff);
-  Serial.println("USB Client MIDI Listening");
+  //Serial.println("USB Client MIDI Listening");
 
   //MIDI 5 Pin DIN
   MIDI.begin();
@@ -162,7 +186,7 @@ void setup() {
   MIDI.setHandleNoteOn(DinHandleNoteOn);
   MIDI.setHandleNoteOff(DinHandleNoteOff);
   MIDI.turnThruOn(midi::Thru::Mode::Off);
-  Serial.println("MIDI In DIN Listening");
+  //Serial.println("MIDI In DIN Listening");
 
 
   //Read Aftertouch from EEPROM, this can be set individually by each patch.
@@ -205,29 +229,29 @@ void setup() {
 
   // reset oscillators before startup
   // volume to 0
-  digitalWriteFast(DEMUX_0, HIGH);
-  digitalWriteFast(DEMUX_1, HIGH);
-  digitalWriteFast(DEMUX_2, HIGH);
-  digitalWriteFast(DEMUX_3, LOW);
-  MCP4922_write(DAC_CS1, 0, 0);
-  digitalWriteFast(DEMUX_EN_1, LOW);
-  delayMicroseconds(800);
-  // detune to 0
-  digitalWriteFast(DEMUX_EN_1, HIGH);
-  digitalWriteFast(DEMUX_0, HIGH);
-  digitalWriteFast(DEMUX_1, HIGH);
-  digitalWriteFast(DEMUX_2, LOW);
-  digitalWriteFast(DEMUX_3, LOW);
-  MCP4922_write(DAC_CS1, 0, 0);
-  digitalWriteFast(DEMUX_EN_1, LOW);
-  delayMicroseconds(800);
-  // set the mux back to 0000
-  digitalWriteFast(DEMUX_EN_1, HIGH);
-  digitalWriteFast(DEMUX_0, LOW);
-  digitalWriteFast(DEMUX_1, LOW);
-  digitalWriteFast(DEMUX_2, LOW);
-  digitalWriteFast(DEMUX_3, LOW);
-  delayMicroseconds(DelayForSH3);
+  // digitalWriteFast(DEMUX_0, HIGH);
+  // digitalWriteFast(DEMUX_1, HIGH);
+  // digitalWriteFast(DEMUX_2, HIGH);
+  // digitalWriteFast(DEMUX_3, LOW);
+  // MCP4922_write(DAC_CS1, 0, 0);
+  // digitalWriteFast(DEMUX_EN_1, LOW);
+  // delayMicroseconds(800);
+  // // detune to 0
+  // digitalWriteFast(DEMUX_EN_1, HIGH);
+  // digitalWriteFast(DEMUX_0, HIGH);
+  // digitalWriteFast(DEMUX_1, HIGH);
+  // digitalWriteFast(DEMUX_2, LOW);
+  // digitalWriteFast(DEMUX_3, LOW);
+  // MCP4922_write(DAC_CS1, 0, 0);
+  // digitalWriteFast(DEMUX_EN_1, LOW);
+  // delayMicroseconds(800);
+  // // set the mux back to 0000
+  // digitalWriteFast(DEMUX_EN_1, HIGH);
+  // digitalWriteFast(DEMUX_0, LOW);
+  // digitalWriteFast(DEMUX_1, LOW);
+  // digitalWriteFast(DEMUX_2, LOW);
+  // digitalWriteFast(DEMUX_3, LOW);
+  // delayMicroseconds(DelayForSH3);
   // set all the voices to 16'
   srp.set(OCT1A_UPPER, HIGH);
   srp.set(OCT1B_UPPER, HIGH);
@@ -2808,7 +2832,7 @@ void recallPatch(int patchNo) {
   allNotesOff();
   File patchFile = SD.open(String(patchNo).c_str());
   if (!patchFile) {
-    Serial.println("File not found");
+    //Serial.println("File not found");
   } else {
     String data[NO_OF_PARAMS];  //Array of data read in
     recallPatchData(patchFile, data);
@@ -3305,178 +3329,275 @@ void midiCCOut(byte cc, byte value) {
   MIDI.sendControlChange(cc, value, midiChannel);  //MIDI DIN is set to Out
 }
 
-void MCP4922_write(const int &slavePin, const int &value1, const int &value2) {
-  int value = 0;
-  byte configByte = 0;
-  byte data = 0;
-  int channel = 0;
+// void MCP4922_write(const int &slavePin, const int &value1, const int &value2) {
+//   int value = 0;
+//   byte configByte = 0;
+//   byte data = 0;
+//   int channel = 0;
 
-  for (channel = 0; channel < 2; channel++) {
-    digitalWrite(slavePin, LOW);  //set DAC ready to accept commands
-    if (channel == 0) {
-      configByte = B01110000;  //channel 0, Vref buffered, Gain of 1x, Active Mode
-      value = value1;
-    } else {
-      configByte = B11110000;  //channel 1, Vref buffered, Gain of 1x, Active Mode
-      value = value2;
-    }
+//   for (channel = 0; channel < 2; channel++) {
+//     digitalWrite(slavePin, LOW);  //set DAC ready to accept commands
+//     if (channel == 0) {
+//       configByte = B01110000;  //channel 0, Vref buffered, Gain of 1x, Active Mode
+//       value = value1;
+//     } else {
+//       configByte = B11110000;  //channel 1, Vref buffered, Gain of 1x, Active Mode
+//       value = value2;
+//     }
 
-    //write first byte
-    data = highByte(value);
-    data = B00001111 & data;   //clear out the 4 command bits
-    data = configByte | data;  //set the first four command bits
-    SPI.transfer(data);
+//     //write first byte
+//     data = highByte(value);
+//     data = B00001111 & data;   //clear out the 4 command bits
+//     data = configByte | data;  //set the first four command bits
+//     SPI.transfer(data);
 
-    //write second byte
-    data = lowByte(value);
-    SPI.transfer(data);
+//     //write second byte
+//     data = lowByte(value);
+//     SPI.transfer(data);
 
-    //close the transfer
-    digitalWrite(slavePin, HIGH);  //set DAC ready to accept commands
-  }
+//     //close the transfer
+//     digitalWrite(slavePin, HIGH);  //set DAC ready to accept commands
+//   }
+// }
+
+void outputDAC(int CHIP_SELECT, uint32_t sample_data1, uint32_t sample_data2) {
+  SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE1));
+  digitalWriteFast(CHIP_SELECT, LOW);
+  SPI.transfer(sample_data1 >> 24);
+  SPI.transfer(sample_data1 >> 16);
+  SPI.transfer(sample_data1 >> 8);
+  SPI.transfer(sample_data1);
+  digitalWriteFast(CHIP_SELECT, HIGH);
+  digitalWriteFast(CHIP_SELECT, LOW);
+  SPI.transfer(sample_data2 >> 24);
+  SPI.transfer(sample_data2 >> 16);
+  SPI.transfer(sample_data2 >> 8);
+  SPI.transfer(sample_data2);
+  digitalWriteFast(CHIP_SELECT, HIGH);
+  SPI.endTransaction();
 }
 
 void writeDemux() {
-  //DEMUX 1
-  //digitalWriteFast(DEMUX_EN_1, LOW);
 
   switch (muxOutput) {
     case 0:
       if (LFODelayGoL && LFODelayGoU) {
-        MCP4922_write(DAC_CS1, int(fmDepthU * DACMULT), int(fmDepthL * DACMULT));
+        sample_data1 = (channel_a & 0xFFF0000F) | (((int(fmDepthU * DACMULT)) & 0xFFFF) << 4);
+        sample_data2 = (channel_b & 0xFFF0000F) | (((int(fmDepthL * DACMULT)) & 0xFFFF) << 4);
+        outputDAC(DAC_CS1, sample_data1, sample_data2);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
       if (LFODelayGoL && !LFODelayGoU) {
-        MCP4922_write(DAC_CS1, 0, int(fmDepthL * DACMULT));
+        sample_data1 = (channel_a & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+        sample_data2 = (channel_b & 0xFFF0000F) | (((int(fmDepthL * DACMULT)) & 0xFFFF) << 4);
+        outputDAC(DAC_CS1, sample_data1, sample_data2);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
       if (!LFODelayGoL && LFODelayGoU) {
-        MCP4922_write(DAC_CS1, int(fmDepthU * DACMULT), 0);
+        sample_data1 = (channel_a & 0xFFF0000F) | (((int(fmDepthU * DACMULT)) & 0xFFFF) << 4);
+        sample_data2 = (channel_b & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+        outputDAC(DAC_CS1, sample_data1, sample_data2);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
       if (!LFODelayGoL && !LFODelayGoU) {
-        MCP4922_write(DAC_CS1, 0, 0);
+        sample_data1 = (channel_a & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+        sample_data2 = (channel_b & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+        outputDAC(DAC_CS1, sample_data1, sample_data2);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
-      MCP4922_write(DAC_CS2, int(filterAttackU * DACMULT), int(filterAttackL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterAttackU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterAttackL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 1:
-      MCP4922_write(DAC_CS1, int(osc2PWMU * DACMULT), int(osc2PWML * DACMULT));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc2PWMU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc2PWML * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(filterDecayU * DACMULT), int(filterDecayL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterDecayU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterDecayL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 2:
-      MCP4922_write(DAC_CS1, int(osc1PWMU * DACMULT), int(osc1PWML * DACMULT));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc1PWMU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc1PWML * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(filterSustainU * DACMULT), int(filterSustainL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterSustainU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterSustainL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 3:
-      MCP4922_write(DAC_CS1, int(stackU * DACMULT), int(stackL * DACMULT));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(stackU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(stackL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(filterReleaseU * DACMULT), int(filterReleaseL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterReleaseU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterReleaseL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 4:
-      MCP4922_write(DAC_CS1, int(osc2DetuneU * DACMULT), int(osc2DetuneL * DACMULT));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc2DetuneU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc2DetuneL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(ampAttackU * DACMULT), int(ampAttackL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(ampAttackU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(ampAttackL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 5:
-      MCP4922_write(DAC_CS1, int(noiseLevelU * DACMULT), int(noiseLevelL * DACMULT));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(noiseLevelU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(noiseLevelL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(ampDecayU * DACMULT), int(ampDecayL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(ampDecayU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(ampDecayL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 6:
       if (LFODelayGoL && LFODelayGoU) {
-        MCP4922_write(DAC_CS1, int(filterLFOU * DACMULT), int(filterLFOL * DACMULT));
+        sample_data1 = (channel_a & 0xFFF0000F) | (((int(filterLFOU * DACMULT)) & 0xFFFF) << 4);
+        sample_data2 = (channel_b & 0xFFF0000F) | (((int(filterLFOL * DACMULT)) & 0xFFFF) << 4);
+        outputDAC(DAC_CS1, sample_data1, sample_data2);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
       if (LFODelayGoL && !LFODelayGoU) {
-        MCP4922_write(DAC_CS1, 0, int(filterLFOL * DACMULT));
+        sample_data1 = (channel_a & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+        sample_data2 = (channel_b & 0xFFF0000F) | (((int(filterLFOL * DACMULT)) & 0xFFFF) << 4);
+        outputDAC(DAC_CS1, sample_data1, sample_data2);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
       if (!LFODelayGoL && LFODelayGoU) {
-        MCP4922_write(DAC_CS1, int(filterLFOU * DACMULT), 0);
+        sample_data1 = (channel_a & 0xFFF0000F) | (((int(filterLFOU * DACMULT)) & 0xFFFF) << 4);
+        sample_data2 = (channel_b & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+        outputDAC(DAC_CS1, sample_data1, sample_data2);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
       if (!LFODelayGoL && !LFODelayGoU) {
-        MCP4922_write(DAC_CS1, 0, 0);
+        sample_data1 = (channel_a & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+        sample_data2 = (channel_b & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+        outputDAC(DAC_CS1, sample_data1, sample_data2);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
-      MCP4922_write(DAC_CS2, int(ampSustainU * DACMULT), int(ampSustainL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(ampSustainU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(ampSustainL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 7:
-      MCP4922_write(DAC_CS1, int(volumeControlU * DACMULT), int(volumeControlL * DACMULT));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(volumeControlU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(volumeControlL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(ampReleaseU * DACMULT), int(ampReleaseL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(ampReleaseU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(ampReleaseL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 8:
-      MCP4922_write(DAC_CS1, int(osc1SawLevelU * DACMULT), int(osc1SawLevelL * DACMULT));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc1SawLevelU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc1SawLevelL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(pwLFOU * DACMULT), int(pwLFOL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(pwLFOU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(pwLFOL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 9:
-      MCP4922_write(DAC_CS1, int(osc1PulseLevelU * DACMULT), int(osc1PulseLevelL * DACMULT));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc1PulseLevelU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc1PulseLevelL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(LFORateU * DACMULT), int(LFORateL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(LFORateU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(LFORateL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 10:
-      MCP4922_write(DAC_CS1, int(osc2SawLevelU * DACMULT), int(osc2SawLevelL * DACMULT));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc2SawLevelU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc2SawLevelL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(LFOWaveformU * DACMULT), int(LFOWaveformL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(LFOWaveformU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(LFOWaveformL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 11:
-      MCP4922_write(DAC_CS1, int(osc2PulseLevelU * DACMULT), int(osc2PulseLevelL * DACMULT));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc2PulseLevelU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc2PulseLevelL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(filterEGlevelU * DACMULT), int(filterEGlevelL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterEGlevelU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterEGlevelL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 12:
-      MCP4922_write(DAC_CS1, int(keytrackU * 1.55), int(keytrackL * 1.55));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(keytrackU * 12)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(keytrackL * 12)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(filterCutoffU * DACMULT), int(filterCutoffL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterCutoffU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterCutoffL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 13:
-      MCP4922_write(DAC_CS1, int(osc1PWU * DACMULT), int(osc1PWL * DACMULT));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc1PWU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc1PWL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(filterResU * DACMULT), int(filterResL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterResU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterResL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 14:
-      MCP4922_write(DAC_CS1, int(osc2PWU * DACMULT), int(osc2PWL * DACMULT));
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc2PWU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc2PWL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(osc1SubLevelU * 2.5), int(osc1SubLevelL * 2.5));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(osc1SubLevelU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(osc1SubLevelL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 15:
       if (LFODelayGoL && LFODelayGoU) {
-        MCP4922_write(DAC_CS1, int(amDepthU * DACMULT), int(amDepthL * DACMULT));
+        sample_data1 = (channel_a & 0xFFF0000F) | (((int(amDepthU * DACMULT)) & 0xFFFF) << 4);
+        sample_data2 = (channel_b & 0xFFF0000F) | (((int(amDepthL * DACMULT)) & 0xFFFF) << 4);
+        outputDAC(DAC_CS1, sample_data1, sample_data2);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
       if (LFODelayGoL && !LFODelayGoU) {
-        MCP4922_write(DAC_CS1, 0, int(amDepthL * DACMULT));
+        sample_data1 = (channel_a & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+        sample_data2 = (channel_b & 0xFFF0000F) | (((int(amDepthL * DACMULT)) & 0xFFFF) << 4);
+        outputDAC(DAC_CS1, sample_data1, sample_data2);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
       if (!LFODelayGoL && LFODelayGoU) {
-        MCP4922_write(DAC_CS1, int(amDepthU * DACMULT), 0);
+        sample_data1 = (channel_a & 0xFFF0000F) | (((int(amDepthU * DACMULT)) & 0xFFFF) << 4);
+        sample_data2 = (channel_b & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+        outputDAC(DAC_CS1, sample_data1, sample_data2);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
       if (!LFODelayGoL && !LFODelayGoU) {
-        MCP4922_write(DAC_CS1, 0, 0);
+        sample_data1 = (channel_a & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+        sample_data2 = (channel_b & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+        outputDAC(DAC_CS1, sample_data1, sample_data2);
         digitalWriteFast(DEMUX_EN_1, LOW);
       }
-      MCP4922_write(DAC_CS2, int(osc2TriangleLevelU * DACMULT), int(osc2TriangleLevelL * DACMULT));
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(osc2TriangleLevelU * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(osc2TriangleLevelL * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
   }
