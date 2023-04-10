@@ -321,60 +321,49 @@ void setTranspose(int splitTrans) {
 void LFODelayHandle() {
   // LFO Delay code
   getDelayTime();
-  if (upperSW) {
-    unsigned long currentMillisU = millis();
-    if (monoMultiU) {
-      if (oldnumberOfNotes < numberOfNotes) {
-        previousMillisU = currentMillisU;
-        oldnumberOfNotes = numberOfNotes;
-      }
-    }
-    if (numberOfNotes > 0) {
-      if (currentMillisU - previousMillisU >= intervalU) {
-        LFODelayGoU = 1;
-      } else {
-        LFODelayGoU = 0;
-      }
-    } else {
-      LFODelayGoU = 1;
-      previousMillisU = currentMillisU;  //reset timer so its ready for the next time
-    }
-  } else {
-    unsigned long currentMillisL = millis();
-    if (monoMultiL) {
-      if (oldnumberOfNotes < numberOfNotes) {
-        previousMillisL = currentMillisL;
-        oldnumberOfNotes = numberOfNotes;
-      }
-    }
-    if (numberOfNotes > 0) {
-      if (currentMillisL - previousMillisL >= intervalL) {
-        LFODelayGoL = 1;
-        if (wholemode) {
-          LFODelayGoU = 1;
-        }
-      } else {
-        LFODelayGoL = 0;
-        if (wholemode) {
-          LFODelayGoU = 0;
-        }
-      }
-    } else {
-      LFODelayGoL = 1;
-      if (wholemode) {
-        LFODelayGoU = 1;
-      }
-      previousMillisL = currentMillisL;  //reset timer so its ready for the next time
+
+  unsigned long currentMillisU = millis();
+  if (monoMultiU && !LFODelayGoU) {
+    if (oldnumberOfNotesU < numberOfNotesU) {
+      previousMillisU = currentMillisU;
+      oldnumberOfNotesU = numberOfNotesU;
     }
   }
-  // end of LFO code
+  if (numberOfNotesU > 0) {
+    if (currentMillisU - previousMillisU >= intervalU) {
+      LFODelayGoU = 1;
+    } else {
+      LFODelayGoU = 0;
+    }
+  } else {
+    LFODelayGoU = 1;
+    previousMillisU = currentMillisU;  //reset timer so its ready for the next time
+  }
+
+  unsigned long currentMillisL = millis();
+  if (monoMultiL && !LFODelayGoL) {
+    if (oldnumberOfNotesL < numberOfNotesL) {
+      previousMillisL = currentMillisL;
+      oldnumberOfNotesL = numberOfNotesL;
+    }
+  }
+  if (numberOfNotesL > 0) {
+    if (currentMillisL - previousMillisL >= intervalL) {
+      LFODelayGoL = 1;
+    } else {
+      LFODelayGoL = 0;
+    }
+  } else {
+    LFODelayGoL = 1;
+    previousMillisL = currentMillisL;  //reset timer so its ready for the next time
+  }
 }
 
 void DinHandleNoteOn(byte channel, byte note, byte velocity) {
-  numberOfNotes = numberOfNotes + 1;
+  numberOfNotesU = numberOfNotesU + 1;
+  numberOfNotesL = numberOfNotesL + 1;
 
   if (wholemode) {
-    //Check for out of range notes
     if (note < 0 || note > 127) return;
     switch (getVoiceNo(-1)) {
       case 1:
@@ -502,12 +491,14 @@ void DinHandleNoteOn(byte channel, byte note, byte velocity) {
       MIDI.sendNoteOn(note, velocity, 2);
     }
   }
-  //oldnumberOfNotes = numberOfNotes;
 }
 
 void DinHandleNoteOff(byte channel, byte note, byte velocity) {
-  numberOfNotes = numberOfNotes - 1;
-  oldnumberOfNotes = oldnumberOfNotes - 1;
+  numberOfNotesU = numberOfNotesU - 1;
+  oldnumberOfNotesU = oldnumberOfNotesU - 1;
+  numberOfNotesL = numberOfNotesL - 1;
+  oldnumberOfNotesL = oldnumberOfNotesL - 1;
+
   if (wholemode) {
     switch (getVoiceNo(note)) {
       case 1:

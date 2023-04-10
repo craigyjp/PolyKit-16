@@ -14,8 +14,10 @@ int lowerTranspose = 0;
 float keytrackingAmount = 0.5;
 
 //Delayed LFO
-int numberOfNotes = 0;
-int oldnumberOfNotes = 0;
+int numberOfNotesU = 0;
+int oldnumberOfNotesU = 0;
+int numberOfNotesL = 0;
+int oldnumberOfNotesL = 0;
 unsigned long previousMillisL = 0;
 unsigned long intervalL = 1; //10 seconds
 long delaytimeL  = 0;
