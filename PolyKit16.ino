@@ -777,22 +777,38 @@ void updateosc2Range(boolean announce) {
 }
 
 void updatestack() {
-  if (stackstr > 120) {
-    showCurrentParameterPage("Voice Stack", String("8 Note"));
-  } else if (stackstr < 120 && stackstr > 105) {
-    showCurrentParameterPage("Voice Stack", String("7 Note"));
-  } else if (stackstr < 105 && stackstr > 88) {
-    showCurrentParameterPage("Voice Stack", String("6 Note"));
-  } else if (stackstr < 88 && stackstr > 66) {
-    showCurrentParameterPage("Voice Stack", String("5 Note"));
-  } else if (stackstr < 66 && stackstr > 44) {
-    showCurrentParameterPage("Voice Stack", String("4 Note"));
-  } else if (stackstr < 44 && stackstr > 22) {
-    showCurrentParameterPage("Voice Stack", String("3 Note"));
-  } else if (stackstr < 22 && stackstr > 12) {
-    showCurrentParameterPage("Voice Stack", String("2 Note"));
-  } else {
-    showCurrentParameterPage("Voice Stack", String("Poly"));
+  switch (stackstr) {
+    case 7:
+      showCurrentParameterPage("Voice Stack", String("8 Note"));
+      break;
+
+    case 6:
+      showCurrentParameterPage("Voice Stack", String("7 Note"));
+      break;
+
+    case 5:
+      showCurrentParameterPage("Voice Stack", String("6 Note"));
+      break;
+
+    case 4:
+      showCurrentParameterPage("Voice Stack", String("5 Note"));
+      break;
+
+    case 3:
+      showCurrentParameterPage("Voice Stack", String("4 Note"));
+      break;
+
+    case 2:
+      showCurrentParameterPage("Voice Stack", String("3 Note"));
+      break;
+
+    case 1:
+      showCurrentParameterPage("Voice Stack", String("2 Note"));
+      break;
+
+    case 0:
+      showCurrentParameterPage("Voice Stack", String("Poly"));
+      break;
   }
 }
 
@@ -850,274 +866,292 @@ void updatefilterRes() {
 
 void updateFilterType(boolean announce) {
   if (upperSW) {
-    if (filterTypestr < 12) {
-      if (filterPoleSWU == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("3P LowPass"));
+    switch (filterTypeU) {
+      case 0:
+        if (filterPoleSWU == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("3P LowPass"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("4P LowPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("4P LowPass"));
-        }
-      }
-      srp.set(FILTERA_UPPER, LOW);
-      srp.set(FILTERB_UPPER, LOW);
-      srp.set(FILTERC_UPPER, LOW);
+        srp.set(FILTERA_UPPER, LOW);
+        srp.set(FILTERB_UPPER, LOW);
+        srp.set(FILTERC_UPPER, LOW);
+        break;
 
-    } else if (filterTypestr > 12 && filterTypestr < 22) {
-      if (filterPoleSWU == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("1P LowPass"));
+      case 1:
+        if (filterPoleSWU == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("1P LowPass"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("2P LowPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("2P LowPass"));
-        }
-      }
-      srp.set(FILTERA_UPPER, HIGH);
-      srp.set(FILTERB_UPPER, LOW);
-      srp.set(FILTERC_UPPER, LOW);
+        srp.set(FILTERA_UPPER, HIGH);
+        srp.set(FILTERB_UPPER, LOW);
+        srp.set(FILTERC_UPPER, LOW);
+        break;
 
-    } else if (filterTypestr > 22 && filterTypestr < 44) {
-      if (filterPoleSWU == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("3P HP + 1P LP"));
+      case 2:
+        if (filterPoleSWU == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("3P HP + 1P LP"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("4P HighPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("4P HighPass"));
-        }
-      }
-      srp.set(FILTERA_UPPER, LOW);
-      srp.set(FILTERB_UPPER, HIGH);
-      srp.set(FILTERC_UPPER, LOW);
+        srp.set(FILTERA_UPPER, LOW);
+        srp.set(FILTERB_UPPER, HIGH);
+        srp.set(FILTERC_UPPER, LOW);
+        break;
 
-    } else if (filterTypestr > 44 && filterTypestr < 66) {
-      if (filterPoleSWU == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("1P HP + 1P LP"));
+      case 3:
+        if (filterPoleSWU == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("1P HP + 1P LP"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("2P HighPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("2P HighPass"));
-        }
-      }
-      srp.set(FILTERA_UPPER, HIGH);
-      srp.set(FILTERB_UPPER, HIGH);
-      srp.set(FILTERC_UPPER, LOW);
+        srp.set(FILTERA_UPPER, HIGH);
+        srp.set(FILTERB_UPPER, HIGH);
+        srp.set(FILTERC_UPPER, LOW);
+        break;
 
-    } else if (filterTypestr > 66 && filterTypestr < 88) {
-      if (filterPoleSWU == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("2P HP + 1P LP"));
+      case 4:
+        if (filterPoleSWU == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("2P HP + 1P LP"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("4P BandPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("4P BandPass"));
-        }
-      }
-      srp.set(FILTERA_UPPER, LOW);
-      srp.set(FILTERB_UPPER, LOW);
-      srp.set(FILTERC_UPPER, HIGH);
+        srp.set(FILTERA_UPPER, LOW);
+        srp.set(FILTERB_UPPER, LOW);
+        srp.set(FILTERC_UPPER, HIGH);
+        break;
 
-    } else if (filterTypestr > 88 && filterTypestr < 105) {
-      if (filterPoleSWU == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("2P BP + 1P LP"));
+      case 5:
+        if (filterPoleSWU == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("2P BP + 1P LP"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("2P BandPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("2P BandPass"));
-        }
-      }
-      srp.set(FILTERA_UPPER, HIGH);
-      srp.set(FILTERB_UPPER, LOW);
-      srp.set(FILTERC_UPPER, HIGH);
+        srp.set(FILTERA_UPPER, HIGH);
+        srp.set(FILTERB_UPPER, LOW);
+        srp.set(FILTERC_UPPER, HIGH);
+        break;
 
-    } else if (filterTypestr > 105 && filterTypestr < 120) {
-      if (filterPoleSWU == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("3P AP + 1P LP"));
+      case 6:
+        if (filterPoleSWU == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("3P AP + 1P LP"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("3P AllPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("3P AllPass"));
-        }
-      }
-      srp.set(FILTERA_UPPER, LOW);
-      srp.set(FILTERB_UPPER, HIGH);
-      srp.set(FILTERC_UPPER, HIGH);
+        srp.set(FILTERA_UPPER, LOW);
+        srp.set(FILTERB_UPPER, HIGH);
+        srp.set(FILTERC_UPPER, HIGH);
+        break;
 
-    } else {
-      if (filterPoleSWU == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("2P Notch + LP"));
+      case 7:
+        if (filterPoleSWU == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("2P Notch + LP"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("Notch"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("Notch"));
-        }
-      }
-      srp.set(FILTERA_UPPER, HIGH);
-      srp.set(FILTERB_UPPER, HIGH);
-      srp.set(FILTERC_UPPER, HIGH);
+        srp.set(FILTERA_UPPER, HIGH);
+        srp.set(FILTERB_UPPER, HIGH);
+        srp.set(FILTERC_UPPER, HIGH);
+        break;
     }
   } else {
-    if (filterTypestr < 12) {
-      if (filterPoleSWL == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("3P LowPass"));
+    switch (filterTypeL) {
+      case 0:
+        if (filterPoleSWL == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("3P LowPass"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("4P LowPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("4P LowPass"));
+        srp.set(FILTERA_LOWER, LOW);
+        srp.set(FILTERB_LOWER, LOW);
+        srp.set(FILTERC_LOWER, LOW);
+        if (wholemode) {
+          srp.set(FILTERA_UPPER, LOW);
+          srp.set(FILTERB_UPPER, LOW);
+          srp.set(FILTERC_UPPER, LOW);
         }
-      }
-      srp.set(FILTERA_LOWER, LOW);
-      srp.set(FILTERB_LOWER, LOW);
-      srp.set(FILTERC_LOWER, LOW);
-      if (wholemode) {
-        srp.set(FILTERA_UPPER, LOW);
-        srp.set(FILTERB_UPPER, LOW);
-        srp.set(FILTERC_UPPER, LOW);
-      }
+        break;
 
-    } else if (filterTypestr > 12 && filterTypestr < 22) {
-      if (filterPoleSWL == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("1P LowPass"));
+      case 1:
+        if (filterPoleSWL == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("1P LowPass"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("2P LowPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("2P LowPass"));
+        srp.set(FILTERA_LOWER, HIGH);
+        srp.set(FILTERB_LOWER, LOW);
+        srp.set(FILTERC_LOWER, LOW);
+        if (wholemode) {
+          srp.set(FILTERA_UPPER, HIGH);
+          srp.set(FILTERB_UPPER, LOW);
+          srp.set(FILTERC_UPPER, LOW);
         }
-      }
-      srp.set(FILTERA_LOWER, HIGH);
-      srp.set(FILTERB_LOWER, LOW);
-      srp.set(FILTERC_LOWER, LOW);
-      if (wholemode) {
-        srp.set(FILTERA_UPPER, HIGH);
-        srp.set(FILTERB_UPPER, LOW);
-        srp.set(FILTERC_UPPER, LOW);
-      }
+        break;
 
-    } else if (filterTypestr > 22 && filterTypestr < 44) {
-      if (filterPoleSWL == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("3P HP + 1P LP"));
+      case 2:
+        if (filterPoleSWL == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("3P HP + 1P LP"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("4P HighPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("4P HighPass"));
+        srp.set(FILTERA_LOWER, LOW);
+        srp.set(FILTERB_LOWER, HIGH);
+        srp.set(FILTERC_LOWER, LOW);
+        if (wholemode) {
+          srp.set(FILTERA_UPPER, LOW);
+          srp.set(FILTERB_UPPER, HIGH);
+          srp.set(FILTERC_UPPER, LOW);
         }
-      }
-      srp.set(FILTERA_LOWER, LOW);
-      srp.set(FILTERB_LOWER, HIGH);
-      srp.set(FILTERC_LOWER, LOW);
-      if (wholemode) {
-        srp.set(FILTERA_UPPER, LOW);
-        srp.set(FILTERB_UPPER, HIGH);
-        srp.set(FILTERC_UPPER, LOW);
-      }
+        break;
 
-    } else if (filterTypestr > 44 && filterTypestr < 66) {
-      if (filterPoleSWL == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("1P HP + 1P LP"));
+      case 3:
+        if (filterPoleSWL == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("1P HP + 1P LP"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("2P HighPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("2P HighPass"));
+        srp.set(FILTERA_LOWER, HIGH);
+        srp.set(FILTERB_LOWER, HIGH);
+        srp.set(FILTERC_LOWER, LOW);
+        if (wholemode) {
+          srp.set(FILTERA_UPPER, HIGH);
+          srp.set(FILTERB_UPPER, HIGH);
+          srp.set(FILTERC_UPPER, LOW);
         }
-      }
-      srp.set(FILTERA_LOWER, HIGH);
-      srp.set(FILTERB_LOWER, HIGH);
-      srp.set(FILTERC_LOWER, LOW);
-      if (wholemode) {
-        srp.set(FILTERA_UPPER, HIGH);
-        srp.set(FILTERB_UPPER, HIGH);
-        srp.set(FILTERC_UPPER, LOW);
-      }
+        break;
 
-    } else if (filterTypestr > 66 && filterTypestr < 88) {
-      if (filterPoleSWL == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("2P HP + 1P LP"));
+      case 4:
+        if (filterPoleSWL == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("2P HP + 1P LP"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("4P BandPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("4P BandPass"));
+        srp.set(FILTERA_LOWER, LOW);
+        srp.set(FILTERB_LOWER, LOW);
+        srp.set(FILTERC_LOWER, HIGH);
+        if (wholemode) {
+          srp.set(FILTERA_UPPER, LOW);
+          srp.set(FILTERB_UPPER, LOW);
+          srp.set(FILTERC_UPPER, HIGH);
         }
-      }
-      srp.set(FILTERA_LOWER, LOW);
-      srp.set(FILTERB_LOWER, LOW);
-      srp.set(FILTERC_LOWER, HIGH);
-      if (wholemode) {
-        srp.set(FILTERA_UPPER, LOW);
-        srp.set(FILTERB_UPPER, LOW);
-        srp.set(FILTERC_UPPER, HIGH);
-      }
+        break;
 
-    } else if (filterTypestr > 88 && filterTypestr < 105) {
-      if (filterPoleSWL == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("2P BP + 1P LP"));
+      case 5:
+        if (filterPoleSWL == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("2P BP + 1P LP"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("2P BandPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("2P BandPass"));
+        srp.set(FILTERA_LOWER, HIGH);
+        srp.set(FILTERB_LOWER, LOW);
+        srp.set(FILTERC_LOWER, HIGH);
+        if (wholemode) {
+          srp.set(FILTERA_UPPER, HIGH);
+          srp.set(FILTERB_UPPER, LOW);
+          srp.set(FILTERC_UPPER, HIGH);
         }
-      }
-      srp.set(FILTERA_LOWER, HIGH);
-      srp.set(FILTERB_LOWER, LOW);
-      srp.set(FILTERC_LOWER, HIGH);
-      if (wholemode) {
-        srp.set(FILTERA_UPPER, HIGH);
-        srp.set(FILTERB_UPPER, LOW);
-        srp.set(FILTERC_UPPER, HIGH);
-      }
+        break;
 
-    } else if (filterTypestr > 105 && filterTypestr < 120) {
-      if (filterPoleSWL == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("3P AP + 1P LP"));
-        }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("3P AllPass"));
-        }
-      }
-      srp.set(FILTERA_LOWER, LOW);
-      srp.set(FILTERB_LOWER, HIGH);
-      srp.set(FILTERC_LOWER, HIGH);
-      if (wholemode) {
-        srp.set(FILTERA_UPPER, LOW);
-        srp.set(FILTERB_UPPER, HIGH);
-        srp.set(FILTERC_UPPER, HIGH);
-      }
 
-    } else {
-      if (filterPoleSWL == 1) {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("2P Notch + LP"));
+      case 6:
+        if (filterPoleSWL == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("3P AP + 1P LP"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("3P AllPass"));
+          }
         }
-      } else {
-        if (announce) {
-          showCurrentParameterPage("Filter Type", String("Notch"));
+        srp.set(FILTERA_LOWER, LOW);
+        srp.set(FILTERB_LOWER, HIGH);
+        srp.set(FILTERC_LOWER, HIGH);
+        if (wholemode) {
+          srp.set(FILTERA_UPPER, LOW);
+          srp.set(FILTERB_UPPER, HIGH);
+          srp.set(FILTERC_UPPER, HIGH);
         }
-      }
-      srp.set(FILTERA_LOWER, HIGH);
-      srp.set(FILTERB_LOWER, HIGH);
-      srp.set(FILTERC_LOWER, HIGH);
-      if (wholemode) {
-        srp.set(FILTERA_UPPER, HIGH);
-        srp.set(FILTERB_UPPER, HIGH);
-        srp.set(FILTERC_UPPER, HIGH);
-      }
+        break;
+
+      case 7:
+        if (filterPoleSWL == 1) {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("2P Notch + LP"));
+          }
+        } else {
+          if (announce) {
+            showCurrentParameterPage("Filter Type", String("Notch"));
+          }
+        }
+        srp.set(FILTERA_LOWER, HIGH);
+        srp.set(FILTERB_LOWER, HIGH);
+        srp.set(FILTERC_LOWER, HIGH);
+        if (wholemode) {
+          srp.set(FILTERA_UPPER, HIGH);
+          srp.set(FILTERB_UPPER, HIGH);
+          srp.set(FILTERC_UPPER, HIGH);
+        }
+        break;
     }
   }
 }
-
 
 void updatefilterEGlevel() {
   showCurrentParameterPage("EG Depth", int(filterEGlevelstr));
@@ -1136,48 +1170,77 @@ void updateLFODelay() {
 }
 
 void updateStratusLFOWaveform() {
-  getStratusLFOWaveform(LFOWaveformstr);
-  showCurrentParameterPage("LFO Wave", StratusLFOWaveform);
-}
-
-int getStratusLFOWaveform(int value) {
   if (lfoAlt == 1) {
-    if (value >= 0 && value < 127) {
-      StratusLFOWaveform = "Saw +Oct";
-    } else if (value >= 128 && value < 255) {
-      StratusLFOWaveform = "Quad Saw";
-    } else if (value >= 256 && value < 383) {
-      StratusLFOWaveform = "Quad Pulse";
-    } else if (value >= 384 && value < 511) {
-      StratusLFOWaveform = "Tri Step";
-    } else if (value >= 512 && value < 639) {
-      StratusLFOWaveform = "Sine +Oct";
-    } else if (value >= 640 && value < 767) {
-      StratusLFOWaveform = "Sine +3rd";
-    } else if (value >= 768 && value < 895) {
-      StratusLFOWaveform = "Sine +4th";
-    } else if (value >= 896 && value < 1024) {
-      StratusLFOWaveform = "Rand Slopes";
+    switch (LFOWaveformstr) {
+      case 0:
+        StratusLFOWaveform = "Saw +Oct";
+        break;
+
+      case 1:
+        StratusLFOWaveform = "Quad Saw";
+        break;
+
+      case 2:
+        StratusLFOWaveform = "Quad Pulse";
+        break;
+
+      case 3:
+        StratusLFOWaveform = "Tri Step";
+        break;
+
+      case 4:
+        StratusLFOWaveform = "Sine +Oct";
+        break;
+
+      case 5:
+        StratusLFOWaveform = "Sine +3rd";
+        break;
+
+      case 6:
+        StratusLFOWaveform = "Sine +4th";
+        break;
+
+      case 7:
+        StratusLFOWaveform = "Rand Slopes";
+        break;
     }
   } else {
-    if (value >= 0 && value < 127) {
-      StratusLFOWaveform = "Sawtooth Up";
-    } else if (value >= 128 && value < 255) {
-      StratusLFOWaveform = "Sawtooth Down";
-    } else if (value >= 256 && value < 383) {
-      StratusLFOWaveform = "Squarewave";
-    } else if (value >= 384 && value < 511) {
-      StratusLFOWaveform = "Triangle";
-    } else if (value >= 512 && value < 639) {
-      StratusLFOWaveform = "Sinewave";
-    } else if (value >= 640 && value < 767) {
-      StratusLFOWaveform = "Sweeps";
-    } else if (value >= 768 && value < 895) {
-      StratusLFOWaveform = "Lumps";
-    } else if (value >= 896 && value < 1024) {
-      StratusLFOWaveform = "Sample & Hold";
+    switch (LFOWaveformstr) {
+      case 0:
+        StratusLFOWaveform = "Sawtooth Up";
+        break;
+
+
+      case 1:
+        StratusLFOWaveform = "Sawtooth Down";
+        break;
+
+      case 2:
+        StratusLFOWaveform = "Squarewave";
+        break;
+
+      case 3:
+        StratusLFOWaveform = "Triangle";
+        break;
+
+      case 4:
+        StratusLFOWaveform = "Sinewave";
+        break;
+
+      case 5:
+        StratusLFOWaveform = "Sweeps";
+        break;
+
+      case 6:
+        StratusLFOWaveform = "Lumps";
+        break;
+
+      case 7:
+        StratusLFOWaveform = "Sample & Hold";
+        break;
     }
   }
+  showCurrentParameterPage("LFO Wave", StratusLFOWaveform);
 }
 
 void updatefilterAttack() {
@@ -1286,14 +1349,16 @@ void updatefilterPoleSwitch(boolean announce) {
   if (upperSW) {
     if (filterPoleSWU == 1) {
       if (announce) {
-        showCurrentParameterPage("VCF Pole", "On");
+        //showCurrentParameterPage("VCF Pole", "On");
+        updateFilterType(1);
         midiCCOut(CCfilterPoleSW, 127);
       }
       sr.set(FILTERPOLE_LED, HIGH);
       srp.set(FILTER_POLE_UPPER, HIGH);
     } else {
       if (announce) {
-        showCurrentParameterPage("VCF Pole", "Off");
+        //showCurrentParameterPage("VCF Pole", "Off");
+        updateFilterType(1);
         midiCCOut(CCfilterPoleSW, 1);
       }
       sr.set(FILTERPOLE_LED, LOW);
@@ -1302,7 +1367,8 @@ void updatefilterPoleSwitch(boolean announce) {
   } else {
     if (filterPoleSWL == 1) {
       if (announce) {
-        showCurrentParameterPage("VCF Pole", "On");
+        //showCurrentParameterPage("VCF Pole", "On");
+        updateFilterType(1);
         midiCCOut(CCfilterPoleSW, 127);
       }
       sr.set(FILTERPOLE_LED, HIGH);
@@ -1312,7 +1378,8 @@ void updatefilterPoleSwitch(boolean announce) {
       }
     } else {
       if (announce) {
-        showCurrentParameterPage("VCF Pole", "Off");
+        //showCurrentParameterPage("VCF Pole", "Off");
+        updateFilterType(1);
         midiCCOut(CCfilterPoleSW, 1);
       }
       sr.set(FILTERPOLE_LED, LOW);
@@ -1332,8 +1399,8 @@ void updatefilterLoop(boolean announce) {
           showCurrentParameterPage("VCF Key Loop", "On");
           midiCCOut(CCfilterLoop, 127);
         }
-        sr.set(FILTERLOOP_LED, LOW);          // LED on
-        sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.set(FILTERLOOP_LED, HIGH);        // LED on
+        sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
         srp.set(FILTER_MODE_BIT0_UPPER, LOW);
         srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
         oldfilterLoop = statefilterLoopU;
@@ -1344,8 +1411,8 @@ void updatefilterLoop(boolean announce) {
           showCurrentParameterPage("VCF LFO Loop", "On");
           midiCCOut(CCfilterDoubleLoop, 127);
         }
-        sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
-        sr.set(FILTERLOOP_LED, HIGH);
+        sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.set(FILTERLOOP_LED, LOW);
         srp.set(FILTER_MODE_BIT0_UPPER, HIGH);
         srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
         oldfilterLoop = statefilterLoopU;
@@ -1356,8 +1423,8 @@ void updatefilterLoop(boolean announce) {
           showCurrentParameterPage("VCF Looping", "Off");
           midiCCOut(CCfilterLoop, 1);
         }
-        sr.set(FILTERLOOP_LED, HIGH);         // LED off
-        sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.set(FILTERLOOP_LED, LOW);         // LED off
+        sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
         srp.set(FILTER_MODE_BIT0_UPPER, LOW);
         srp.set(FILTER_MODE_BIT1_UPPER, LOW);
         oldfilterLoop = 0;
@@ -1370,8 +1437,8 @@ void updatefilterLoop(boolean announce) {
           showCurrentParameterPage("VCF Key Loop", "On");
           midiCCOut(CCfilterLoop, 127);
         }
-        sr.set(FILTERLOOP_LED, LOW);          // LED on
-        sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.set(FILTERLOOP_LED, HIGH);        // LED on
+        sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
         srp.set(FILTER_MODE_BIT0_LOWER, LOW);
         srp.set(FILTER_MODE_BIT1_LOWER, HIGH);
         if (wholemode) {
@@ -1386,8 +1453,8 @@ void updatefilterLoop(boolean announce) {
           showCurrentParameterPage("VCF LFO Loop", "On");
           midiCCOut(CCfilterDoubleLoop, 127);
         }
-        sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
-        sr.set(FILTERLOOP_LED, HIGH);
+        sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.set(FILTERLOOP_LED, LOW);
         srp.set(FILTER_MODE_BIT0_LOWER, HIGH);
         srp.set(FILTER_MODE_BIT1_LOWER, HIGH);
         if (wholemode) {
@@ -1402,8 +1469,8 @@ void updatefilterLoop(boolean announce) {
           showCurrentParameterPage("VCF Looping", "Off");
           midiCCOut(CCfilterLoop, 1);
         }
-        sr.set(FILTERLOOP_LED, HIGH);         // LED off
-        sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.set(FILTERLOOP_LED, LOW);         // LED off
+        sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
         srp.set(FILTER_MODE_BIT0_LOWER, LOW);
         srp.set(FILTER_MODE_BIT1_LOWER, LOW);
         if (wholemode) {
@@ -1508,8 +1575,8 @@ void updatevcaLoop(boolean announce) {
           showCurrentParameterPage("VCA Key Loop", "On");
           midiCCOut(CCvcaLoop, 127);
         }
-        sr.set(VCALOOP_LED, LOW);          // LED on
-        sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.set(VCALOOP_LED, HIGH);        // LED on
+        sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
         srp.set(AMP_MODE_BIT0_UPPER, LOW);
         srp.set(AMP_MODE_BIT1_UPPER, HIGH);
         oldvcaLoop = statevcaLoopU;
@@ -1520,8 +1587,8 @@ void updatevcaLoop(boolean announce) {
           showCurrentParameterPage("VCA LFO Loop", "On");
           midiCCOut(CCvcaDoubleLoop, 127);
         }
-        sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
-        sr.set(VCALOOP_LED, HIGH);
+        sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.set(VCALOOP_LED, LOW);
         srp.set(AMP_MODE_BIT0_UPPER, HIGH);
         srp.set(AMP_MODE_BIT1_UPPER, HIGH);
         oldvcaLoop = statevcaLoopU;
@@ -1532,8 +1599,8 @@ void updatevcaLoop(boolean announce) {
           showCurrentParameterPage("VCA Looping", "Off");
           midiCCOut(CCvcaLoop, 1);
         }
-        sr.set(VCALOOP_LED, HIGH);         // LED off
-        sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.set(VCALOOP_LED, LOW);         // LED off
+        sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
         srp.set(AMP_MODE_BIT0_UPPER, LOW);
         srp.set(AMP_MODE_BIT1_UPPER, LOW);
         oldvcaLoop = 0;
@@ -1546,8 +1613,8 @@ void updatevcaLoop(boolean announce) {
           showCurrentParameterPage("VCA Key Loop", "On");
           midiCCOut(CCvcaLoop, 127);
         }
-        sr.set(VCALOOP_LED, LOW);          // LED on
-        sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.set(VCALOOP_LED, HIGH);        // LED on
+        sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
         srp.set(AMP_MODE_BIT0_LOWER, LOW);
         srp.set(AMP_MODE_BIT1_LOWER, HIGH);
         if (wholemode) {
@@ -1562,8 +1629,8 @@ void updatevcaLoop(boolean announce) {
           showCurrentParameterPage("VCA LFO Loop", "On");
           midiCCOut(CCvcaDoubleLoop, 127);
         }
-        sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
-        sr.set(VCALOOP_LED, HIGH);
+        sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.set(VCALOOP_LED, LOW);
         srp.set(AMP_MODE_BIT0_LOWER, HIGH);
         srp.set(AMP_MODE_BIT1_LOWER, HIGH);
         if (wholemode) {
@@ -1578,8 +1645,8 @@ void updatevcaLoop(boolean announce) {
           showCurrentParameterPage("VCA Looping", "Off");
           midiCCOut(CCvcaLoop, 1);
         }
-        sr.set(VCALOOP_LED, HIGH);         // LED off
-        sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.set(VCALOOP_LED, LOW);         // LED off
+        sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
         srp.set(AMP_MODE_BIT0_LOWER, LOW);
         srp.set(AMP_MODE_BIT1_LOWER, LOW);
         if (wholemode) {
@@ -1699,14 +1766,16 @@ void updatelfoAlt(boolean announce) {
   if (upperSW) {
     if (lfoAltU == 0) {
       if (announce) {
-        showCurrentParameterPage("LFO Waveform", String("Original"));
+        //showCurrentParameterPage("LFO Waveform", String("Original"));
+        updateStratusLFOWaveform();
         midiCCOut(CClfoAlt, 1);
       }
       sr.set(LFO_ALT_LED, LOW);  // LED off
       srp.set(LFO_ALT_UPPER, HIGH);
     } else {
       if (announce) {
-        showCurrentParameterPage("LFO Waveform", String("Alternate"));
+        //showCurrentParameterPage("LFO Waveform", String("Alternate"));
+        updateStratusLFOWaveform();
         midiCCOut(CClfoAlt, 127);
       }
       sr.set(LFO_ALT_LED, HIGH);  // LED on
@@ -1715,7 +1784,8 @@ void updatelfoAlt(boolean announce) {
   } else {
     if (lfoAltL == 0) {
       if (announce) {
-        showCurrentParameterPage("LFO Waveform", String("Original"));
+        //showCurrentParameterPage("LFO Waveform", String("Original"));
+        updateStratusLFOWaveform();
         midiCCOut(CClfoAlt, 1);
       }
       sr.set(LFO_ALT_LED, LOW);  // LED off
@@ -1725,7 +1795,8 @@ void updatelfoAlt(boolean announce) {
       }
     } else {
       if (announce) {
-        showCurrentParameterPage("LFO Waveform", String("Alternate"));
+        //showCurrentParameterPage("LFO Waveform", String("Alternate"));
+        updateStratusLFOWaveform();
         midiCCOut(CClfoAlt, 127);
       }
       sr.set(LFO_ALT_LED, HIGH);  // LED on
@@ -1741,10 +1812,8 @@ void updatekeyTrackSW(boolean announce) {
   if (upperSW) {
     if (keyTrackSWU == 0) {
       srp.set(FILTER_KEYTRACK_UPPER, LOW);
-      //midiCCOut(CCkeyTrackSW, 1);
     } else {
       srp.set(FILTER_KEYTRACK_UPPER, HIGH);
-      //midiCCOut(CCkeyTrackSW, 127);
     }
   } else {
     if (keyTrackSWL == 0) {
@@ -1752,13 +1821,11 @@ void updatekeyTrackSW(boolean announce) {
       if (wholemode) {
         srp.set(FILTER_KEYTRACK_UPPER, LOW);
       }
-      //midiCCOut(CCkeyTrackSW, 1);
     } else {
       srp.set(FILTER_KEYTRACK_LOWER, HIGH);
       if (wholemode) {
         srp.set(FILTER_KEYTRACK_UPPER, HIGH);
       }
-      //midiCCOut(CCkeyTrackSW, 127);
     }
   }
 }
@@ -2098,7 +2165,7 @@ void myControlChange(byte channel, byte control, int value) {
           stackU = value;
         }
       }
-      stackstr = int(value / 8);
+      stackstr = value >> 7;
       updatestack();
       break;
 
@@ -2276,14 +2343,13 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CCfilterType:
       if (upperSW) {
-        filterResU = value;
+        filterTypeU = value >> 7;
       } else {
-        filterTypeL = value;
+        filterTypeL = value >> 7;
         if (wholemode) {
-          filterResU = value;
+          filterTypeU = value >> 7;
         }
       }
-      filterTypestr = value / midioutfrig;
       updateFilterType(1);
       break;
 
@@ -2322,7 +2388,7 @@ void myControlChange(byte channel, byte control, int value) {
           LFOWaveformU = value;
         }
       }
-      LFOWaveformstr = value;
+      LFOWaveformstr = value >> 7;
       updateStratusLFOWaveform();
       break;
 
@@ -2705,7 +2771,7 @@ void myAfterTouch(byte channel, byte value) {
       if (afterTouch < 10) {
         filterCutoffU = oldfilterCutoffU;
       }
-            if (filterCutoffU > 1023) {
+      if (filterCutoffU > 1023) {
         filterCutoffU = 1023;
       }
       break;
@@ -2780,7 +2846,7 @@ void setCurrentPatchData(String data[]) {
     filterCutoffU = data[17].toFloat();
     filterLFOU = data[18].toFloat();
     filterResU = data[19].toFloat();
-    filterTypeU = data[20].toFloat();
+    filterTypeU = data[20].toInt();
     filterdoubleLoopU = data[21].toInt();
     vcadoubleLoopU = data[22].toInt();
     LFODelayGoU = data[23].toInt();
@@ -2851,7 +2917,7 @@ void setCurrentPatchData(String data[]) {
     filterCutoffL = data[17].toFloat();
     filterLFOL = data[18].toFloat();
     filterResL = data[19].toFloat();
-    filterTypeL = data[20].toFloat();
+    filterTypeL = data[20].toInt();
     filterdoubleLoopL = data[21].toInt();
     vcadoubleLoopL = data[22].toInt();
     LFODelayGoL = data[23].toInt();
@@ -2922,7 +2988,7 @@ void setCurrentPatchData(String data[]) {
       filterCutoffU = data[17].toFloat();
       filterLFOU = data[18].toFloat();
       filterResU = data[19].toFloat();
-      filterTypeU = data[20].toFloat();
+      filterTypeU = data[20].toInt();
       filterdoubleLoopU = data[21].toInt();
       vcadoubleLoopU = data[22].toInt();
       LFODelayGoU = data[23].toInt();
@@ -3326,8 +3392,22 @@ void writeDemux() {
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 6:
-      MCP4922_write(DAC_CS1, int(filterLFOU * DACMULT), int(filterLFOL * DACMULT));
-      digitalWriteFast(DEMUX_EN_1, LOW);
+      if (LFODelayGoL && LFODelayGoU) {
+        MCP4922_write(DAC_CS1, int(filterLFOU * DACMULT), int(filterLFOL * DACMULT));
+        digitalWriteFast(DEMUX_EN_1, LOW);
+      }
+      if (LFODelayGoL && !LFODelayGoU) {
+        MCP4922_write(DAC_CS1, 0, int(filterLFOL * DACMULT));
+        digitalWriteFast(DEMUX_EN_1, LOW);
+      }
+      if (!LFODelayGoL && LFODelayGoU) {
+        MCP4922_write(DAC_CS1, int(filterLFOU * DACMULT), 0);
+        digitalWriteFast(DEMUX_EN_1, LOW);
+      }
+      if (!LFODelayGoL && !LFODelayGoU) {
+        MCP4922_write(DAC_CS1, 0, 0);
+        digitalWriteFast(DEMUX_EN_1, LOW);
+      }
       MCP4922_write(DAC_CS2, int(ampSustainU * DACMULT), int(ampSustainL * DACMULT));
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
@@ -3362,7 +3442,7 @@ void writeDemux() {
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 12:
-      MCP4922_write(DAC_CS1, int(keytrackU * DACMULT), int(keytrackL * DACMULT));
+      MCP4922_write(DAC_CS1, int(keytrackU * 1.55), int(keytrackL * 1.55));
       digitalWriteFast(DEMUX_EN_1, LOW);
       MCP4922_write(DAC_CS2, int(filterCutoffU * DACMULT), int(filterCutoffL * DACMULT));
       digitalWriteFast(DEMUX_EN_2, LOW);
@@ -3376,12 +3456,26 @@ void writeDemux() {
     case 14:
       MCP4922_write(DAC_CS1, int(osc2PWU * DACMULT), int(osc2PWL * DACMULT));
       digitalWriteFast(DEMUX_EN_1, LOW);
-      MCP4922_write(DAC_CS2, int(osc1SubLevelU * DACMULT), int(osc1SubLevelL * DACMULT));
+      MCP4922_write(DAC_CS2, int(osc1SubLevelU * 2.5), int(osc1SubLevelL * 2.5));
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
     case 15:
-      MCP4922_write(DAC_CS1, int(amDepthU * DACMULT), int(amDepthL * DACMULT));
-      digitalWriteFast(DEMUX_EN_1, LOW);
+      if (LFODelayGoL && LFODelayGoU) {
+        MCP4922_write(DAC_CS1, int(amDepthU * DACMULT), int(amDepthL * DACMULT));
+        digitalWriteFast(DEMUX_EN_1, LOW);
+      }
+      if (LFODelayGoL && !LFODelayGoU) {
+        MCP4922_write(DAC_CS1, 0, int(amDepthL * DACMULT));
+        digitalWriteFast(DEMUX_EN_1, LOW);
+      }
+      if (!LFODelayGoL && LFODelayGoU) {
+        MCP4922_write(DAC_CS1, int(amDepthU * DACMULT), 0);
+        digitalWriteFast(DEMUX_EN_1, LOW);
+      }
+      if (!LFODelayGoL && !LFODelayGoU) {
+        MCP4922_write(DAC_CS1, 0, 0);
+        digitalWriteFast(DEMUX_EN_1, LOW);
+      }
       MCP4922_write(DAC_CS2, int(osc2TriangleLevelU * DACMULT), int(osc2TriangleLevelL * DACMULT));
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
