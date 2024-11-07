@@ -3,6 +3,7 @@
 #define ENCODER_OPTIMIZE_INTERRUPTS
 #include <Encoder.h>
 #include <Bounce.h>
+#include "TButton.h"
 #include <ADC.h>
 #include <ADC_util.h>
 
@@ -262,14 +263,11 @@ static int mux3Read = 0;
 
 static long encPrevious = 0;
 
-Bounce recallButton = Bounce(RECALL_SW, DEBOUNCE); //On encoder
-boolean recall = true; //Hack for recall button
-Bounce saveButton = Bounce(SAVE_SW, DEBOUNCE);
-boolean del = true; //Hack for save button
-Bounce settingsButton = Bounce(SETTINGS_SW, DEBOUNCE);
-boolean reini = true; //Hack for settings button
-Bounce backButton = Bounce(BACK_SW, DEBOUNCE);
-boolean panic = true; //Hack for back button
+TButton saveButton{ SAVE_SW, LOW, HOLD_DURATION, DEBOUNCE, CLICK_DURATION };
+TButton settingsButton{ SETTINGS_SW, LOW, HOLD_DURATION, DEBOUNCE, CLICK_DURATION };
+TButton backButton{ BACK_SW, LOW, HOLD_DURATION, DEBOUNCE, CLICK_DURATION };
+TButton recallButton{ RECALL_SW, LOW, HOLD_DURATION, DEBOUNCE, CLICK_DURATION }; // on encoder
+
 Encoder encoder(ENCODER_PINB, ENCODER_PINA);//This often needs the pins swapping depending on the encoder
 
 void setupHardware()
@@ -316,6 +314,11 @@ void setupHardware()
   digitalWrite(DEMUX_1, LOW);
   digitalWrite(DEMUX_2, LOW);
   digitalWrite(DEMUX_3, LOW);
+
+    //Mux ADC
+  pinMode(MUX1_S, INPUT_DISABLE);
+  pinMode(MUX2_S, INPUT_DISABLE);
+  pinMode(MUX3_S, INPUT_DISABLE);
 
   pinMode(DEMUX_EN_1, OUTPUT);
   pinMode(DEMUX_EN_2, OUTPUT);

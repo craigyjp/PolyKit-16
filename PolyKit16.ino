@@ -1,5 +1,5 @@
 /*
-  PolyKit 16 MUX - Firmware Rev 1.4
+  PolyKit 16 MUX - Firmware Rev 1.7
 
   Includes code by:
     Dave Benn - Handling MUXs, a few other bits and original inspiration  https://www.notesandvolts.com/2019/01/teensy-synth-part-10-hardware.html
@@ -29,7 +29,6 @@
 #include "HWControls.h"
 #include "EepromMgr.h"
 #include "Settings.h"
-#include <ShiftRegister74HC595.h>
 #include <RoxMux.h>
 
 
@@ -114,14 +113,27 @@ int voiceToReturn = -1;        //Initialise
 long earliestTime = millis();  //For voice allocation - initialise to now
 unsigned long buttonDebounce = 0;
 
-// create a global shift register object
-// parameters: <number of shift registers> (data pin, clock pin, latch pin)
-ShiftRegister74HC595<3> sr(23, 22, 21);
-ShiftRegister74HC595<6> srp(20, 19, 41);
-
 #define OCTO_TOTAL 2
 #define BTN_DEBOUNCE 50
 RoxOctoswitch<OCTO_TOTAL, BTN_DEBOUNCE> octoswitch;
+
+#define SRP_TOTAL 6
+Rox74HC595<SRP_TOTAL> srp;
+
+// pins for 74HC595
+#define SRP_DATA 20   // pin 14 on 74HC595 (DATA)
+#define SRP_CLK 19    // pin 11 on 74HC595 (CLK)
+#define SRP_LATCH 41  // pin 12 on 74HC595 (LATCH)
+#define SRP_PWM -1    // pin 13 on 74HC595
+
+#define SR_TOTAL 3
+Rox74HC595<SR_TOTAL> sr;
+
+// pins for 74HC595
+#define SR_DATA 23   // pin 14 on 74HC595 (DATA)
+#define SR_CLK 22    // pin 11 on 74HC595 (CLK)
+#define SR_LATCH 21  // pin 12 on 74HC595 (LATCH)
+#define SR_PWM -1    // pin 13 on 74HC595
 
 // pins for 74HC165
 #define PIN_DATA 50  // pin 9 on 74HC165 (DATA)
@@ -133,6 +145,10 @@ void setup() {
   SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE0));
   octoswitch.begin(PIN_DATA, PIN_LOAD, PIN_CLK);
   octoswitch.setCallback(onButtonPress);
+
+  srp.begin(SRP_DATA, SRP_LATCH, SRP_CLK, SRP_PWM);
+  sr.begin(SR_DATA, SR_LATCH, SR_CLK, SR_PWM);
+
   setupDisplay();
   setUpSettings();
   setupHardware();
@@ -140,10 +156,7 @@ void setup() {
   SPI.beginTransaction(SPISettings(2000000, MSBFIRST, SPI_MODE1));
   digitalWrite(DAC_CS1, LOW);
   delayMicroseconds(1);
-  SPI.transfer(int_ref_on_flexible_mode >> 24);
-  SPI.transfer(int_ref_on_flexible_mode >> 16);
-  SPI.transfer(int_ref_on_flexible_mode >> 8);
-  SPI.transfer(int_ref_on_flexible_mode);
+  SPI.transfer32(int_ref_on_flexible_mode);
   digitalWrite(DAC_CS1, HIGH);
   SPI.endTransaction();
 
@@ -169,7 +182,7 @@ void setup() {
   //Serial.println("MIDI Ch:" + String(midiChannel) + " (0 is Omni On)");
 
   //USB Client MIDI
-  usbMIDI.setHandleControlChange(myControlChange);
+  usbMIDI.setHandleControlChange(myConvertControlChange);
   usbMIDI.setHandleProgramChange(myProgramChange);
   usbMIDI.setHandleAfterTouchChannel(myAfterTouch);
   usbMIDI.setHandlePitchChange(DinHandlePitchBend);
@@ -179,7 +192,7 @@ void setup() {
 
   //MIDI 5 Pin DIN
   MIDI.begin();
-  MIDI.setHandleControlChange(myControlChange);
+  MIDI.setHandleControlChange(myConvertControlChange);
   MIDI.setHandleProgramChange(myProgramChange);
   MIDI.setHandleAfterTouchChannel(myAfterTouch);
   MIDI.setHandlePitchBend(DinHandlePitchBend);
@@ -257,14 +270,14 @@ void setup() {
   digitalWriteFast(DEMUX_3, LOW);
   // delayMicroseconds(DelayForSH3);
   // set all the voices to 16'
-  srp.set(OCT1A_UPPER, HIGH);
-  srp.set(OCT1B_UPPER, HIGH);
-  srp.set(OCT2A_UPPER, HIGH);
-  srp.set(OCT2B_UPPER, HIGH);
-  srp.set(OCT1A_LOWER, HIGH);
-  srp.set(OCT1B_LOWER, HIGH);
-  srp.set(OCT2A_LOWER, HIGH);
-  srp.set(OCT2B_LOWER, HIGH);
+  srp.writePin(OCT1A_UPPER, HIGH);
+  srp.writePin(OCT1B_UPPER, HIGH);
+  srp.writePin(OCT2A_UPPER, HIGH);
+  srp.writePin(OCT2B_UPPER, HIGH);
+  srp.writePin(OCT1A_LOWER, HIGH);
+  srp.writePin(OCT1B_LOWER, HIGH);
+  srp.writePin(OCT2A_LOWER, HIGH);
+  srp.writePin(OCT2B_LOWER, HIGH);
   // Send some notes on and off
 
   for (int i = 0; i < 8; i++) {
@@ -632,7 +645,7 @@ int getVoiceNo(int note) {
   return 1;
 }
 
-void DinHandlePitchBend(byte channel, byte pitch) {
+void DinHandlePitchBend(byte channel, int pitch) {
   if (wholemode) {
     MIDI.sendPitchBend(pitch, 1);
     MIDI.sendPitchBend(pitch, 2);
@@ -695,51 +708,51 @@ void updateosc1Range(boolean announce) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("8"));
       }
-      srp.set(OCT1A_UPPER, LOW);
-      srp.set(OCT1B_UPPER, HIGH);
+      srp.writePin(OCT1A_UPPER, LOW);
+      srp.writePin(OCT1B_UPPER, HIGH);
     } else if (osc1Rangestr < 100 && osc1Rangestr > 33) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("16"));
       }
-      srp.set(OCT1A_UPPER, HIGH);
-      srp.set(OCT1B_UPPER, HIGH);
+      srp.writePin(OCT1A_UPPER, HIGH);
+      srp.writePin(OCT1B_UPPER, HIGH);
     } else {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("32"));
       }
-      srp.set(OCT1A_UPPER, HIGH);
-      srp.set(OCT1B_UPPER, LOW);
+      srp.writePin(OCT1A_UPPER, HIGH);
+      srp.writePin(OCT1B_UPPER, LOW);
     }
   } else {
     if (osc1Rangestr > 100) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("8"));
       }
-      srp.set(OCT1A_LOWER, LOW);
-      srp.set(OCT1B_LOWER, HIGH);
+      srp.writePin(OCT1A_LOWER, LOW);
+      srp.writePin(OCT1B_LOWER, HIGH);
       if (wholemode) {
-        srp.set(OCT1A_UPPER, LOW);
-        srp.set(OCT1B_UPPER, HIGH);
+        srp.writePin(OCT1A_UPPER, LOW);
+        srp.writePin(OCT1B_UPPER, HIGH);
       }
     } else if (osc1Rangestr < 100 && osc1Rangestr > 33) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("16"));
       }
-      srp.set(OCT1A_LOWER, HIGH);
-      srp.set(OCT1B_LOWER, HIGH);
+      srp.writePin(OCT1A_LOWER, HIGH);
+      srp.writePin(OCT1B_LOWER, HIGH);
       if (wholemode) {
-        srp.set(OCT1A_UPPER, HIGH);
-        srp.set(OCT1B_UPPER, HIGH);
+        srp.writePin(OCT1A_UPPER, HIGH);
+        srp.writePin(OCT1B_UPPER, HIGH);
       }
     } else {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("32"));
       }
-      srp.set(OCT1A_LOWER, HIGH);
-      srp.set(OCT1B_LOWER, LOW);
+      srp.writePin(OCT1A_LOWER, HIGH);
+      srp.writePin(OCT1B_LOWER, LOW);
       if (wholemode) {
-        srp.set(OCT1A_UPPER, HIGH);
-        srp.set(OCT1B_UPPER, LOW);
+        srp.writePin(OCT1A_UPPER, HIGH);
+        srp.writePin(OCT1B_UPPER, LOW);
       }
     }
   }
@@ -751,51 +764,51 @@ void updateosc2Range(boolean announce) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("8"));
       }
-      srp.set(OCT2A_UPPER, LOW);
-      srp.set(OCT2B_UPPER, HIGH);
+      srp.writePin(OCT2A_UPPER, LOW);
+      srp.writePin(OCT2B_UPPER, HIGH);
     } else if (osc2Rangestr < 100 && osc2Rangestr > 33) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("16"));
       }
-      srp.set(OCT2A_UPPER, HIGH);
-      srp.set(OCT2B_UPPER, HIGH);
+      srp.writePin(OCT2A_UPPER, HIGH);
+      srp.writePin(OCT2B_UPPER, HIGH);
     } else {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("32"));
       }
-      srp.set(OCT2A_UPPER, HIGH);
-      srp.set(OCT2B_UPPER, LOW);
+      srp.writePin(OCT2A_UPPER, HIGH);
+      srp.writePin(OCT2B_UPPER, LOW);
     }
   } else {
     if (osc2Rangestr > 100) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("8"));
       }
-      srp.set(OCT2A_LOWER, LOW);
-      srp.set(OCT2B_LOWER, HIGH);
+      srp.writePin(OCT2A_LOWER, LOW);
+      srp.writePin(OCT2B_LOWER, HIGH);
       if (wholemode) {
-        srp.set(OCT2A_UPPER, LOW);
-        srp.set(OCT2B_UPPER, HIGH);
+        srp.writePin(OCT2A_UPPER, LOW);
+        srp.writePin(OCT2B_UPPER, HIGH);
       }
     } else if (osc2Rangestr < 100 && osc2Rangestr > 33) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("16"));
       }
-      srp.set(OCT2A_LOWER, HIGH);
-      srp.set(OCT2B_LOWER, HIGH);
+      srp.writePin(OCT2A_LOWER, HIGH);
+      srp.writePin(OCT2B_LOWER, HIGH);
       if (wholemode) {
-        srp.set(OCT2A_UPPER, HIGH);
-        srp.set(OCT2B_UPPER, HIGH);
+        srp.writePin(OCT2A_UPPER, HIGH);
+        srp.writePin(OCT2B_UPPER, HIGH);
       }
     } else {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("32"));
       }
-      srp.set(OCT2A_LOWER, HIGH);
-      srp.set(OCT2B_LOWER, LOW);
+      srp.writePin(OCT2A_LOWER, HIGH);
+      srp.writePin(OCT2B_LOWER, LOW);
       if (wholemode) {
-        srp.set(OCT2A_UPPER, HIGH);
-        srp.set(OCT2B_UPPER, LOW);
+        srp.writePin(OCT2A_UPPER, HIGH);
+        srp.writePin(OCT2B_UPPER, LOW);
       }
     }
   }
@@ -902,9 +915,9 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("4P LowPass"));
           }
         }
-        srp.set(FILTERA_UPPER, LOW);
-        srp.set(FILTERB_UPPER, LOW);
-        srp.set(FILTERC_UPPER, LOW);
+        srp.writePin(FILTERA_UPPER, LOW);
+        srp.writePin(FILTERB_UPPER, LOW);
+        srp.writePin(FILTERC_UPPER, LOW);
         break;
 
       case 1:
@@ -917,9 +930,9 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("2P LowPass"));
           }
         }
-        srp.set(FILTERA_UPPER, HIGH);
-        srp.set(FILTERB_UPPER, LOW);
-        srp.set(FILTERC_UPPER, LOW);
+        srp.writePin(FILTERA_UPPER, HIGH);
+        srp.writePin(FILTERB_UPPER, LOW);
+        srp.writePin(FILTERC_UPPER, LOW);
         break;
 
       case 2:
@@ -932,9 +945,9 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("4P HighPass"));
           }
         }
-        srp.set(FILTERA_UPPER, LOW);
-        srp.set(FILTERB_UPPER, HIGH);
-        srp.set(FILTERC_UPPER, LOW);
+        srp.writePin(FILTERA_UPPER, LOW);
+        srp.writePin(FILTERB_UPPER, HIGH);
+        srp.writePin(FILTERC_UPPER, LOW);
         break;
 
       case 3:
@@ -947,9 +960,9 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("2P HighPass"));
           }
         }
-        srp.set(FILTERA_UPPER, HIGH);
-        srp.set(FILTERB_UPPER, HIGH);
-        srp.set(FILTERC_UPPER, LOW);
+        srp.writePin(FILTERA_UPPER, HIGH);
+        srp.writePin(FILTERB_UPPER, HIGH);
+        srp.writePin(FILTERC_UPPER, LOW);
         break;
 
       case 4:
@@ -962,9 +975,9 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("4P BandPass"));
           }
         }
-        srp.set(FILTERA_UPPER, LOW);
-        srp.set(FILTERB_UPPER, LOW);
-        srp.set(FILTERC_UPPER, HIGH);
+        srp.writePin(FILTERA_UPPER, LOW);
+        srp.writePin(FILTERB_UPPER, LOW);
+        srp.writePin(FILTERC_UPPER, HIGH);
         break;
 
       case 5:
@@ -977,9 +990,9 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("2P BandPass"));
           }
         }
-        srp.set(FILTERA_UPPER, HIGH);
-        srp.set(FILTERB_UPPER, LOW);
-        srp.set(FILTERC_UPPER, HIGH);
+        srp.writePin(FILTERA_UPPER, HIGH);
+        srp.writePin(FILTERB_UPPER, LOW);
+        srp.writePin(FILTERC_UPPER, HIGH);
         break;
 
       case 6:
@@ -992,9 +1005,9 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("3P AllPass"));
           }
         }
-        srp.set(FILTERA_UPPER, LOW);
-        srp.set(FILTERB_UPPER, HIGH);
-        srp.set(FILTERC_UPPER, HIGH);
+        srp.writePin(FILTERA_UPPER, LOW);
+        srp.writePin(FILTERB_UPPER, HIGH);
+        srp.writePin(FILTERC_UPPER, HIGH);
         break;
 
       case 7:
@@ -1007,9 +1020,9 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("Notch"));
           }
         }
-        srp.set(FILTERA_UPPER, HIGH);
-        srp.set(FILTERB_UPPER, HIGH);
-        srp.set(FILTERC_UPPER, HIGH);
+        srp.writePin(FILTERA_UPPER, HIGH);
+        srp.writePin(FILTERB_UPPER, HIGH);
+        srp.writePin(FILTERC_UPPER, HIGH);
         break;
     }
   } else {
@@ -1024,13 +1037,13 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("4P LowPass"));
           }
         }
-        srp.set(FILTERA_LOWER, LOW);
-        srp.set(FILTERB_LOWER, LOW);
-        srp.set(FILTERC_LOWER, LOW);
+        srp.writePin(FILTERA_LOWER, LOW);
+        srp.writePin(FILTERB_LOWER, LOW);
+        srp.writePin(FILTERC_LOWER, LOW);
         if (wholemode) {
-          srp.set(FILTERA_UPPER, LOW);
-          srp.set(FILTERB_UPPER, LOW);
-          srp.set(FILTERC_UPPER, LOW);
+          srp.writePin(FILTERA_UPPER, LOW);
+          srp.writePin(FILTERB_UPPER, LOW);
+          srp.writePin(FILTERC_UPPER, LOW);
         }
         break;
 
@@ -1044,13 +1057,13 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("2P LowPass"));
           }
         }
-        srp.set(FILTERA_LOWER, HIGH);
-        srp.set(FILTERB_LOWER, LOW);
-        srp.set(FILTERC_LOWER, LOW);
+        srp.writePin(FILTERA_LOWER, HIGH);
+        srp.writePin(FILTERB_LOWER, LOW);
+        srp.writePin(FILTERC_LOWER, LOW);
         if (wholemode) {
-          srp.set(FILTERA_UPPER, HIGH);
-          srp.set(FILTERB_UPPER, LOW);
-          srp.set(FILTERC_UPPER, LOW);
+          srp.writePin(FILTERA_UPPER, HIGH);
+          srp.writePin(FILTERB_UPPER, LOW);
+          srp.writePin(FILTERC_UPPER, LOW);
         }
         break;
 
@@ -1064,13 +1077,13 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("4P HighPass"));
           }
         }
-        srp.set(FILTERA_LOWER, LOW);
-        srp.set(FILTERB_LOWER, HIGH);
-        srp.set(FILTERC_LOWER, LOW);
+        srp.writePin(FILTERA_LOWER, LOW);
+        srp.writePin(FILTERB_LOWER, HIGH);
+        srp.writePin(FILTERC_LOWER, LOW);
         if (wholemode) {
-          srp.set(FILTERA_UPPER, LOW);
-          srp.set(FILTERB_UPPER, HIGH);
-          srp.set(FILTERC_UPPER, LOW);
+          srp.writePin(FILTERA_UPPER, LOW);
+          srp.writePin(FILTERB_UPPER, HIGH);
+          srp.writePin(FILTERC_UPPER, LOW);
         }
         break;
 
@@ -1084,13 +1097,13 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("2P HighPass"));
           }
         }
-        srp.set(FILTERA_LOWER, HIGH);
-        srp.set(FILTERB_LOWER, HIGH);
-        srp.set(FILTERC_LOWER, LOW);
+        srp.writePin(FILTERA_LOWER, HIGH);
+        srp.writePin(FILTERB_LOWER, HIGH);
+        srp.writePin(FILTERC_LOWER, LOW);
         if (wholemode) {
-          srp.set(FILTERA_UPPER, HIGH);
-          srp.set(FILTERB_UPPER, HIGH);
-          srp.set(FILTERC_UPPER, LOW);
+          srp.writePin(FILTERA_UPPER, HIGH);
+          srp.writePin(FILTERB_UPPER, HIGH);
+          srp.writePin(FILTERC_UPPER, LOW);
         }
         break;
 
@@ -1104,13 +1117,13 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("4P BandPass"));
           }
         }
-        srp.set(FILTERA_LOWER, LOW);
-        srp.set(FILTERB_LOWER, LOW);
-        srp.set(FILTERC_LOWER, HIGH);
+        srp.writePin(FILTERA_LOWER, LOW);
+        srp.writePin(FILTERB_LOWER, LOW);
+        srp.writePin(FILTERC_LOWER, HIGH);
         if (wholemode) {
-          srp.set(FILTERA_UPPER, LOW);
-          srp.set(FILTERB_UPPER, LOW);
-          srp.set(FILTERC_UPPER, HIGH);
+          srp.writePin(FILTERA_UPPER, LOW);
+          srp.writePin(FILTERB_UPPER, LOW);
+          srp.writePin(FILTERC_UPPER, HIGH);
         }
         break;
 
@@ -1124,13 +1137,13 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("2P BandPass"));
           }
         }
-        srp.set(FILTERA_LOWER, HIGH);
-        srp.set(FILTERB_LOWER, LOW);
-        srp.set(FILTERC_LOWER, HIGH);
+        srp.writePin(FILTERA_LOWER, HIGH);
+        srp.writePin(FILTERB_LOWER, LOW);
+        srp.writePin(FILTERC_LOWER, HIGH);
         if (wholemode) {
-          srp.set(FILTERA_UPPER, HIGH);
-          srp.set(FILTERB_UPPER, LOW);
-          srp.set(FILTERC_UPPER, HIGH);
+          srp.writePin(FILTERA_UPPER, HIGH);
+          srp.writePin(FILTERB_UPPER, LOW);
+          srp.writePin(FILTERC_UPPER, HIGH);
         }
         break;
 
@@ -1145,13 +1158,13 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("3P AllPass"));
           }
         }
-        srp.set(FILTERA_LOWER, LOW);
-        srp.set(FILTERB_LOWER, HIGH);
-        srp.set(FILTERC_LOWER, HIGH);
+        srp.writePin(FILTERA_LOWER, LOW);
+        srp.writePin(FILTERB_LOWER, HIGH);
+        srp.writePin(FILTERC_LOWER, HIGH);
         if (wholemode) {
-          srp.set(FILTERA_UPPER, LOW);
-          srp.set(FILTERB_UPPER, HIGH);
-          srp.set(FILTERC_UPPER, HIGH);
+          srp.writePin(FILTERA_UPPER, LOW);
+          srp.writePin(FILTERB_UPPER, HIGH);
+          srp.writePin(FILTERC_UPPER, HIGH);
         }
         break;
 
@@ -1165,13 +1178,13 @@ void updateFilterType(boolean announce) {
             showCurrentParameterPage("Filter Type", String("Notch"));
           }
         }
-        srp.set(FILTERA_LOWER, HIGH);
-        srp.set(FILTERB_LOWER, HIGH);
-        srp.set(FILTERC_LOWER, HIGH);
+        srp.writePin(FILTERA_LOWER, HIGH);
+        srp.writePin(FILTERB_LOWER, HIGH);
+        srp.writePin(FILTERC_LOWER, HIGH);
         if (wholemode) {
-          srp.set(FILTERA_UPPER, HIGH);
-          srp.set(FILTERB_UPPER, HIGH);
-          srp.set(FILTERC_UPPER, HIGH);
+          srp.writePin(FILTERA_UPPER, HIGH);
+          srp.writePin(FILTERB_UPPER, HIGH);
+          srp.writePin(FILTERC_UPPER, HIGH);
         }
         break;
     }
@@ -1339,7 +1352,7 @@ void updateglideSW(boolean announce) {
         delay(1);
         midiCCOut(CCglideTime, 0);
       }
-      sr.set(GLIDE_LED, LOW);  // LED off
+      sr.writePin(GLIDE_LED, LOW);  // LED off
     } else {
       if (announce) {
         showCurrentParameterPage("Glide", "On");
@@ -1347,7 +1360,7 @@ void updateglideSW(boolean announce) {
         delay(1);
         midiCCOut(CCglideSW, 127);
       }
-      sr.set(GLIDE_LED, HIGH);  // LED on
+      sr.writePin(GLIDE_LED, HIGH);  // LED on
     }
   } else {
     if (glideSWL == 0) {
@@ -1357,7 +1370,7 @@ void updateglideSW(boolean announce) {
         delay(1);
         midiCCOut(CCglideTime, 0);
       }
-      sr.set(GLIDE_LED, LOW);  // LED off
+      sr.writePin(GLIDE_LED, LOW);  // LED off
     } else {
       if (announce) {
         showCurrentParameterPage("Glide", "On");
@@ -1365,7 +1378,7 @@ void updateglideSW(boolean announce) {
         delay(1);
         midiCCOut(CCglideSW, 127);
       }
-      sr.set(GLIDE_LED, HIGH);  // LED on
+      sr.writePin(GLIDE_LED, HIGH);  // LED on
     }
   }
 }
@@ -1378,16 +1391,16 @@ void updatefilterPoleSwitch(boolean announce) {
         updateFilterType(1);
         midiCCOut(CCfilterPoleSW, 127);
       }
-      sr.set(FILTERPOLE_LED, HIGH);
-      srp.set(FILTER_POLE_UPPER, HIGH);
+      sr.writePin(FILTERPOLE_LED, HIGH);
+      srp.writePin(FILTER_POLE_UPPER, HIGH);
     } else {
       if (announce) {
         //showCurrentParameterPage("VCF Pole", "Off");
         updateFilterType(1);
         midiCCOut(CCfilterPoleSW, 1);
       }
-      sr.set(FILTERPOLE_LED, LOW);
-      srp.set(FILTER_POLE_UPPER, LOW);
+      sr.writePin(FILTERPOLE_LED, LOW);
+      srp.writePin(FILTER_POLE_UPPER, LOW);
     }
   } else {
     if (filterPoleSWL == 1) {
@@ -1396,10 +1409,10 @@ void updatefilterPoleSwitch(boolean announce) {
         updateFilterType(1);
         midiCCOut(CCfilterPoleSW, 127);
       }
-      sr.set(FILTERPOLE_LED, HIGH);
-      srp.set(FILTER_POLE_LOWER, HIGH);
+      sr.writePin(FILTERPOLE_LED, HIGH);
+      srp.writePin(FILTER_POLE_LOWER, HIGH);
       if (wholemode) {
-        srp.set(FILTER_POLE_UPPER, HIGH);
+        srp.writePin(FILTER_POLE_UPPER, HIGH);
       }
     } else {
       if (announce) {
@@ -1407,10 +1420,10 @@ void updatefilterPoleSwitch(boolean announce) {
         updateFilterType(1);
         midiCCOut(CCfilterPoleSW, 1);
       }
-      sr.set(FILTERPOLE_LED, LOW);
-      srp.set(FILTER_POLE_LOWER, LOW);
+      sr.writePin(FILTERPOLE_LED, LOW);
+      srp.writePin(FILTER_POLE_LOWER, LOW);
       if (wholemode) {
-        srp.set(FILTER_POLE_UPPER, LOW);
+        srp.writePin(FILTER_POLE_UPPER, LOW);
       }
     }
   }
@@ -1424,10 +1437,10 @@ void updatefilterLoop(boolean announce) {
           showCurrentParameterPage("VCF Key Loop", "On");
           midiCCOut(CCfilterLoop, 127);
         }
-        sr.set(FILTERLOOP_LED, HIGH);        // LED on
-        sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
-        srp.set(FILTER_MODE_BIT0_UPPER, LOW);
-        srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
+        sr.writePin(FILTERLOOP_LED, HIGH);        // LED on
+        sr.writePin(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
+        srp.writePin(FILTER_MODE_BIT0_UPPER, LOW);
+        srp.writePin(FILTER_MODE_BIT1_UPPER, HIGH);
         oldfilterLoop = statefilterLoopU;
         break;
 
@@ -1436,10 +1449,10 @@ void updatefilterLoop(boolean announce) {
           showCurrentParameterPage("VCF LFO Loop", "On");
           midiCCOut(CCfilterDoubleLoop, 127);
         }
-        sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
-        sr.set(FILTERLOOP_LED, LOW);
-        srp.set(FILTER_MODE_BIT0_UPPER, HIGH);
-        srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
+        sr.writePin(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.writePin(FILTERLOOP_LED, LOW);
+        srp.writePin(FILTER_MODE_BIT0_UPPER, HIGH);
+        srp.writePin(FILTER_MODE_BIT1_UPPER, HIGH);
         oldfilterLoop = statefilterLoopU;
         break;
 
@@ -1448,10 +1461,10 @@ void updatefilterLoop(boolean announce) {
           showCurrentParameterPage("VCF Looping", "Off");
           midiCCOut(CCfilterLoop, 1);
         }
-        sr.set(FILTERLOOP_LED, LOW);         // LED off
-        sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
-        srp.set(FILTER_MODE_BIT0_UPPER, LOW);
-        srp.set(FILTER_MODE_BIT1_UPPER, LOW);
+        sr.writePin(FILTERLOOP_LED, LOW);         // LED off
+        sr.writePin(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
+        srp.writePin(FILTER_MODE_BIT0_UPPER, LOW);
+        srp.writePin(FILTER_MODE_BIT1_UPPER, LOW);
         oldfilterLoop = 0;
         break;
     }
@@ -1462,13 +1475,13 @@ void updatefilterLoop(boolean announce) {
           showCurrentParameterPage("VCF Key Loop", "On");
           midiCCOut(CCfilterLoop, 127);
         }
-        sr.set(FILTERLOOP_LED, HIGH);        // LED on
-        sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
-        srp.set(FILTER_MODE_BIT0_LOWER, LOW);
-        srp.set(FILTER_MODE_BIT1_LOWER, HIGH);
+        sr.writePin(FILTERLOOP_LED, HIGH);        // LED on
+        sr.writePin(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
+        srp.writePin(FILTER_MODE_BIT0_LOWER, LOW);
+        srp.writePin(FILTER_MODE_BIT1_LOWER, HIGH);
         if (wholemode) {
-          srp.set(FILTER_MODE_BIT0_UPPER, LOW);
-          srp.set(FILTER_MODE_BIT1_UPPER, HIGH);
+          srp.writePin(FILTER_MODE_BIT0_UPPER, LOW);
+          srp.writePin(FILTER_MODE_BIT1_UPPER, HIGH);
         }
         oldfilterLoop = statefilterLoopL;
         break;
@@ -1478,13 +1491,13 @@ void updatefilterLoop(boolean announce) {
           showCurrentParameterPage("VCF LFO Loop", "On");
           midiCCOut(CCfilterDoubleLoop, 127);
         }
-        sr.set(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
-        sr.set(FILTERLOOP_LED, LOW);
-        srp.set(FILTER_MODE_BIT0_LOWER, HIGH);
-        srp.set(FILTER_MODE_BIT1_LOWER, HIGH);
+        sr.writePin(FILTERLOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.writePin(FILTERLOOP_LED, LOW);
+        srp.writePin(FILTER_MODE_BIT0_LOWER, HIGH);
+        srp.writePin(FILTER_MODE_BIT1_LOWER, HIGH);
         if (wholemode) {
-          srp.set(FILTER_MODE_BIT0_UPPER, LOW);
-          srp.set(FILTER_MODE_BIT1_UPPER, LOW);
+          srp.writePin(FILTER_MODE_BIT0_UPPER, LOW);
+          srp.writePin(FILTER_MODE_BIT1_UPPER, LOW);
         }
         oldfilterLoop = statefilterLoopL;
         break;
@@ -1494,13 +1507,13 @@ void updatefilterLoop(boolean announce) {
           showCurrentParameterPage("VCF Looping", "Off");
           midiCCOut(CCfilterLoop, 1);
         }
-        sr.set(FILTERLOOP_LED, LOW);         // LED off
-        sr.set(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
-        srp.set(FILTER_MODE_BIT0_LOWER, LOW);
-        srp.set(FILTER_MODE_BIT1_LOWER, LOW);
+        sr.writePin(FILTERLOOP_LED, LOW);         // LED off
+        sr.writePin(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
+        srp.writePin(FILTER_MODE_BIT0_LOWER, LOW);
+        srp.writePin(FILTER_MODE_BIT1_LOWER, LOW);
         if (wholemode) {
-          srp.set(FILTER_MODE_BIT0_UPPER, LOW);
-          srp.set(FILTER_MODE_BIT1_UPPER, LOW);
+          srp.writePin(FILTER_MODE_BIT0_UPPER, LOW);
+          srp.writePin(FILTER_MODE_BIT1_UPPER, LOW);
         }
         oldfilterLoop = 0;
         break;
@@ -1515,15 +1528,15 @@ void updatefilterEGinv(boolean announce) {
         showCurrentParameterPage("Filter Env", "Positive");
         midiCCOut(CCfilterEGinv, 1);
       }
-      sr.set(FILTERINV_LED, LOW);  // LED off
-      srp.set(FILTER_EG_INV_UPPER, LOW);
+      sr.writePin(FILTERINV_LED, LOW);  // LED off
+      srp.writePin(FILTER_EG_INV_UPPER, LOW);
     } else {
       if (announce) {
         showCurrentParameterPage("Filter Env", "Negative");
         midiCCOut(CCfilterEGinv, 127);
       }
-      sr.set(FILTERINV_LED, HIGH);  // LED on
-      srp.set(FILTER_EG_INV_UPPER, HIGH);
+      sr.writePin(FILTERINV_LED, HIGH);  // LED on
+      srp.writePin(FILTER_EG_INV_UPPER, HIGH);
     }
   } else {
     if (filterEGinvL == 0) {
@@ -1531,20 +1544,20 @@ void updatefilterEGinv(boolean announce) {
         showCurrentParameterPage("Filter Env", "Positive");
         midiCCOut(CCfilterEGinv, 1);
       }
-      sr.set(FILTERINV_LED, LOW);  // LED off
-      srp.set(FILTER_EG_INV_LOWER, LOW);
+      sr.writePin(FILTERINV_LED, LOW);  // LED off
+      srp.writePin(FILTER_EG_INV_LOWER, LOW);
       if (wholemode) {
-        srp.set(FILTER_EG_INV_UPPER, LOW);
+        srp.writePin(FILTER_EG_INV_UPPER, LOW);
       }
     } else {
       if (announce) {
         showCurrentParameterPage("Filter Env", "Negative");
         midiCCOut(CCfilterEGinv, 127);
       }
-      sr.set(FILTERINV_LED, HIGH);  // LED on
-      srp.set(FILTER_EG_INV_LOWER, HIGH);
+      sr.writePin(FILTERINV_LED, HIGH);  // LED on
+      srp.writePin(FILTER_EG_INV_LOWER, HIGH);
       if (wholemode) {
-        srp.set(FILTER_EG_INV_UPPER, HIGH);
+        srp.writePin(FILTER_EG_INV_UPPER, HIGH);
       }
     }
   }
@@ -1557,15 +1570,15 @@ void updatefilterVel(boolean announce) {
         showCurrentParameterPage("VCF Velocity", "Off");
         midiCCOut(CCfilterVel, 1);
       }
-      sr.set(FILTERVEL_LED, LOW);  // LED off
-      srp.set(FILTER_VELOCITY_UPPER, LOW);
+      sr.writePin(FILTERVEL_LED, LOW);  // LED off
+      srp.writePin(FILTER_VELOCITY_UPPER, LOW);
     } else {
       if (announce) {
         showCurrentParameterPage("VCF Velocity", "On");
         midiCCOut(CCfilterVel, 127);
       }
-      sr.set(FILTERVEL_LED, HIGH);  // LED on
-      srp.set(FILTER_VELOCITY_UPPER, HIGH);
+      sr.writePin(FILTERVEL_LED, HIGH);  // LED on
+      srp.writePin(FILTER_VELOCITY_UPPER, HIGH);
     }
   } else {
     if (filterVelL == 0) {
@@ -1573,20 +1586,20 @@ void updatefilterVel(boolean announce) {
         showCurrentParameterPage("VCF Velocity", "Off");
         midiCCOut(CCfilterVel, 1);
       }
-      sr.set(FILTERVEL_LED, LOW);  // LED off
-      srp.set(FILTER_VELOCITY_LOWER, LOW);
+      sr.writePin(FILTERVEL_LED, LOW);  // LED off
+      srp.writePin(FILTER_VELOCITY_LOWER, LOW);
       if (wholemode) {
-        srp.set(FILTER_VELOCITY_UPPER, LOW);
+        srp.writePin(FILTER_VELOCITY_UPPER, LOW);
       }
     } else {
       if (announce) {
         showCurrentParameterPage("VCF Velocity", "On");
         midiCCOut(CCfilterVel, 127);
       }
-      sr.set(FILTERVEL_LED, HIGH);  // LED on
-      srp.set(FILTER_VELOCITY_LOWER, HIGH);
+      sr.writePin(FILTERVEL_LED, HIGH);  // LED on
+      srp.writePin(FILTER_VELOCITY_LOWER, HIGH);
       if (wholemode) {
-        srp.set(FILTER_VELOCITY_UPPER, HIGH);
+        srp.writePin(FILTER_VELOCITY_UPPER, HIGH);
       }
     }
   }
@@ -1600,10 +1613,10 @@ void updatevcaLoop(boolean announce) {
           showCurrentParameterPage("VCA Key Loop", "On");
           midiCCOut(CCvcaLoop, 127);
         }
-        sr.set(VCALOOP_LED, HIGH);        // LED on
-        sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
-        srp.set(AMP_MODE_BIT0_UPPER, LOW);
-        srp.set(AMP_MODE_BIT1_UPPER, HIGH);
+        sr.writePin(VCALOOP_LED, HIGH);        // LED on
+        sr.writePin(VCALOOP_DOUBLE_LED, LOW);  // LED on
+        srp.writePin(AMP_MODE_BIT0_UPPER, LOW);
+        srp.writePin(AMP_MODE_BIT1_UPPER, HIGH);
         oldvcaLoop = statevcaLoopU;
         break;
 
@@ -1612,10 +1625,10 @@ void updatevcaLoop(boolean announce) {
           showCurrentParameterPage("VCA LFO Loop", "On");
           midiCCOut(CCvcaDoubleLoop, 127);
         }
-        sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
-        sr.set(VCALOOP_LED, LOW);
-        srp.set(AMP_MODE_BIT0_UPPER, HIGH);
-        srp.set(AMP_MODE_BIT1_UPPER, HIGH);
+        sr.writePin(VCALOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.writePin(VCALOOP_LED, LOW);
+        srp.writePin(AMP_MODE_BIT0_UPPER, HIGH);
+        srp.writePin(AMP_MODE_BIT1_UPPER, HIGH);
         oldvcaLoop = statevcaLoopU;
         break;
 
@@ -1624,10 +1637,10 @@ void updatevcaLoop(boolean announce) {
           showCurrentParameterPage("VCA Looping", "Off");
           midiCCOut(CCvcaLoop, 1);
         }
-        sr.set(VCALOOP_LED, LOW);         // LED off
-        sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
-        srp.set(AMP_MODE_BIT0_UPPER, LOW);
-        srp.set(AMP_MODE_BIT1_UPPER, LOW);
+        sr.writePin(VCALOOP_LED, LOW);         // LED off
+        sr.writePin(VCALOOP_DOUBLE_LED, LOW);  // LED on
+        srp.writePin(AMP_MODE_BIT0_UPPER, LOW);
+        srp.writePin(AMP_MODE_BIT1_UPPER, LOW);
         oldvcaLoop = 0;
         break;
     }
@@ -1638,13 +1651,13 @@ void updatevcaLoop(boolean announce) {
           showCurrentParameterPage("VCA Key Loop", "On");
           midiCCOut(CCvcaLoop, 127);
         }
-        sr.set(VCALOOP_LED, HIGH);        // LED on
-        sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
-        srp.set(AMP_MODE_BIT0_LOWER, LOW);
-        srp.set(AMP_MODE_BIT1_LOWER, HIGH);
+        sr.writePin(VCALOOP_LED, HIGH);        // LED on
+        sr.writePin(VCALOOP_DOUBLE_LED, LOW);  // LED on
+        srp.writePin(AMP_MODE_BIT0_LOWER, LOW);
+        srp.writePin(AMP_MODE_BIT1_LOWER, HIGH);
         if (wholemode) {
-          srp.set(AMP_MODE_BIT0_UPPER, LOW);
-          srp.set(AMP_MODE_BIT1_UPPER, HIGH);
+          srp.writePin(AMP_MODE_BIT0_UPPER, LOW);
+          srp.writePin(AMP_MODE_BIT1_UPPER, HIGH);
         }
         oldvcaLoop = statevcaLoopL;
         break;
@@ -1654,13 +1667,13 @@ void updatevcaLoop(boolean announce) {
           showCurrentParameterPage("VCA LFO Loop", "On");
           midiCCOut(CCvcaDoubleLoop, 127);
         }
-        sr.set(VCALOOP_DOUBLE_LED, HIGH);  // LED on
-        sr.set(VCALOOP_LED, LOW);
-        srp.set(AMP_MODE_BIT0_LOWER, HIGH);
-        srp.set(AMP_MODE_BIT1_LOWER, HIGH);
+        sr.writePin(VCALOOP_DOUBLE_LED, HIGH);  // LED on
+        sr.writePin(VCALOOP_LED, LOW);
+        srp.writePin(AMP_MODE_BIT0_LOWER, HIGH);
+        srp.writePin(AMP_MODE_BIT1_LOWER, HIGH);
         if (wholemode) {
-          srp.set(AMP_MODE_BIT0_UPPER, LOW);
-          srp.set(AMP_MODE_BIT1_UPPER, LOW);
+          srp.writePin(AMP_MODE_BIT0_UPPER, LOW);
+          srp.writePin(AMP_MODE_BIT1_UPPER, LOW);
         }
         oldvcaLoop = statevcaLoopL;
         break;
@@ -1670,13 +1683,13 @@ void updatevcaLoop(boolean announce) {
           showCurrentParameterPage("VCA Looping", "Off");
           midiCCOut(CCvcaLoop, 1);
         }
-        sr.set(VCALOOP_LED, LOW);         // LED off
-        sr.set(VCALOOP_DOUBLE_LED, LOW);  // LED on
-        srp.set(AMP_MODE_BIT0_LOWER, LOW);
-        srp.set(AMP_MODE_BIT1_LOWER, LOW);
+        sr.writePin(VCALOOP_LED, LOW);         // LED off
+        sr.writePin(VCALOOP_DOUBLE_LED, LOW);  // LED on
+        srp.writePin(AMP_MODE_BIT0_LOWER, LOW);
+        srp.writePin(AMP_MODE_BIT1_LOWER, LOW);
         if (wholemode) {
-          srp.set(AMP_MODE_BIT0_UPPER, LOW);
-          srp.set(AMP_MODE_BIT1_UPPER, LOW);
+          srp.writePin(AMP_MODE_BIT0_UPPER, LOW);
+          srp.writePin(AMP_MODE_BIT1_UPPER, LOW);
         }
         oldvcaLoop = 0;
         break;
@@ -1691,15 +1704,15 @@ void updatevcaVel(boolean announce) {
         showCurrentParameterPage("VCA Velocity", "Off");
         midiCCOut(CCvcaVel, 1);
       }
-      sr.set(VCAVEL_LED, LOW);  // LED off
-      srp.set(AMP_VELOCITY_UPPER, LOW);
+      sr.writePin(VCAVEL_LED, LOW);  // LED off
+      srp.writePin(AMP_VELOCITY_UPPER, LOW);
     } else {
       if (announce) {
         showCurrentParameterPage("VCA Velocity", "On");
         midiCCOut(CCvcaVel, 127);
       }
-      sr.set(VCAVEL_LED, HIGH);  // LED on
-      srp.set(AMP_VELOCITY_UPPER, HIGH);
+      sr.writePin(VCAVEL_LED, HIGH);  // LED on
+      srp.writePin(AMP_VELOCITY_UPPER, HIGH);
     }
   } else {
     if (vcaVelL == 0) {
@@ -1707,20 +1720,20 @@ void updatevcaVel(boolean announce) {
         showCurrentParameterPage("VCA Velocity", "Off");
         midiCCOut(CCvcaVel, 1);
       }
-      sr.set(VCAVEL_LED, LOW);  // LED off
-      srp.set(AMP_VELOCITY_LOWER, LOW);
+      sr.writePin(VCAVEL_LED, LOW);  // LED off
+      srp.writePin(AMP_VELOCITY_LOWER, LOW);
       if (wholemode) {
-        srp.set(AMP_VELOCITY_UPPER, LOW);
+        srp.writePin(AMP_VELOCITY_UPPER, LOW);
       }
     } else {
       if (announce) {
         showCurrentParameterPage("VCA Velocity", "On");
         midiCCOut(CCvcaVel, 127);
       }
-      sr.set(VCAVEL_LED, HIGH);  // LED on
-      srp.set(AMP_VELOCITY_LOWER, HIGH);
+      sr.writePin(VCAVEL_LED, HIGH);  // LED on
+      srp.writePin(AMP_VELOCITY_LOWER, HIGH);
       if (wholemode) {
-        srp.set(AMP_VELOCITY_UPPER, HIGH);
+        srp.writePin(AMP_VELOCITY_UPPER, HIGH);
       }
     }
   }
@@ -1734,7 +1747,7 @@ void updatevcaGate(boolean announce) {
         showCurrentParameterPage("VCA Gate", "Off");
         midiCCOut(CCvcaGate, 1);
       }
-      sr.set(VCAGATE_LED, LOW);  // LED off
+      sr.writePin(VCAGATE_LED, LOW);  // LED off
       ampAttackU = oldampAttackU;
       ampDecayU = oldampDecayU;
       ampSustainU = oldampSustainU;
@@ -1744,7 +1757,7 @@ void updatevcaGate(boolean announce) {
         showCurrentParameterPage("VCA Gate", "On");
         midiCCOut(CCvcaGate, 127);
       }
-      sr.set(VCAGATE_LED, HIGH);  // LED on
+      sr.writePin(VCAGATE_LED, HIGH);  // LED on
       ampAttackU = 0;
       ampDecayU = 0;
       ampSustainU = 1023;
@@ -1756,7 +1769,7 @@ void updatevcaGate(boolean announce) {
         showCurrentParameterPage("VCA Gate", "Off");
         midiCCOut(CCvcaGate, 1);
       }
-      sr.set(VCAGATE_LED, LOW);  // LED off
+      sr.writePin(VCAGATE_LED, LOW);  // LED off
       ampAttackL = oldampAttackL;
       ampDecayL = oldampDecayL;
       ampSustainL = oldampSustainL;
@@ -1772,7 +1785,7 @@ void updatevcaGate(boolean announce) {
         showCurrentParameterPage("VCA Gate", "On");
         midiCCOut(CCvcaGate, 127);
       }
-      sr.set(VCAGATE_LED, HIGH);  // LED on
+      sr.writePin(VCAGATE_LED, HIGH);  // LED on
       ampAttackL = 0;
       ampDecayL = 0;
       ampSustainL = 1023;
@@ -1795,16 +1808,16 @@ void updatelfoAlt(boolean announce) {
         updateStratusLFOWaveform();
         midiCCOut(CClfoAlt, 1);
       }
-      sr.set(LFO_ALT_LED, LOW);  // LED off
-      srp.set(LFO_ALT_UPPER, HIGH);
+      sr.writePin(LFO_ALT_LED, LOW);  // LED off
+      srp.writePin(LFO_ALT_UPPER, HIGH);
     } else {
       if (announce) {
         //showCurrentParameterPage("LFO Waveform", String("Alternate"));
         updateStratusLFOWaveform();
         midiCCOut(CClfoAlt, 127);
       }
-      sr.set(LFO_ALT_LED, HIGH);  // LED on
-      srp.set(LFO_ALT_UPPER, LOW);
+      sr.writePin(LFO_ALT_LED, HIGH);  // LED on
+      srp.writePin(LFO_ALT_UPPER, LOW);
     }
   } else {
     if (lfoAltL == 0) {
@@ -1813,10 +1826,10 @@ void updatelfoAlt(boolean announce) {
         updateStratusLFOWaveform();
         midiCCOut(CClfoAlt, 1);
       }
-      sr.set(LFO_ALT_LED, LOW);  // LED off
-      srp.set(LFO_ALT_LOWER, HIGH);
+      sr.writePin(LFO_ALT_LED, LOW);  // LED off
+      srp.writePin(LFO_ALT_LOWER, HIGH);
       if (wholemode) {
-        srp.set(LFO_ALT_UPPER, HIGH);
+        srp.writePin(LFO_ALT_UPPER, HIGH);
       }
     } else {
       if (announce) {
@@ -1824,10 +1837,10 @@ void updatelfoAlt(boolean announce) {
         updateStratusLFOWaveform();
         midiCCOut(CClfoAlt, 127);
       }
-      sr.set(LFO_ALT_LED, HIGH);  // LED on
-      srp.set(LFO_ALT_LOWER, LOW);
+      sr.writePin(LFO_ALT_LED, HIGH);  // LED on
+      srp.writePin(LFO_ALT_LOWER, LOW);
       if (wholemode) {
-        srp.set(LFO_ALT_UPPER, LOW);
+        srp.writePin(LFO_ALT_UPPER, LOW);
       }
     }
   }
@@ -1836,20 +1849,20 @@ void updatelfoAlt(boolean announce) {
 void updatekeyTrackSW(boolean announce) {
   if (upperSW) {
     if (keyTrackSWU == 0) {
-      srp.set(FILTER_KEYTRACK_UPPER, LOW);
+      srp.writePin(FILTER_KEYTRACK_UPPER, LOW);
     } else {
-      srp.set(FILTER_KEYTRACK_UPPER, HIGH);
+      srp.writePin(FILTER_KEYTRACK_UPPER, HIGH);
     }
   } else {
     if (keyTrackSWL == 0) {
-      srp.set(FILTER_KEYTRACK_LOWER, LOW);
+      srp.writePin(FILTER_KEYTRACK_LOWER, LOW);
       if (wholemode) {
-        srp.set(FILTER_KEYTRACK_UPPER, LOW);
+        srp.writePin(FILTER_KEYTRACK_UPPER, LOW);
       }
     } else {
-      srp.set(FILTER_KEYTRACK_LOWER, HIGH);
+      srp.writePin(FILTER_KEYTRACK_LOWER, HIGH);
       if (wholemode) {
-        srp.set(FILTER_KEYTRACK_UPPER, HIGH);
+        srp.writePin(FILTER_KEYTRACK_UPPER, HIGH);
       }
     }
   }
@@ -1859,13 +1872,13 @@ void updateupperLower() {
   if (!wholemode) {
     if (upperSW) {
       // upper mode upperSW will be true
-      sr.set(UPPER_LED, HIGH);  // LED off
-      //srp.set(UPPER2, LOW);
+      sr.writePin(UPPER_LED, HIGH);  // LED off
+      //srp.writePin(UPPER2, LOW);
       setAllButtons();
     } else {
       // lower mode upperSW will be false
-      sr.set(UPPER_LED, LOW);  // LED off
-      //srp.set(UPPER2, HIGH);
+      sr.writePin(UPPER_LED, LOW);  // LED off
+      //srp.writePin(UPPER2, HIGH);
       setAllButtons();
     }
   } else {
@@ -1876,11 +1889,11 @@ void updateupperLower() {
 void updatewholemode() {
   allNotesOff();
   showCurrentParameterPage("Mode", String("Whole"));
-  sr.set(WHOLE_LED, HIGH);  // LED off
-  sr.set(DUAL_LED, LOW);    // LED off
-  sr.set(SPLIT_LED, LOW);   // LED off
-  sr.set(UPPER_LED, LOW);   // LED off
-  srp.set(UPPER2, HIGH);
+  sr.writePin(WHOLE_LED, HIGH);  // LED off
+  sr.writePin(DUAL_LED, LOW);    // LED off
+  sr.writePin(SPLIT_LED, LOW);   // LED off
+  sr.writePin(UPPER_LED, LOW);   // LED off
+  srp.writePin(UPPER2, HIGH);
   upperSW = 0;
   setAllButtons();
   dualmode = 0;
@@ -1890,10 +1903,10 @@ void updatewholemode() {
 void updatedualmode() {
   allNotesOff();
   showCurrentParameterPage("Mode", String("Dual"));
-  sr.set(DUAL_LED, HIGH);  // LED off
-  sr.set(WHOLE_LED, LOW);  // LED off
-  sr.set(SPLIT_LED, LOW);  // LED off
-  srp.set(UPPER2, LOW);
+  sr.writePin(DUAL_LED, HIGH);  // LED off
+  sr.writePin(WHOLE_LED, LOW);  // LED off
+  sr.writePin(SPLIT_LED, LOW);  // LED off
+  srp.writePin(UPPER2, LOW);
   wholemode = 0;
   splitmode = 0;
 }
@@ -1901,10 +1914,10 @@ void updatedualmode() {
 void updatesplitmode() {
   allNotesOff();
   showCurrentParameterPage("Mode", String("Split"));
-  sr.set(SPLIT_LED, HIGH);  // LED off
-  sr.set(WHOLE_LED, LOW);   // LED off
-  sr.set(DUAL_LED, LOW);    // LED off
-  srp.set(UPPER2, LOW);
+  sr.writePin(SPLIT_LED, HIGH);  // LED off
+  sr.writePin(WHOLE_LED, LOW);   // LED off
+  sr.writePin(DUAL_LED, LOW);    // LED off
+  srp.writePin(UPPER2, LOW);
   wholemode = 0;
   dualmode = 0;
 }
@@ -1916,16 +1929,16 @@ void updatechorus1(boolean announce) {
         showCurrentParameterPage("Chorus 1", String("Off"));
         midiCCOut(CCchorus1, 1);
       }
-      sr.set(CHORUS1_LED, LOW);  // LED off
-      srp.set(CHORUS1_OUT_UPPER, LOW);
+      sr.writePin(CHORUS1_LED, LOW);  // LED off
+      srp.writePin(CHORUS1_OUT_UPPER, LOW);
     }
     if (chorus1U) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("On"));
         midiCCOut(CCchorus1, 127);
       }
-      sr.set(CHORUS1_LED, HIGH);  // LED on
-      srp.set(CHORUS1_OUT_UPPER, HIGH);
+      sr.writePin(CHORUS1_LED, HIGH);  // LED on
+      srp.writePin(CHORUS1_OUT_UPPER, HIGH);
     }
   }
   if (!upperSW) {
@@ -1934,10 +1947,10 @@ void updatechorus1(boolean announce) {
         showCurrentParameterPage("Chorus 1", String("Off"));
         midiCCOut(CCchorus1, 1);
       }
-      sr.set(CHORUS1_LED, LOW);  // LED off
-      srp.set(CHORUS1_OUT_LOWER, LOW);
+      sr.writePin(CHORUS1_LED, LOW);  // LED off
+      srp.writePin(CHORUS1_OUT_LOWER, LOW);
       if (wholemode) {
-        srp.set(CHORUS1_OUT_UPPER, LOW);
+        srp.writePin(CHORUS1_OUT_UPPER, LOW);
       }
     }
     if (chorus1L) {
@@ -1945,11 +1958,11 @@ void updatechorus1(boolean announce) {
         showCurrentParameterPage("Chorus 1", String("On"));
         midiCCOut(CCchorus1, 127);
       }
-      sr.set(CHORUS1_LED, HIGH);  // LED on
-      srp.set(CHORUS1_OUT_LOWER, HIGH);
+      sr.writePin(CHORUS1_LED, HIGH);  // LED on
+      srp.writePin(CHORUS1_OUT_LOWER, HIGH);
 
       if (wholemode) {
-        srp.set(CHORUS1_OUT_UPPER, HIGH);
+        srp.writePin(CHORUS1_OUT_UPPER, HIGH);
       }
     }
   }
@@ -1962,16 +1975,16 @@ void updatechorus2(boolean announce) {
         showCurrentParameterPage("Chorus 2", String("Off"));
         midiCCOut(CCchorus2, 1);
       }
-      sr.set(CHORUS2_LED, LOW);  // LED off
-      srp.set(CHORUS2_OUT_UPPER, LOW);
+      sr.writePin(CHORUS2_LED, LOW);  // LED off
+      srp.writePin(CHORUS2_OUT_UPPER, LOW);
     }
     if (chorus2U) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("On"));
         midiCCOut(CCchorus2, 127);
       }
-      sr.set(CHORUS2_LED, HIGH);  // LED on
-      srp.set(CHORUS2_OUT_UPPER, HIGH);
+      sr.writePin(CHORUS2_LED, HIGH);  // LED on
+      srp.writePin(CHORUS2_OUT_UPPER, HIGH);
     }
   }
   if (!upperSW) {
@@ -1980,10 +1993,10 @@ void updatechorus2(boolean announce) {
         showCurrentParameterPage("Chorus 2", String("Off"));
         midiCCOut(CCchorus2, 1);
       }
-      sr.set(CHORUS2_LED, LOW);  // LED off
-      srp.set(CHORUS2_OUT_LOWER, LOW);
+      sr.writePin(CHORUS2_LED, LOW);  // LED off
+      srp.writePin(CHORUS2_OUT_LOWER, LOW);
       if (wholemode) {
-        srp.set(CHORUS2_OUT_UPPER, LOW);
+        srp.writePin(CHORUS2_OUT_UPPER, LOW);
       }
     }
     if (chorus2L) {
@@ -1991,10 +2004,10 @@ void updatechorus2(boolean announce) {
         showCurrentParameterPage("Chorus 2", String("On"));
         midiCCOut(CCchorus2, 127);
       }
-      sr.set(CHORUS2_LED, HIGH);  // LED on
-      srp.set(CHORUS2_OUT_LOWER, HIGH);
+      sr.writePin(CHORUS2_LED, HIGH);  // LED on
+      srp.writePin(CHORUS2_OUT_LOWER, HIGH);
       if (wholemode) {
-        srp.set(CHORUS2_OUT_UPPER, HIGH);
+        srp.writePin(CHORUS2_OUT_UPPER, HIGH);
       }
     }
   }
@@ -2002,38 +2015,38 @@ void updatechorus2(boolean announce) {
 
 void updateFilterEnv(boolean announce) {
   if (filterLogLinU == 0) {
-    srp.set(FILTER_LIN_LOG_UPPER, HIGH);
+    srp.writePin(FILTER_LIN_LOG_UPPER, HIGH);
   } else {
-    srp.set(FILTER_LIN_LOG_UPPER, LOW);
+    srp.writePin(FILTER_LIN_LOG_UPPER, LOW);
   }
   if (filterLogLinL == 0) {
-    srp.set(FILTER_LIN_LOG_LOWER, HIGH);
+    srp.writePin(FILTER_LIN_LOG_LOWER, HIGH);
     if (wholemode) {
-      srp.set(FILTER_LIN_LOG_UPPER, HIGH);
+      srp.writePin(FILTER_LIN_LOG_UPPER, HIGH);
     }
   } else {
-    srp.set(FILTER_LIN_LOG_LOWER, LOW);
+    srp.writePin(FILTER_LIN_LOG_LOWER, LOW);
     if (wholemode) {
-      srp.set(FILTER_LIN_LOG_UPPER, LOW);
+      srp.writePin(FILTER_LIN_LOG_UPPER, LOW);
     }
   }
 }
 
 void updateAmpEnv(boolean announce) {
   if (ampLogLinU == 0) {
-    srp.set(AMP_LIN_LOG_UPPER, LOW);
+    srp.writePin(AMP_LIN_LOG_UPPER, LOW);
   } else {
-    srp.set(AMP_LIN_LOG_UPPER, HIGH);
+    srp.writePin(AMP_LIN_LOG_UPPER, HIGH);
   }
   if (ampLogLinL == 0) {
-    srp.set(AMP_LIN_LOG_LOWER, LOW);
+    srp.writePin(AMP_LIN_LOG_LOWER, LOW);
     if (wholemode) {
-      srp.set(AMP_LIN_LOG_UPPER, LOW);
+      srp.writePin(AMP_LIN_LOG_UPPER, LOW);
     }
   } else {
-    srp.set(AMP_LIN_LOG_LOWER, HIGH);
+    srp.writePin(AMP_LIN_LOG_LOWER, HIGH);
     if (wholemode) {
-      srp.set(AMP_LIN_LOG_UPPER, HIGH);
+      srp.writePin(AMP_LIN_LOG_UPPER, HIGH);
     }
   }
 }
@@ -2072,6 +2085,11 @@ void updatemodWheel() {
 
 void updatePatchname() {
   showPatchPage(String(patchNoU), patchNameU, String(patchNoL), patchNameL);
+}
+
+void myConvertControlChange(byte channel, byte number, byte value) {
+      newvalue = value;
+      myControlChange(channel, number, newvalue);
 }
 
 void myControlChange(byte channel, byte control, int value) {
@@ -3330,50 +3348,13 @@ void midiCCOut(byte cc, byte value) {
   MIDI.sendControlChange(cc, value, midiChannel);  //MIDI DIN is set to Out
 }
 
-// void MCP4922_write(const int &slavePin, const int &value1, const int &value2) {
-//   int value = 0;
-//   byte configByte = 0;
-//   byte data = 0;
-//   int channel = 0;
-
-//   for (channel = 0; channel < 2; channel++) {
-//     digitalWrite(slavePin, LOW);  //set DAC ready to accept commands
-//     if (channel == 0) {
-//       configByte = B01110000;  //channel 0, Vref buffered, Gain of 1x, Active Mode
-//       value = value1;
-//     } else {
-//       configByte = B11110000;  //channel 1, Vref buffered, Gain of 1x, Active Mode
-//       value = value2;
-//     }
-
-//     //write first byte
-//     data = highByte(value);
-//     data = B00001111 & data;   //clear out the 4 command bits
-//     data = configByte | data;  //set the first four command bits
-//     SPI.transfer(data);
-
-//     //write second byte
-//     data = lowByte(value);
-//     SPI.transfer(data);
-
-//     //close the transfer
-//     digitalWrite(slavePin, HIGH);  //set DAC ready to accept commands
-//   }
-// }
-
 void outputDAC(int CHIP_SELECT, uint32_t sample_data1, uint32_t sample_data2) {
   SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE1));
   digitalWriteFast(CHIP_SELECT, LOW);
-  SPI.transfer(sample_data1 >> 24);
-  SPI.transfer(sample_data1 >> 16);
-  SPI.transfer(sample_data1 >> 8);
-  SPI.transfer(sample_data1);
+  SPI.transfer32(sample_data1);
   digitalWriteFast(CHIP_SELECT, HIGH);
   digitalWriteFast(CHIP_SELECT, LOW);
-  SPI.transfer(sample_data2 >> 24);
-  SPI.transfer(sample_data2 >> 16);
-  SPI.transfer(sample_data2 >> 8);
-  SPI.transfer(sample_data2);
+  SPI.transfer32(sample_data2);
   digitalWriteFast(CHIP_SELECT, HIGH);
   SPI.endTransaction();
 }
@@ -3772,21 +3753,21 @@ void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
   }
 }
 
+void showSettingsPage() {
+  showSettingsPage(settings::current_setting(), settings::current_setting_value(), state);
+}
+
 void checkSwitches() {
 
-
   saveButton.update();
-  if (saveButton.read() == LOW && saveButton.duration() > HOLD_DURATION) {
+  if (saveButton.held()) {
     switch (state) {
       case PARAMETER:
       case PATCH:
         state = DELETE;
-        saveButton.write(HIGH);  //Come out of this state
-        del = true;              //Hack
         break;
     }
-  } else if (saveButton.risingEdge()) {
-    if (!del) {
+  } else if (saveButton.numClicks() == 1) {
       switch (state) {
         case PARAMETER:
           if (patches.size() < PATCHES_LIMIT) {
@@ -3843,51 +3824,35 @@ void checkSwitches() {
           }
           break;
       }
-    } else {
-      del = false;
-    }
   }
 
   settingsButton.update();
-  if (settingsButton.read() == LOW && settingsButton.duration() > HOLD_DURATION) {
+  if (settingsButton.held()) {
     //If recall held, set current patch to match current hardware state
     //Reinitialise all hardware values to force them to be re-read if different
     state = REINITIALISE;
-    reinitialiseToPanel();
-    settingsButton.write(HIGH);              //Come out of this state
-    reini = true;                            //Hack
-  } else if (settingsButton.risingEdge()) {  //cannot be fallingEdge because holding button won't work
-    if (!reini) {
+    reinitialiseToPanel();                        //Hack
+  } else if (settingsButton.numClicks() == 1) {
       switch (state) {
-        case PARAMETER:
-          settingsValueIndex = getCurrentIndex(settingsOptions.first().currentIndex);
-          showSettingsPage(settingsOptions.first().option, settingsOptions.first().value[settingsValueIndex], SETTINGS);
-          state = SETTINGS;
-          break;
-        case SETTINGS:
-          settingsOptions.push(settingsOptions.shift());
-          settingsValueIndex = getCurrentIndex(settingsOptions.first().currentIndex);
-          showSettingsPage(settingsOptions.first().option, settingsOptions.first().value[settingsValueIndex], SETTINGS);
-        case SETTINGSVALUE:
-          //Same as pushing Recall - store current settings item and go back to options
-          settingsHandler(settingsOptions.first().value[settingsValueIndex], settingsOptions.first().handler);
-          showSettingsPage(settingsOptions.first().option, settingsOptions.first().value[settingsValueIndex], SETTINGS);
-          state = SETTINGS;
-          break;
+      case PARAMETER:
+        state = SETTINGS;
+        showSettingsPage();
+        break;
+      case SETTINGS:
+        showSettingsPage();
+      case SETTINGSVALUE:
+        settings::save_current_value();
+        state = SETTINGS;
+        showSettingsPage();
+        break;
       }
-    } else {
-      reini = false;
-    }
   }
 
   backButton.update();
-  if (backButton.read() == LOW && backButton.duration() > HOLD_DURATION) {
+  if (backButton.held()) {
     //If Back button held, Panic - all notes off
-    allNotesOff();
-    backButton.write(HIGH);              //Come out of this state
-    panic = true;                        //Hack
-  } else if (backButton.risingEdge()) {  //cannot be fallingEdge because holding button won't work
-    if (!panic) {
+    allNotesOff();                      //Hack
+  } else if (backButton.numClicks() == 1) {
       switch (state) {
         case RECALL:
           setPatchesOrdering(patchNo);
@@ -3908,23 +3873,19 @@ void checkSwitches() {
           setPatchesOrdering(patchNo);
           state = PARAMETER;
           break;
-        case SETTINGS:
-          state = PARAMETER;
-          break;
-        case SETTINGSVALUE:
-          settingsValueIndex = getCurrentIndex(settingsOptions.first().currentIndex);
-          showSettingsPage(settingsOptions.first().option, settingsOptions.first().value[settingsValueIndex], SETTINGS);
-          state = SETTINGS;
-          break;
+      case SETTINGS:
+        state = PARAMETER;
+        break;
+      case SETTINGSVALUE:
+        state = SETTINGS;
+        showSettingsPage();
+        break;
       }
-    } else {
-      panic = false;
-    }
   }
 
   //Encoder switch
   recallButton.update();
-  if (recallButton.read() == LOW && recallButton.duration() > HOLD_DURATION) {
+  if (recallButton.held()) {
     //If Recall button held, return to current patch setting
     //which clears any changes made
     state = PATCH;
@@ -3932,10 +3893,7 @@ void checkSwitches() {
     patchNo = patches.first().patchNo;
     recallPatch(patchNo);
     state = PARAMETER;
-    recallButton.write(HIGH);  //Come out of this state
-    recall = true;             //Hack
-  } else if (recallButton.risingEdge()) {
-    if (!recall) {
+  } else if (recallButton.numClicks() == 1) {
       switch (state) {
         case PARAMETER:
           state = RECALL;  //show patch list
@@ -3975,22 +3933,16 @@ void checkSwitches() {
           }
           state = PARAMETER;
           break;
-        case SETTINGS:
-          //Choose this option and allow value choice
-          settingsValueIndex = getCurrentIndex(settingsOptions.first().currentIndex);
-          showSettingsPage(settingsOptions.first().option, settingsOptions.first().value[settingsValueIndex], SETTINGSVALUE);
-          state = SETTINGSVALUE;
-          break;
-        case SETTINGSVALUE:
-          //Store current settings item and go back to options
-          settingsHandler(settingsOptions.first().value[settingsValueIndex], settingsOptions.first().handler);
-          showSettingsPage(settingsOptions.first().option, settingsOptions.first().value[settingsValueIndex], SETTINGS);
-          state = SETTINGS;
-          break;
+      case SETTINGS:
+        state = SETTINGSVALUE;
+        showSettingsPage();
+        break;
+      case SETTINGSVALUE:
+        settings::save_current_value();
+        state = SETTINGS;
+        showSettingsPage();
+        break;
       }
-    } else {
-      recall = false;
-    }
   }
 }
 
@@ -4043,13 +3995,12 @@ void checkEncoder() {
         patches.push(patches.shift());
         break;
       case SETTINGS:
-        settingsOptions.push(settingsOptions.shift());
-        settingsValueIndex = getCurrentIndex(settingsOptions.first().currentIndex);
-        showSettingsPage(settingsOptions.first().option, settingsOptions.first().value[settingsValueIndex], SETTINGS);
+        settings::increment_setting();
+        showSettingsPage();
         break;
       case SETTINGSVALUE:
-        if (settingsOptions.first().value[settingsValueIndex + 1] != '\0')
-          showSettingsPage(settingsOptions.first().option, settingsOptions.first().value[++settingsValueIndex], SETTINGSVALUE);
+        settings::increment_setting_value();
+        showSettingsPage();
         break;
     }
     encPrevious = encRead;
@@ -4084,13 +4035,12 @@ void checkEncoder() {
         patches.unshift(patches.pop());
         break;
       case SETTINGS:
-        settingsOptions.unshift(settingsOptions.pop());
-        settingsValueIndex = getCurrentIndex(settingsOptions.first().currentIndex);
-        showSettingsPage(settingsOptions.first().option, settingsOptions.first().value[settingsValueIndex], SETTINGS);
+        settings::decrement_setting();
+        showSettingsPage();
         break;
       case SETTINGSVALUE:
-        if (settingsValueIndex > 0)
-          showSettingsPage(settingsOptions.first().option, settingsOptions.first().value[--settingsValueIndex], SETTINGSVALUE);
+        settings::decrement_setting_value();
+        showSettingsPage();
         break;
     }
     encPrevious = encRead;
@@ -4099,6 +4049,8 @@ void checkEncoder() {
 
 void loop() {
   octoswitch.update();
+  srp.update();
+  sr.update();
   checkSwitches();
   checkEeprom();
   writeDemux();

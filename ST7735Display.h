@@ -35,8 +35,8 @@ String currentPgmNumL = "";
 String currentPatchNameU = "";
 String currentPatchNameL = "";
 String newPatchName = "";
-char *currentSettingsOption = "";
-char *currentSettingsValue = "";
+const char *currentSettingsOption = "";
+const char *currentSettingsValue = "";
 int currentSettingsPart = SETTINGS;
 int paramType = PARAMETER;
 
@@ -435,7 +435,7 @@ void showPatchPage(String numberU, String patchNameU, String numberL, String pat
   currentPatchNameL = patchNameL;
 }
 
-void showSettingsPage(char *option, char *value, int settingsPart) {
+void showSettingsPage(const char *option, const char *value, int settingsPart) {
   currentSettingsOption = option;
   currentSettingsValue = value;
   currentSettingsPart = settingsPart;

@@ -12,6 +12,7 @@ byte splitTrans = 0;
 byte oldsplitTrans = 0;
 int lowerTranspose = 0;
 float keytrackingAmount = 0.5;
+int newvalue = 0;
 
 //Delayed LFO
 int numberOfNotesU = 0;
