@@ -29,7 +29,7 @@ This repository contains my versions of the filter/adsr/lfo with added velocity,
 
 - How it sounds...
 
-https://youtu.be/yFFuoJo9930
+[https://youtu.be/yFFuoJo9930](https://youtu.be/pIsAd5T5sVk)
 
 ## Things to fix/improve
 
