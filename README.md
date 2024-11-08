@@ -2,6 +2,8 @@
 
 Based on the PolyKit DCO and PolyKit-x-voice board projects by PolyKit (Jan Knipper). This design takes Jan's work and expands it into a fully programmable 16 voice DCO based synthesizer. 
 
+![Synth](photos/synth.jpg)
+
 The synth is comparable to a dual Juno 106 combined with a Crumar Bit 01 rack unit but with full control.
 
 This repository contains my versions of the filter/adsr/lfo with added velocity, keytracking and additional 8 filter configurations and programmer section for the Polykit 16.
