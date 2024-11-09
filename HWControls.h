@@ -212,7 +212,7 @@ ADC *adc = new ADC();
 #define VCALOOP_DOUBLE_LED 16
 #define FILTERLOOP_DOUBLE_LED 17
 
-//Switches
+// Buttons
 // roxmux 74HC165
 
 #define CHORUS1_SW 0

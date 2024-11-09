@@ -76,18 +76,10 @@ struct VoiceAndNote voices[NO_OF_VOICES] = {
   { -1, -1, 0 },
   { -1, -1, 0 },
   { -1, -1, 0 },
-  { -1, -1, 0 },
-  { -1, -1, 0 },
-  { -1, -1, 0 },
-  { -1, -1, 0 },
-  { -1, -1, 0 },
-  { -1, -1, 0 },
-  { -1, -1, 0 },
-  { -1, -1, 0 },
   { -1, -1, 0 }
 };
 
-boolean voiceOn[NO_OF_VOICES] = { false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false };
+boolean voiceOn[NO_OF_VOICES] = { false, false, false, false, false, false, false, false };
 int prevNote = 0;  //Initialised to middle value
 bool notes[88] = { 0 }, initial_loop = 1;
 int8_t noteOrder[40] = { 0 }, orderIndx = { 0 };
@@ -435,62 +427,6 @@ void DinHandleNoteOn(byte channel, byte note, byte velocity) {
         MIDI.sendNoteOn(note, velocity, 2);
         voiceOn[7] = true;
         break;
-      case 9:
-        voices[8].note = note;
-        voices[8].velocity = velocity;
-        voices[8].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 1);
-        voiceOn[8] = true;
-        break;
-      case 10:
-        voices[9].note = note;
-        voices[9].velocity = velocity;
-        voices[9].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 2);
-        voiceOn[9] = true;
-        break;
-      case 11:
-        voices[10].note = note;
-        voices[10].velocity = velocity;
-        voices[10].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 1);
-        voiceOn[10] = true;
-        break;
-      case 12:
-        voices[11].note = note;
-        voices[11].velocity = velocity;
-        voices[11].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 2);
-        voiceOn[11] = true;
-        break;
-      case 13:
-        voices[12].note = note;
-        voices[12].velocity = velocity;
-        voices[12].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 1);
-        voiceOn[12] = true;
-        break;
-      case 14:
-        voices[13].note = note;
-        voices[13].velocity = velocity;
-        voices[13].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 2);
-        voiceOn[13] = true;
-        break;
-      case 15:
-        voices[14].note = note;
-        voices[14].velocity = velocity;
-        voices[14].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 1);
-        voiceOn[14] = true;
-        break;
-      case 16:
-        voices[15].note = note;
-        voices[15].velocity = velocity;
-        voices[15].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 2);
-        voiceOn[15] = true;
-        break;
     }
   }
   if (dualmode) {
@@ -553,46 +489,6 @@ void DinHandleNoteOff(byte channel, byte note, byte velocity) {
         MIDI.sendNoteOff(note, velocity, 2);
         voices[7].note = -1;
         voiceOn[7] = false;
-        break;
-      case 9:
-        MIDI.sendNoteOff(note, velocity, 1);
-        voices[8].note = -1;
-        voiceOn[8] = false;
-        break;
-      case 10:
-        MIDI.sendNoteOff(note, velocity, 2);
-        voices[9].note = -1;
-        voiceOn[9] = false;
-        break;
-      case 11:
-        MIDI.sendNoteOff(note, velocity, 1);
-        voices[10].note = -1;
-        voiceOn[10] = false;
-        break;
-      case 12:
-        MIDI.sendNoteOff(note, velocity, 2);
-        voices[11].note = -1;
-        voiceOn[11] = false;
-        break;
-      case 13:
-        MIDI.sendNoteOff(note, velocity, 1);
-        voices[12].note = -1;
-        voiceOn[12] = false;
-        break;
-      case 14:
-        MIDI.sendNoteOff(note, velocity, 2);
-        voices[13].note = -1;
-        voiceOn[13] = false;
-        break;
-      case 15:
-        MIDI.sendNoteOff(note, velocity, 1);
-        voices[14].note = -1;
-        voiceOn[14] = false;
-        break;
-      case 16:
-        MIDI.sendNoteOff(note, velocity, 2);
-        voices[15].note = -1;
-        voiceOn[15] = false;
         break;
     }
   }
@@ -1348,17 +1244,17 @@ void updateglideSW(boolean announce) {
     if (glideSWU == 0) {
       if (announce) {
         showCurrentParameterPage("Glide", "Off");
-        midiCCOut(CCglideSW, 1);
+        midiCCOutCPU(CCglideSW, 1, 1);
         delay(1);
-        midiCCOut(CCglideTime, 0);
+        midiCCOutCPU(CCglideTime, 0, 1);
       }
       sr.writePin(GLIDE_LED, LOW);  // LED off
     } else {
       if (announce) {
         showCurrentParameterPage("Glide", "On");
-        midiCCOut(CCglideTime, int(glideTime / 8));
+        midiCCOutCPU(CCglideTime, int(glideTimeU / 8), 1);
         delay(1);
-        midiCCOut(CCglideSW, 127);
+        midiCCOutCPU(CCglideSW, 127, 1);
       }
       sr.writePin(GLIDE_LED, HIGH);  // LED on
     }
@@ -1366,17 +1262,27 @@ void updateglideSW(boolean announce) {
     if (glideSWL == 0) {
       if (announce) {
         showCurrentParameterPage("Glide", "Off");
-        midiCCOut(CCglideSW, 1);
+        midiCCOutCPU(CCglideSW, 1, 1);
         delay(1);
-        midiCCOut(CCglideTime, 0);
+        midiCCOutCPU(CCglideTime, 0, 1);
+        if (wholemode) {
+          midiCCOutCPU(CCglideSW, 1, 2);
+          delay(1);
+          midiCCOutCPU(CCglideTime, 0, 2);
+        }
       }
       sr.writePin(GLIDE_LED, LOW);  // LED off
     } else {
       if (announce) {
         showCurrentParameterPage("Glide", "On");
-        midiCCOut(CCglideTime, int(glideTime / 8));
+        midiCCOutCPU(CCglideTime, int(glideTimeL / 8), 2);
         delay(1);
-        midiCCOut(CCglideSW, 127);
+        midiCCOutCPU(CCglideSW, 127, 2);
+        if (wholemode) {
+          midiCCOutCPU(CCglideSW, 127, 2);
+          delay(1);
+          midiCCOutCPU(CCglideTime, int(glideTimeU / 8), 2);
+        }
       }
       sr.writePin(GLIDE_LED, HIGH);  // LED on
     }
@@ -1850,19 +1756,37 @@ void updatekeyTrackSW(boolean announce) {
   if (upperSW) {
     if (keyTrackSWU == 0) {
       srp.writePin(FILTER_KEYTRACK_UPPER, LOW);
+      midiCCOutCPU(CCkeyTrackSW, 1, 2);
+      delay(1);
+      midiCCOutCPU(CCkeyTrack, 1, 2);
     } else {
       srp.writePin(FILTER_KEYTRACK_UPPER, HIGH);
+      midiCCOutCPU(CCkeyTrackSW, 127, 2);
+      delay(1);
+      midiCCOutCPU(CCkeyTrack, keytrackU, 2);
     }
   } else {
     if (keyTrackSWL == 0) {
       srp.writePin(FILTER_KEYTRACK_LOWER, LOW);
+      midiCCOutCPU(CCkeyTrackSW, 1, 1);
+      delay(1);
+      midiCCOutCPU(CCkeyTrack, 1, 1);
       if (wholemode) {
         srp.writePin(FILTER_KEYTRACK_UPPER, LOW);
+        midiCCOutCPU(CCkeyTrackSW, 1, 2);
+        delay(1);
+        midiCCOutCPU(CCkeyTrack, 1, 2);
       }
     } else {
       srp.writePin(FILTER_KEYTRACK_LOWER, HIGH);
+      midiCCOutCPU(CCkeyTrackSW, 127, 1);
+      delay(1);
+      midiCCOutCPU(CCkeyTrack, keytrackL, 1);
       if (wholemode) {
         srp.writePin(FILTER_KEYTRACK_UPPER, HIGH);
+        midiCCOutCPU(CCkeyTrackSW, 127, 2);
+        delay(1);
+        midiCCOutCPU(CCkeyTrack, keytrackU, 2);
       }
     }
   }
@@ -3288,7 +3212,8 @@ void checkMux() {
         myControlChange(midiChannel, CCfilterType, mux2Read);
         break;
       case MUX2_keyTrack:
-        midiCCOut(CCkeyTrack, mux2Read / midioutfrig);
+        midiCCOutCPU(CCkeyTrack, mux2Read / midioutfrig, 1);
+        midiCCOutCPU(CCkeyTrack, mux2Read / midioutfrig, 2);
         myControlChange(midiChannel, CCkeyTrack, mux2Read);
         break;
       case MUX2_filterEGlevel:
@@ -3343,9 +3268,11 @@ void checkMux() {
 }
 
 void midiCCOut(byte cc, byte value) {
-  //usbMIDI.sendControlChange(cc, value, midiChannel); //MIDI DIN is set to Out
-  //midi1.sendControlChange(cc, value, midiChannel);
   MIDI.sendControlChange(cc, value, midiChannel);  //MIDI DIN is set to Out
+}
+
+void midiCCOutCPU(byte cc, byte value, byte channel) {
+  MIDI.sendControlChange(cc, value, channel);  //MIDI DIN is set to Out
 }
 
 void outputDAC(int CHIP_SELECT, uint32_t sample_data1, uint32_t sample_data2) {

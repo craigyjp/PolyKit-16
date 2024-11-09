@@ -18,8 +18,8 @@
 #define   CCvcaGate 21
 #define   CCfilterLFO 22
 #define   CCnoiseLevel 23
-#define   CCfilterPoleSW 24//Off/On
-#define   CCkeyTrack 30//Off/On
+#define   CCfilterPoleSW 24
+#define   CCkeyTrack 30
 #define   CCupperSW 31
 #define   CCwholemode 32
 #define   CCdualmode 33
