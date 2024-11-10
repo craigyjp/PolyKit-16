@@ -109,6 +109,8 @@ void note_off(uint8_t note);
 void voice_task();
 void adc_task();
 void octave_task();
+void update_keytrack();
+void turn_off_all_notes();
 long map(long x, long in_min, long in_max, long out_min, long out_max);
 
 int main() {
@@ -209,6 +211,20 @@ int main() {
         octave_task();
         #endif
         led_blinking_task();
+    }
+}
+
+void update_keytrack() {
+    if (keytrack_on) {
+        float scale_factor = keytrack / 127.0f;  // Scale keytrack to 0-1 range
+
+        for (int i = 0; i < NUM_VOICES; i++) {
+            if (VOICE_GATE[i] == 1) {  // Only update active voices
+                uint32_t mV = ((VOICE_NOTES[i]) * NOTE_SF * sfAdj[i] + 0.5) * scale_factor;
+                sample_data = ((DACS[i] & 0xFFF0000F) | ((mV & 0xFFFF) << 4));
+                output_DAC(sample_data);  // Update DAC with new scaled value
+            }
+        }
     }
 }
 
@@ -353,10 +369,16 @@ void usb_midi_task() {
             if (buff[2] == 30)
             { // Keytrack 0-127
                 keytrack = buff[3];
+                update_keytrack();
             }
             if (buff[2] == 38)
             { // keytrack on/off
                 keytrack_on = buff[3] > 63;
+                update_keytrack();
+            }
+            if (buff[2] == 123 && buff[3] == 0) 
+            {
+                turn_off_all_notes();  // Turn off all notes on CC 123, value 0
             }
         }
     }
@@ -421,10 +443,17 @@ void serial_midi_task() {
         if (lsb == 30)
         { // Keytrack 0-127
             keytrack = msb;
+            update_keytrack();
         }
         if (lsb == 38)
         { // Keytrack on/off
             keytrack_on = msb > 63;
+            update_keytrack();
+        }
+        if (lsb == 123 && msb == 0) 
+        {
+            turn_off_all_notes();  // Turn off all notes on CC 123, value 0
+
         }
     }
 }
@@ -448,8 +477,6 @@ void note_on(uint8_t note, uint8_t velocity) {
         if (keytrack_on) {
             float scale_factor = keytrack / 127.0f; // Scale keytrack to 0-1 range
             mV = mV * scale_factor;                 // Apply scaling to mV value
-        } else {
-            mV = 0;
         }
         sample_data = ((DACS[voice_num] & 0xFFF0000F) | ((mV & 0xFFFF) << 4));
         output_DAC(sample_data);
@@ -505,6 +532,15 @@ uint8_t get_free_voice() {
 
     NEXT_VOICE = (oldest_voice+1)%NUM_VOICES;
     return oldest_voice;
+}
+
+void turn_off_all_notes() {
+    for (int i = 0; i < NUM_VOICES; i++) {
+        gpio_put(GATE_PINS[i], 0);  // Turn off the gate for each voice
+        VOICE_GATE[i] = 0;          // Mark the voice as inactive
+        VOICE_NOTES[i] = 0;         // Reset the note for each voice
+        VOICES[i] = 0;              // Reset the timestamp or state
+    }
 }
 
 void voice_task() {
