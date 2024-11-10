@@ -93,7 +93,7 @@ MIDIDevice midi1(myusb);
 
 //MIDI 5 Pin DIN
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI);  //RX - Pin 0
-
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial2, MIDI2);  //RX - Pin 7
 
 int count = 0;  //For MIDI Clk Sync
 int DelayForSH3 = 50;
@@ -193,6 +193,7 @@ void setup() {
   MIDI.turnThruOn(midi::Thru::Mode::Off);
   //Serial.println("MIDI In DIN Listening");
 
+  MIDI2.begin();
 
   //Read Aftertouch from EEPROM, this can be set individually by each patch.
   AfterTouchDestU = getAfterTouchU();
@@ -274,13 +275,13 @@ void setup() {
 
   for (int i = 0; i < 8; i++) {
     int noteon = 60;
-    MIDI.sendNoteOn(noteon, 64, 1);
+    MIDI2.sendNoteOn(noteon, 64, 1);
     delayMicroseconds(DelayForSH3);
-    MIDI.sendNoteOn(noteon, 64, 2);
+    MIDI2.sendNoteOn(noteon, 64, 2);
     delay(1);
-    MIDI.sendNoteOff(noteon, 64, 1);
+    MIDI2.sendNoteOff(noteon, 64, 1);
     delayMicroseconds(DelayForSH3);
-    MIDI.sendNoteOff(noteon, 64, 2);
+    MIDI2.sendNoteOff(noteon, 64, 2);
     noteon++;
   }
   delay(200);
@@ -375,69 +376,69 @@ void DinHandleNoteOn(byte channel, byte note, byte velocity) {
         voices[0].note = note;
         voices[0].velocity = velocity;
         voices[0].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 1);
+        MIDI2.sendNoteOn(note, velocity, 1);
         voiceOn[0] = true;
         break;
       case 2:
         voices[1].note = note;
         voices[1].velocity = velocity;
         voices[1].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 2);
+        MIDI2.sendNoteOn(note, velocity, 2);
         voiceOn[1] = true;
         break;
       case 3:
         voices[2].note = note;
         voices[2].velocity = velocity;
         voices[2].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 1);
+        MIDI2.sendNoteOn(note, velocity, 1);
         voiceOn[2] = true;
         break;
       case 4:
         voices[3].note = note;
         voices[3].velocity = velocity;
         voices[3].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 2);
+        MIDI2.sendNoteOn(note, velocity, 2);
         voiceOn[3] = true;
         break;
       case 5:
         voices[4].note = note;
         voices[4].velocity = velocity;
         voices[4].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 1);
+        MIDI2.sendNoteOn(note, velocity, 1);
         voiceOn[4] = true;
         break;
       case 6:
         voices[5].note = note;
         voices[5].velocity = velocity;
         voices[5].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 2);
+        MIDI2.sendNoteOn(note, velocity, 2);
         voiceOn[5] = true;
         break;
       case 7:
         voices[6].note = note;
         voices[6].velocity = velocity;
         voices[6].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 1);
+        MIDI2.sendNoteOn(note, velocity, 1);
         voiceOn[6] = true;
         break;
       case 8:
         voices[7].note = note;
         voices[7].velocity = velocity;
         voices[7].timeOn = millis();
-        MIDI.sendNoteOn(note, velocity, 2);
+        MIDI2.sendNoteOn(note, velocity, 2);
         voiceOn[7] = true;
         break;
     }
   }
   if (dualmode) {
-    MIDI.sendNoteOn(note, velocity, 1);
-    MIDI.sendNoteOn(note, velocity, 2);
+    MIDI2.sendNoteOn(note, velocity, 1);
+    MIDI2.sendNoteOn(note, velocity, 2);
   }
   if (splitmode) {
     if (note < (newsplitPoint + 36)) {
-      MIDI.sendNoteOn((note + lowerTranspose), velocity, 1);
+      MIDI2.sendNoteOn((note + lowerTranspose), velocity, 1);
     } else {
-      MIDI.sendNoteOn(note, velocity, 2);
+      MIDI2.sendNoteOn(note, velocity, 2);
     }
   }
 }
@@ -451,56 +452,56 @@ void DinHandleNoteOff(byte channel, byte note, byte velocity) {
   if (wholemode) {
     switch (getVoiceNo(note)) {
       case 1:
-        MIDI.sendNoteOff(note, velocity, 1);
+        MIDI2.sendNoteOff(note, velocity, 1);
         voices[0].note = -1;
         voiceOn[0] = false;
         break;
       case 2:
-        MIDI.sendNoteOff(note, velocity, 2);
+        MIDI2.sendNoteOff(note, velocity, 2);
         voices[1].note = -1;
         voiceOn[1] = false;
         break;
       case 3:
-        MIDI.sendNoteOff(note, velocity, 1);
+        MIDI2.sendNoteOff(note, velocity, 1);
         voices[2].note = -1;
         voiceOn[2] = false;
         break;
       case 4:
-        MIDI.sendNoteOff(note, velocity, 2);
+        MIDI2.sendNoteOff(note, velocity, 2);
         voices[3].note = -1;
         voiceOn[3] = false;
         break;
       case 5:
-        MIDI.sendNoteOff(note, velocity, 1);
+        MIDI2.sendNoteOff(note, velocity, 1);
         voices[4].note = -1;
         voiceOn[4] = false;
         break;
       case 6:
-        MIDI.sendNoteOff(note, velocity, 2);
+        MIDI2.sendNoteOff(note, velocity, 2);
         voices[5].note = -1;
         voiceOn[5] = false;
         break;
       case 7:
-        MIDI.sendNoteOff(note, velocity, 1);
+        MIDI2.sendNoteOff(note, velocity, 1);
         voices[6].note = -1;
         voiceOn[6] = false;
         break;
       case 8:
-        MIDI.sendNoteOff(note, velocity, 2);
+        MIDI2.sendNoteOff(note, velocity, 2);
         voices[7].note = -1;
         voiceOn[7] = false;
         break;
     }
   }
   if (dualmode) {
-    MIDI.sendNoteOff(note, velocity, 1);
-    MIDI.sendNoteOff(note, velocity, 2);
+    MIDI2.sendNoteOff(note, velocity, 1);
+    MIDI2.sendNoteOff(note, velocity, 2);
   }
   if (splitmode) {
     if (note < (newsplitPoint + 36)) {
-      MIDI.sendNoteOff((note + lowerTranspose), velocity, 1);
+      MIDI2.sendNoteOff((note + lowerTranspose), velocity, 1);
     } else {
-      MIDI.sendNoteOff(note, velocity, 2);
+      MIDI2.sendNoteOff(note, velocity, 2);
     }
   }
 }
@@ -542,18 +543,8 @@ int getVoiceNo(int note) {
 }
 
 void DinHandlePitchBend(byte channel, int pitch) {
-  if (wholemode) {
-    MIDI.sendPitchBend(pitch, 1);
-    MIDI.sendPitchBend(pitch, 2);
-  }
-  if (dualmode) {
-    MIDI.sendPitchBend(pitch, 1);
-    MIDI.sendPitchBend(pitch, 2);
-  }
-  if (splitmode) {
-    MIDI.sendPitchBend(pitch, 1);
-    MIDI.sendPitchBend(pitch, 2);
-  }
+    MIDI2.sendPitchBend(pitch, 1);
+    MIDI2.sendPitchBend(pitch, 2);
 }
 
 void getDelayTime() {
@@ -571,7 +562,12 @@ void getDelayTime() {
 }
 
 void allNotesOff() {
-  //midiCCOut(CCallnotesoff, 127);
+  midiCCOutCPU(CCallnotesoff, 0, 1);
+  midiCCOutCPU(CCallnotesoff, 0, 2);
+  for (int i = 0; i < 8; i++) {
+    voices[i].note = -1;
+    voiceOn[i] = false;
+  }
 }
 
 void updatepwLFO() {
@@ -2491,10 +2487,13 @@ void myControlChange(byte channel, byte control, int value) {
     case CCkeyTrack:
       if (upperSW) {
         keytrackU = value;
+        midiCCOutCPU(CCkeyTrack, (keytrackU / midioutfrig), 2);
       } else {
         keytrackL = value;
+        midiCCOutCPU(CCkeyTrack, (keytrackL / midioutfrig), 1);
         if (wholemode) {
           keytrackU = value;
+          midiCCOutCPU(CCkeyTrack, (keytrackU / midioutfrig), 2);
         }
       }
       keytrackstr = value / midioutfrig;
@@ -3212,8 +3211,7 @@ void checkMux() {
         myControlChange(midiChannel, CCfilterType, mux2Read);
         break;
       case MUX2_keyTrack:
-        midiCCOutCPU(CCkeyTrack, mux2Read / midioutfrig, 1);
-        midiCCOutCPU(CCkeyTrack, mux2Read / midioutfrig, 2);
+        midiCCOut(CCkeyTrack, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCkeyTrack, mux2Read);
         break;
       case MUX2_filterEGlevel:
@@ -3272,7 +3270,7 @@ void midiCCOut(byte cc, byte value) {
 }
 
 void midiCCOutCPU(byte cc, byte value, byte channel) {
-  MIDI.sendControlChange(cc, value, channel);  //MIDI DIN is set to Out
+  MIDI2.sendControlChange(cc, value, channel);  //MIDI DIN is set to Out
 }
 
 void outputDAC(int CHIP_SELECT, uint32_t sample_data1, uint32_t sample_data2) {
@@ -3465,9 +3463,9 @@ void writeDemux() {
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
-    case 12:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(keytrackU * 12)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(keytrackL * 12)) & 0xFFFF) << 4);
+    case 12: // was keytrack, but now moved to MIDI
+      sample_data1 = (channel_a & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
