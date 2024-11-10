@@ -2135,10 +2135,13 @@ void myControlChange(byte channel, byte control, int value) {
     case CCglideTime:
       if (upperSW) {
         glideTimeU = value;
+        midiCCOutCPU(CCglideTime, (glideTimeU / midioutfrig), 2);
       } else {
         glideTimeL = value;
+        midiCCOutCPU(CCglideTime, (glideTimeL / midioutfrig), 1);
         if (wholemode) {
           glideTimeU = value;
+          midiCCOutCPU(CCglideTime, (glideTimeU / midioutfrig), 2);
         }
       }
       glideTimestr = LINEAR[value / midioutfrig];
