@@ -93,7 +93,8 @@ MIDIDevice midi1(myusb);
 
 //MIDI 5 Pin DIN
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI);  //RX - Pin 0
-MIDI_CREATE_INSTANCE(HardwareSerial, Serial2, MIDI2);  //RX - Pin 7
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial2, MIDI2);  //TX - Pin 8
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial5, MIDI5);  //TX - Pin 24
 
 int count = 0;  //For MIDI Clk Sync
 int DelayForSH3 = 50;
@@ -113,7 +114,7 @@ RoxOctoswitch<OCTO_TOTAL, BTN_DEBOUNCE> octoswitch;
 Rox74HC595<SRP_TOTAL> srp;
 
 // pins for 74HC595
-#define SRP_DATA 20   // pin 14 on 74HC595 (DATA)
+#define SRP_DATA 18   // pin 14 on 74HC595 (DATA)
 #define SRP_CLK 19    // pin 11 on 74HC595 (CLK)
 #define SRP_LATCH 41  // pin 12 on 74HC595 (LATCH)
 #define SRP_PWM -1    // pin 13 on 74HC595
@@ -122,9 +123,9 @@ Rox74HC595<SRP_TOTAL> srp;
 Rox74HC595<SR_TOTAL> sr;
 
 // pins for 74HC595
-#define SR_DATA 23   // pin 14 on 74HC595 (DATA)
-#define SR_CLK 22    // pin 11 on 74HC595 (CLK)
-#define SR_LATCH 21  // pin 12 on 74HC595 (LATCH)
+#define SR_DATA 37   // pin 14 on 74HC595 (DATA)
+#define SR_CLK 48    // pin 11 on 74HC595 (CLK)
+#define SR_LATCH 52  // pin 12 on 74HC595 (LATCH)
 #define SR_PWM -1    // pin 13 on 74HC595
 
 // pins for 74HC165
@@ -194,6 +195,9 @@ void setup() {
   //Serial.println("MIDI In DIN Listening");
 
   MIDI2.begin();
+  MIDI2.turnThruOn(midi::Thru::Mode::Off);
+  MIDI5.begin();
+  MIDI5.turnThruOn(midi::Thru::Mode::Off);
 
   //Read Aftertouch from EEPROM, this can be set individually by each patch.
   AfterTouchDestU = getAfterTouchU();
@@ -263,28 +267,14 @@ void setup() {
   digitalWriteFast(DEMUX_3, LOW);
   // delayMicroseconds(DelayForSH3);
   // set all the voices to 16'
-  srp.writePin(OCT1A_UPPER, HIGH);
-  srp.writePin(OCT1B_UPPER, HIGH);
-  srp.writePin(OCT2A_UPPER, HIGH);
-  srp.writePin(OCT2B_UPPER, HIGH);
-  srp.writePin(OCT1A_LOWER, HIGH);
-  srp.writePin(OCT1B_LOWER, HIGH);
-  srp.writePin(OCT2A_LOWER, HIGH);
-  srp.writePin(OCT2B_LOWER, HIGH);
-  // Send some notes on and off
-
-  for (int i = 0; i < 8; i++) {
-    int noteon = 60;
-    MIDI2.sendNoteOn(noteon, 64, 1);
-    delayMicroseconds(DelayForSH3);
-    MIDI2.sendNoteOn(noteon, 64, 2);
-    delay(1);
-    MIDI2.sendNoteOff(noteon, 64, 1);
-    delayMicroseconds(DelayForSH3);
-    MIDI2.sendNoteOff(noteon, 64, 2);
-    noteon++;
-  }
-  delay(200);
+  // srp.writePin(OCT1A_UPPER, HIGH);
+  // srp.writePin(OCT1B_UPPER, HIGH);
+  // srp.writePin(OCT2A_UPPER, HIGH);
+  // srp.writePin(OCT2B_UPPER, HIGH);
+  // srp.writePin(OCT1A_LOWER, HIGH);
+  // srp.writePin(OCT1B_LOWER, HIGH);
+  // srp.writePin(OCT2A_LOWER, HIGH);
+  // srp.writePin(OCT2B_LOWER, HIGH);
 
   patchNoU = getLastPatchU();
   patchNoL = getLastPatchL();
@@ -383,7 +373,7 @@ void DinHandleNoteOn(byte channel, byte note, byte velocity) {
         voices[1].note = note;
         voices[1].velocity = velocity;
         voices[1].timeOn = millis();
-        MIDI2.sendNoteOn(note, velocity, 2);
+        MIDI5.sendNoteOn(note, velocity, 1);
         voiceOn[1] = true;
         break;
       case 3:
@@ -397,7 +387,7 @@ void DinHandleNoteOn(byte channel, byte note, byte velocity) {
         voices[3].note = note;
         voices[3].velocity = velocity;
         voices[3].timeOn = millis();
-        MIDI2.sendNoteOn(note, velocity, 2);
+        MIDI5.sendNoteOn(note, velocity, 1);
         voiceOn[3] = true;
         break;
       case 5:
@@ -411,7 +401,7 @@ void DinHandleNoteOn(byte channel, byte note, byte velocity) {
         voices[5].note = note;
         voices[5].velocity = velocity;
         voices[5].timeOn = millis();
-        MIDI2.sendNoteOn(note, velocity, 2);
+        MIDI5.sendNoteOn(note, velocity, 1);
         voiceOn[5] = true;
         break;
       case 7:
@@ -425,20 +415,20 @@ void DinHandleNoteOn(byte channel, byte note, byte velocity) {
         voices[7].note = note;
         voices[7].velocity = velocity;
         voices[7].timeOn = millis();
-        MIDI2.sendNoteOn(note, velocity, 2);
+        MIDI5.sendNoteOn(note, velocity, 1);
         voiceOn[7] = true;
         break;
     }
   }
   if (dualmode) {
+    MIDI5.sendNoteOn(note, velocity, 1);
     MIDI2.sendNoteOn(note, velocity, 1);
-    MIDI2.sendNoteOn(note, velocity, 2);
   }
   if (splitmode) {
     if (note < (newsplitPoint + 36)) {
       MIDI2.sendNoteOn((note + lowerTranspose), velocity, 1);
     } else {
-      MIDI2.sendNoteOn(note, velocity, 2);
+      MIDI5.sendNoteOn(note, velocity, 1);
     }
   }
 }
@@ -457,7 +447,7 @@ void DinHandleNoteOff(byte channel, byte note, byte velocity) {
         voiceOn[0] = false;
         break;
       case 2:
-        MIDI2.sendNoteOff(note, velocity, 2);
+        MIDI5.sendNoteOff(note, velocity, 1);
         voices[1].note = -1;
         voiceOn[1] = false;
         break;
@@ -467,7 +457,7 @@ void DinHandleNoteOff(byte channel, byte note, byte velocity) {
         voiceOn[2] = false;
         break;
       case 4:
-        MIDI2.sendNoteOff(note, velocity, 2);
+        MIDI5.sendNoteOff(note, velocity, 1);
         voices[3].note = -1;
         voiceOn[3] = false;
         break;
@@ -477,7 +467,7 @@ void DinHandleNoteOff(byte channel, byte note, byte velocity) {
         voiceOn[4] = false;
         break;
       case 6:
-        MIDI2.sendNoteOff(note, velocity, 2);
+        MIDI5.sendNoteOff(note, velocity, 1);
         voices[5].note = -1;
         voiceOn[5] = false;
         break;
@@ -487,7 +477,7 @@ void DinHandleNoteOff(byte channel, byte note, byte velocity) {
         voiceOn[6] = false;
         break;
       case 8:
-        MIDI2.sendNoteOff(note, velocity, 2);
+        MIDI5.sendNoteOff(note, velocity, 1);
         voices[7].note = -1;
         voiceOn[7] = false;
         break;
@@ -495,13 +485,13 @@ void DinHandleNoteOff(byte channel, byte note, byte velocity) {
   }
   if (dualmode) {
     MIDI2.sendNoteOff(note, velocity, 1);
-    MIDI2.sendNoteOff(note, velocity, 2);
+    MIDI5.sendNoteOff(note, velocity, 1);
   }
   if (splitmode) {
     if (note < (newsplitPoint + 36)) {
       MIDI2.sendNoteOff((note + lowerTranspose), velocity, 1);
     } else {
-      MIDI2.sendNoteOff(note, velocity, 2);
+      MIDI5.sendNoteOff(note, velocity, 1);
     }
   }
 }
@@ -544,7 +534,7 @@ int getVoiceNo(int note) {
 
 void DinHandlePitchBend(byte channel, int pitch) {
     MIDI2.sendPitchBend(pitch, 1);
-    MIDI2.sendPitchBend(pitch, 2);
+    MIDI5.sendPitchBend(pitch, 1);
 }
 
 void getDelayTime() {
@@ -562,8 +552,8 @@ void getDelayTime() {
 }
 
 void allNotesOff() {
-  midiCCOutCPU(CCallnotesoff, 0, 1);
-  midiCCOutCPU(CCallnotesoff, 0, 2);
+  midiCCOutCPU2(CCallnotesoff, 0, 1);
+  midiCCOutCPU5(CCallnotesoff, 0, 1);
   for (int i = 0; i < 8; i++) {
     voices[i].note = -1;
     voiceOn[i] = false;
@@ -600,51 +590,42 @@ void updateosc1Range(boolean announce) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("8"));
       }
-      srp.writePin(OCT1A_UPPER, LOW);
-      srp.writePin(OCT1B_UPPER, HIGH);
+      midiCCOutCPU5(CCosc1Range, 127, 1);
     } else if (osc1Rangestr < 100 && osc1Rangestr > 33) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("16"));
       }
-      srp.writePin(OCT1A_UPPER, HIGH);
-      srp.writePin(OCT1B_UPPER, HIGH);
+      midiCCOutCPU5(CCosc1Range, 63, 1);
     } else {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("32"));
       }
-      srp.writePin(OCT1A_UPPER, HIGH);
-      srp.writePin(OCT1B_UPPER, LOW);
+      midiCCOutCPU5(CCosc1Range, 0, 1);
     }
   } else {
     if (osc1Rangestr > 100) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("8"));
       }
-      srp.writePin(OCT1A_LOWER, LOW);
-      srp.writePin(OCT1B_LOWER, HIGH);
+      midiCCOutCPU2(CCosc1Range, 127, 1);
       if (wholemode) {
-        srp.writePin(OCT1A_UPPER, LOW);
-        srp.writePin(OCT1B_UPPER, HIGH);
+        midiCCOutCPU5(CCosc1Range, 127, 1);
       }
     } else if (osc1Rangestr < 100 && osc1Rangestr > 33) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("16"));
       }
-      srp.writePin(OCT1A_LOWER, HIGH);
-      srp.writePin(OCT1B_LOWER, HIGH);
+      midiCCOutCPU2(CCosc1Range, 63, 1);
       if (wholemode) {
-        srp.writePin(OCT1A_UPPER, HIGH);
-        srp.writePin(OCT1B_UPPER, HIGH);
+        midiCCOutCPU5(CCosc1Range, 63, 1);
       }
     } else {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("32"));
       }
-      srp.writePin(OCT1A_LOWER, HIGH);
-      srp.writePin(OCT1B_LOWER, LOW);
+      midiCCOutCPU2(CCosc1Range, 0, 1);
       if (wholemode) {
-        srp.writePin(OCT1A_UPPER, HIGH);
-        srp.writePin(OCT1B_UPPER, LOW);
+        midiCCOutCPU5(CCosc1Range, 0, 1);
       }
     }
   }
@@ -656,51 +637,42 @@ void updateosc2Range(boolean announce) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("8"));
       }
-      srp.writePin(OCT2A_UPPER, LOW);
-      srp.writePin(OCT2B_UPPER, HIGH);
+      midiCCOutCPU5(CCosc2Range, 127, 1);
     } else if (osc2Rangestr < 100 && osc2Rangestr > 33) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("16"));
       }
-      srp.writePin(OCT2A_UPPER, HIGH);
-      srp.writePin(OCT2B_UPPER, HIGH);
+      midiCCOutCPU5(CCosc2Range, 63, 1);
     } else {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("32"));
       }
-      srp.writePin(OCT2A_UPPER, HIGH);
-      srp.writePin(OCT2B_UPPER, LOW);
+      midiCCOutCPU5(CCosc2Range, 0, 1);
     }
   } else {
     if (osc2Rangestr > 100) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("8"));
       }
-      srp.writePin(OCT2A_LOWER, LOW);
-      srp.writePin(OCT2B_LOWER, HIGH);
+      midiCCOutCPU2(CCosc2Range, 127, 1);
       if (wholemode) {
-        srp.writePin(OCT2A_UPPER, LOW);
-        srp.writePin(OCT2B_UPPER, HIGH);
+        midiCCOutCPU5(CCosc2Range, 127, 1);
       }
     } else if (osc2Rangestr < 100 && osc2Rangestr > 33) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("16"));
       }
-      srp.writePin(OCT2A_LOWER, HIGH);
-      srp.writePin(OCT2B_LOWER, HIGH);
+      midiCCOutCPU2(CCosc2Range, 63, 1);
       if (wholemode) {
-        srp.writePin(OCT2A_UPPER, HIGH);
-        srp.writePin(OCT2B_UPPER, HIGH);
+        midiCCOutCPU5(CCosc2Range, 63, 1);
       }
     } else {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("32"));
       }
-      srp.writePin(OCT2A_LOWER, HIGH);
-      srp.writePin(OCT2B_LOWER, LOW);
+      midiCCOutCPU2(CCosc2Range, 0, 1);
       if (wholemode) {
-        srp.writePin(OCT2A_UPPER, HIGH);
-        srp.writePin(OCT2B_UPPER, LOW);
+        midiCCOutCPU5(CCosc2Range, 0, 1);
       }
     }
   }
@@ -1240,17 +1212,17 @@ void updateglideSW(boolean announce) {
     if (glideSWU == 0) {
       if (announce) {
         showCurrentParameterPage("Glide", "Off");
-        midiCCOutCPU(CCglideSW, 1, 1);
+        midiCCOutCPU5(CCglideSW, 1, 1);
         delay(1);
-        midiCCOutCPU(CCglideTime, 0, 1);
+        midiCCOutCPU5(CCglideTime, 0, 1);
       }
       sr.writePin(GLIDE_LED, LOW);  // LED off
     } else {
       if (announce) {
         showCurrentParameterPage("Glide", "On");
-        midiCCOutCPU(CCglideTime, int(glideTimeU / 8), 1);
+        midiCCOutCPU5(CCglideTime, int(glideTimeU / 8), 1);
         delay(1);
-        midiCCOutCPU(CCglideSW, 127, 1);
+        midiCCOutCPU5(CCglideSW, 127, 1);
       }
       sr.writePin(GLIDE_LED, HIGH);  // LED on
     }
@@ -1258,26 +1230,26 @@ void updateglideSW(boolean announce) {
     if (glideSWL == 0) {
       if (announce) {
         showCurrentParameterPage("Glide", "Off");
-        midiCCOutCPU(CCglideSW, 1, 1);
+        midiCCOutCPU2(CCglideSW, 1, 1);
         delay(1);
-        midiCCOutCPU(CCglideTime, 0, 1);
+        midiCCOutCPU2(CCglideTime, 0, 1);
         if (wholemode) {
-          midiCCOutCPU(CCglideSW, 1, 2);
+          midiCCOutCPU5(CCglideSW, 1, 1);
           delay(1);
-          midiCCOutCPU(CCglideTime, 0, 2);
+          midiCCOutCPU5(CCglideTime, 0, 1);
         }
       }
       sr.writePin(GLIDE_LED, LOW);  // LED off
     } else {
       if (announce) {
         showCurrentParameterPage("Glide", "On");
-        midiCCOutCPU(CCglideTime, int(glideTimeL / 8), 2);
+        midiCCOutCPU2(CCglideTime, int(glideTimeL / 8), 1);
         delay(1);
-        midiCCOutCPU(CCglideSW, 127, 2);
+        midiCCOutCPU2(CCglideSW, 127, 1);
         if (wholemode) {
-          midiCCOutCPU(CCglideSW, 127, 2);
+          midiCCOutCPU5(CCglideSW, 127, 1);
           delay(1);
-          midiCCOutCPU(CCglideTime, int(glideTimeU / 8), 2);
+          midiCCOutCPU5(CCglideTime, int(glideTimeU / 8), 1);
         }
       }
       sr.writePin(GLIDE_LED, HIGH);  // LED on
@@ -1752,37 +1724,37 @@ void updatekeyTrackSW(boolean announce) {
   if (upperSW) {
     if (keyTrackSWU == 0) {
       srp.writePin(FILTER_KEYTRACK_UPPER, LOW);
-      midiCCOutCPU(CCkeyTrackSW, 1, 2);
+      midiCCOutCPU5(CCkeyTrackSW, 1, 1);
       delay(1);
-      midiCCOutCPU(CCkeyTrack, 1, 2);
+      midiCCOutCPU5(CCkeyTrack, 1, 1);
     } else {
       srp.writePin(FILTER_KEYTRACK_UPPER, HIGH);
-      midiCCOutCPU(CCkeyTrackSW, 127, 2);
+      midiCCOutCPU5(CCkeyTrackSW, 127, 1);
       delay(1);
-      midiCCOutCPU(CCkeyTrack, keytrackU, 2);
+      midiCCOutCPU5(CCkeyTrack, keytrackU, 1);
     }
   } else {
     if (keyTrackSWL == 0) {
       srp.writePin(FILTER_KEYTRACK_LOWER, LOW);
-      midiCCOutCPU(CCkeyTrackSW, 1, 1);
+      midiCCOutCPU2(CCkeyTrackSW, 1, 1);
       delay(1);
-      midiCCOutCPU(CCkeyTrack, 1, 1);
+      midiCCOutCPU2(CCkeyTrack, 1, 1);
       if (wholemode) {
         srp.writePin(FILTER_KEYTRACK_UPPER, LOW);
-        midiCCOutCPU(CCkeyTrackSW, 1, 2);
+        midiCCOutCPU5(CCkeyTrackSW, 1, 1);
         delay(1);
-        midiCCOutCPU(CCkeyTrack, 1, 2);
+        midiCCOutCPU5(CCkeyTrack, 1, 1);
       }
     } else {
       srp.writePin(FILTER_KEYTRACK_LOWER, HIGH);
-      midiCCOutCPU(CCkeyTrackSW, 127, 1);
+      midiCCOutCPU2(CCkeyTrackSW, 127, 1);
       delay(1);
-      midiCCOutCPU(CCkeyTrack, keytrackL, 1);
+      midiCCOutCPU2(CCkeyTrack, keytrackL, 1);
       if (wholemode) {
         srp.writePin(FILTER_KEYTRACK_UPPER, HIGH);
-        midiCCOutCPU(CCkeyTrackSW, 127, 2);
+        midiCCOutCPU5(CCkeyTrackSW, 127, 1);
         delay(1);
-        midiCCOutCPU(CCkeyTrack, keytrackU, 2);
+        midiCCOutCPU5(CCkeyTrack, keytrackU, 1);
       }
     }
   }
@@ -1816,8 +1788,8 @@ void updatewholemode() {
   srp.writePin(UPPER2, HIGH);
   upperSW = 0;
   setAllButtons();
-  dualmode = 0;
-  splitmode = 0;
+  dualmode = false;
+  splitmode = false;
 }
 
 void updatedualmode() {
@@ -1827,8 +1799,8 @@ void updatedualmode() {
   sr.writePin(WHOLE_LED, LOW);  // LED off
   sr.writePin(SPLIT_LED, LOW);  // LED off
   srp.writePin(UPPER2, LOW);
-  wholemode = 0;
-  splitmode = 0;
+  wholemode = false;
+  splitmode = false;
 }
 
 void updatesplitmode() {
@@ -1838,8 +1810,8 @@ void updatesplitmode() {
   sr.writePin(WHOLE_LED, LOW);   // LED off
   sr.writePin(DUAL_LED, LOW);    // LED off
   srp.writePin(UPPER2, LOW);
-  wholemode = 0;
-  dualmode = 0;
+  wholemode = false;
+  dualmode = false;
 }
 
 void updatechorus1(boolean announce) {
@@ -1880,7 +1852,6 @@ void updatechorus1(boolean announce) {
       }
       sr.writePin(CHORUS1_LED, HIGH);  // LED on
       srp.writePin(CHORUS1_OUT_LOWER, HIGH);
-
       if (wholemode) {
         srp.writePin(CHORUS1_OUT_UPPER, HIGH);
       }
@@ -2135,13 +2106,13 @@ void myControlChange(byte channel, byte control, int value) {
     case CCglideTime:
       if (upperSW) {
         glideTimeU = value;
-        midiCCOutCPU(CCglideTime, (glideTimeU / midioutfrig), 2);
+        midiCCOutCPU5(CCglideTime, (glideTimeU / midioutfrig), 1);
       } else {
         glideTimeL = value;
-        midiCCOutCPU(CCglideTime, (glideTimeL / midioutfrig), 1);
+        midiCCOutCPU2(CCglideTime, (glideTimeL / midioutfrig), 1);
         if (wholemode) {
           glideTimeU = value;
-          midiCCOutCPU(CCglideTime, (glideTimeU / midioutfrig), 2);
+          midiCCOutCPU5(CCglideTime, (glideTimeU / midioutfrig), 1);
         }
       }
       glideTimestr = LINEAR[value / midioutfrig];
@@ -2490,13 +2461,13 @@ void myControlChange(byte channel, byte control, int value) {
     case CCkeyTrack:
       if (upperSW) {
         keytrackU = value;
-        midiCCOutCPU(CCkeyTrack, (keytrackU / midioutfrig), 2);
+        midiCCOutCPU5(CCkeyTrack, (keytrackU / midioutfrig), 1);
       } else {
         keytrackL = value;
-        midiCCOutCPU(CCkeyTrack, (keytrackL / midioutfrig), 1);
+        midiCCOutCPU2(CCkeyTrack, (keytrackL / midioutfrig), 1);
         if (wholemode) {
           keytrackU = value;
-          midiCCOutCPU(CCkeyTrack, (keytrackU / midioutfrig), 2);
+          midiCCOutCPU5(CCkeyTrack, (keytrackU / midioutfrig), 1);
         }
       }
       keytrackstr = value / midioutfrig;
@@ -2611,17 +2582,17 @@ void myControlChange(byte channel, byte control, int value) {
       break;
 
     case CCwholemode:
-      wholemode = 1;
+      wholemode = true;
       updatewholemode();
       break;
 
     case CCdualmode:
-      dualmode = 1;
+      dualmode = true;
       updatedualmode();
       break;
 
     case CCsplitmode:
-      splitmode = 1;
+      splitmode = true;
       updatesplitmode();
       break;
 
@@ -2796,43 +2767,43 @@ void recallPatch(int patchNo) {
 void setCurrentPatchData(String data[]) {
   if (upperSW) {
     patchNameU = data[0];
-    pwLFOU = data[1].toFloat();
-    fmDepthU = data[2].toFloat();
-    osc2PWU = data[3].toFloat();
-    osc2PWMU = data[4].toFloat();
-    osc1PWU = data[5].toFloat();
-    osc1PWMU = data[6].toFloat();
-    osc1RangeU = data[7].toFloat();
-    osc2RangeU = data[8].toFloat();
-    stackU = data[9].toFloat();
-    glideTimeU = data[10].toFloat();
-    osc2DetuneU = data[11].toFloat();
-    noiseLevelU = data[12].toFloat();
-    osc2SawLevelU = data[13].toFloat();
-    osc1SawLevelU = data[14].toFloat();
-    osc2PulseLevelU = data[15].toFloat();
-    osc1PulseLevelU = data[16].toFloat();
-    filterCutoffU = data[17].toFloat();
-    filterLFOU = data[18].toFloat();
-    filterResU = data[19].toFloat();
+    pwLFOU = data[1].toInt();
+    fmDepthU = data[2].toInt();
+    osc2PWU = data[3].toInt();
+    osc2PWMU = data[4].toInt();
+    osc1PWU = data[5].toInt();
+    osc1PWMU = data[6].toInt();
+    osc1RangeU = data[7].toInt();
+    osc2RangeU = data[8].toInt();
+    stackU = data[9].toInt();
+    glideTimeU = data[10].toInt();
+    osc2DetuneU = data[11].toInt();
+    noiseLevelU = data[12].toInt();
+    osc2SawLevelU = data[13].toInt();
+    osc1SawLevelU = data[14].toInt();
+    osc2PulseLevelU = data[15].toInt();
+    osc1PulseLevelU = data[16].toInt();
+    filterCutoffU = data[17].toInt();
+    filterLFOU = data[18].toInt();
+    filterResU = data[19].toInt();
     filterTypeU = data[20].toInt();
     filterdoubleLoopU = data[21].toInt();
     vcadoubleLoopU = data[22].toInt();
     LFODelayGoU = data[23].toInt();
-    filterEGlevelU = data[24].toFloat();
-    LFORateU = data[25].toFloat();
-    LFOWaveformU = data[26].toFloat();
-    filterAttackU = data[27].toFloat();
-    filterDecayU = data[28].toFloat();
-    filterSustainU = data[29].toFloat();
-    filterReleaseU = data[30].toFloat();
-    ampAttackU = data[31].toFloat();
-    ampDecayU = data[32].toFloat();
-    ampSustainU = data[33].toFloat();
-    ampReleaseU = data[34].toFloat();
-    volumeControlU = data[35].toFloat();
+    filterEGlevelU = data[24].toInt();
+    LFORateU = data[25].toInt();
+    LFOWaveformU = data[26].toInt();
+    filterAttackU = data[27].toInt();
+    filterDecayU = data[28].toInt();
+    filterSustainU = data[29].toInt();
+    filterReleaseU = data[30].toInt();
+    ampAttackU = data[31].toInt();
+    ampDecayU = data[32].toInt();
+    ampSustainU = data[33].toInt();
+    ampReleaseU = data[34].toInt();
+    volumeControlU = data[35].toInt();
     glideSWU = data[36].toInt();
-    keytrackU = data[37].toFloat();
+    keytrackU = data[37].toInt();
     filterPoleSWU = data[38].toInt();
     filterLoopU = data[39].toInt();
     filterEGinvU = data[40].toInt();
@@ -2844,66 +2815,66 @@ void setCurrentPatchData(String data[]) {
     chorus1U = data[46].toInt();
     chorus2U = data[47].toInt();
     monoMultiU = data[48].toInt();
-    modWheelLevelU = data[49].toFloat();
-    PitchBendLevelU = data[50].toFloat();
-    amDepthU = data[51].toFloat();
-    oct1AU = data[52].toFloat();
-    oct1BU = data[53].toFloat();
-    oct2AU = data[54].toFloat();
-    oct2BU = data[55].toFloat();
-    oldampAttackU = data[56].toFloat();
-    oldampDecayU = data[57].toFloat();
-    oldampSustainU = data[58].toFloat();
-    oldampReleaseU = data[59].toFloat();
+    modWheelLevelU = data[49].toInt();
+    PitchBendLevelU = data[50].toInt();
+    amDepthU = data[51].toInt();
+    oct1AU = data[52].toInt();
+    oct1BU = data[53].toInt();
+    oct2AU = data[54].toInt();
+    oct2BU = data[55].toInt();
+    oldampAttackU = data[56].toInt();
+    oldampDecayU = data[57].toInt();
+    oldampSustainU = data[58].toInt();
+    oldampReleaseU = data[59].toInt();
     AfterTouchDestU = data[60].toInt();
     filterLogLinU = data[61].toInt();
     ampLogLinU = data[62].toInt();
-    osc2TriangleLevelU = data[63].toFloat();
-    osc1SubLevelU = data[64].toFloat();
+    osc2TriangleLevelU = data[63].toInt();
+    osc1SubLevelU = data[64].toInt();
     keyTrackSWU = data[65].toInt();
-    LFODelayU = data[66].toFloat();
+    LFODelayU = data[66].toInt();
 
     oldfilterCutoffU = filterCutoffU;
 
   } else {
     patchNameL = data[0];
-    pwLFOL = data[1].toFloat();
-    fmDepthL = data[2].toFloat();
-    osc2PWL = data[3].toFloat();
-    osc2PWML = data[4].toFloat();
-    osc1PWL = data[5].toFloat();
-    osc1PWML = data[6].toFloat();
-    osc1RangeL = data[7].toFloat();
-    osc2RangeL = data[8].toFloat();
-    stackL = data[9].toFloat();
-    glideTimeL = data[10].toFloat();
-    osc2DetuneL = data[11].toFloat();
-    noiseLevelL = data[12].toFloat();
-    osc2SawLevelL = data[13].toFloat();
-    osc1SawLevelL = data[14].toFloat();
-    osc2PulseLevelL = data[15].toFloat();
-    osc1PulseLevelL = data[16].toFloat();
-    filterCutoffL = data[17].toFloat();
-    filterLFOL = data[18].toFloat();
-    filterResL = data[19].toFloat();
+    pwLFOL = data[1].toInt();
+    fmDepthL = data[2].toInt();
+    osc2PWL = data[3].toInt();
+    osc2PWML = data[4].toInt();
+    osc1PWL = data[5].toInt();
+    osc1PWML = data[6].toInt();
+    osc1RangeL = data[7].toInt();
+    osc2RangeL = data[8].toInt();
+    stackL = data[9].toInt();
+    glideTimeL = data[10].toInt();
+    osc2DetuneL = data[11].toInt();
+    noiseLevelL = data[12].toInt();
+    osc2SawLevelL = data[13].toInt();
+    osc1SawLevelL = data[14].toInt();
+    osc2PulseLevelL = data[15].toInt();
+    osc1PulseLevelL = data[16].toInt();
+    filterCutoffL = data[17].toInt();
+    filterLFOL = data[18].toInt();
+    filterResL = data[19].toInt();
     filterTypeL = data[20].toInt();
     filterdoubleLoopL = data[21].toInt();
     vcadoubleLoopL = data[22].toInt();
     LFODelayGoL = data[23].toInt();
-    filterEGlevelL = data[24].toFloat();
-    LFORateL = data[25].toFloat();
-    LFOWaveformL = data[26].toFloat();
-    filterAttackL = data[27].toFloat();
-    filterDecayL = data[28].toFloat();
-    filterSustainL = data[29].toFloat();
-    filterReleaseL = data[30].toFloat();
-    ampAttackL = data[31].toFloat();
-    ampDecayL = data[32].toFloat();
-    ampSustainL = data[33].toFloat();
-    ampReleaseL = data[34].toFloat();
-    volumeControlL = data[35].toFloat();
+    filterEGlevelL = data[24].toInt();
+    LFORateL = data[25].toInt();
+    LFOWaveformL = data[26].toInt();
+    filterAttackL = data[27].toInt();
+    filterDecayL = data[28].toInt();
+    filterSustainL = data[29].toInt();
+    filterReleaseL = data[30].toInt();
+    ampAttackL = data[31].toInt();
+    ampDecayL = data[32].toInt();
+    ampSustainL = data[33].toInt();
+    ampReleaseL = data[34].toInt();
+    volumeControlL = data[35].toInt();
     glideSWL = data[36].toInt();
-    keytrackL = data[37].toFloat();
+    keytrackL = data[37].toInt();
     filterPoleSWL = data[38].toInt();
     filterLoopL = data[39].toInt();
     filterEGinvL = data[40].toInt();
@@ -2915,66 +2886,66 @@ void setCurrentPatchData(String data[]) {
     chorus1L = data[46].toInt();
     chorus2L = data[47].toInt();
     monoMultiL = data[48].toInt();
-    modWheelLevelL = data[49].toFloat();
-    PitchBendLevelL = data[50].toFloat();
-    amDepthL = data[51].toFloat();
-    oct1AL = data[52].toFloat();
-    oct1BL = data[53].toFloat();
-    oct2AL = data[54].toFloat();
-    oct2BL = data[55].toFloat();
-    oldampAttackL = data[56].toFloat();
-    oldampDecayL = data[57].toFloat();
-    oldampSustainL = data[58].toFloat();
-    oldampReleaseL = data[59].toFloat();
+    modWheelLevelL = data[49].toInt();
+    PitchBendLevelL = data[50].toInt();
+    amDepthL = data[51].toInt();
+    oct1AL = data[52].toInt();
+    oct1BL = data[53].toInt();
+    oct2AL = data[54].toInt();
+    oct2BL = data[55].toInt();
+    oldampAttackL = data[56].toInt();
+    oldampDecayL = data[57].toInt();
+    oldampSustainL = data[58].toInt();
+    oldampReleaseL = data[59].toInt();
     AfterTouchDestL = data[60].toInt();
     filterLogLinL = data[61].toInt();
     ampLogLinL = data[62].toInt();
-    osc2TriangleLevelL = data[63].toFloat();
-    osc1SubLevelL = data[64].toFloat();
+    osc2TriangleLevelL = data[63].toInt();
+    osc1SubLevelL = data[64].toInt();
     keyTrackSWL = data[65].toInt();
-    LFODelayL = data[66].toFloat();
+    LFODelayL = data[66].toInt();
 
     oldfilterCutoffL = filterCutoffL;
 
     if (wholemode) {
       patchNameU = data[0];
-      pwLFOU = data[1].toFloat();
-      fmDepthU = data[2].toFloat();
-      osc2PWU = data[3].toFloat();
-      osc2PWMU = data[4].toFloat();
-      osc1PWU = data[5].toFloat();
-      osc1PWMU = data[6].toFloat();
-      osc1RangeU = data[7].toFloat();
-      osc2RangeU = data[8].toFloat();
-      stackU = data[9].toFloat();
-      glideTimeU = data[10].toFloat();
-      osc2DetuneU = data[11].toFloat();
-      noiseLevelU = data[12].toFloat();
-      osc2SawLevelU = data[13].toFloat();
-      osc1SawLevelU = data[14].toFloat();
-      osc2PulseLevelU = data[15].toFloat();
-      osc1PulseLevelU = data[16].toFloat();
-      filterCutoffU = data[17].toFloat();
-      filterLFOU = data[18].toFloat();
-      filterResU = data[19].toFloat();
+      pwLFOU = data[1].toInt();
+      fmDepthU = data[2].toInt();
+      osc2PWU = data[3].toInt();
+      osc2PWMU = data[4].toInt();
+      osc1PWU = data[5].toInt();
+      osc1PWMU = data[6].toInt();
+      osc1RangeU = data[7].toInt();
+      osc2RangeU = data[8].toInt();
+      stackU = data[9].toInt();
+      glideTimeU = data[10].toInt();
+      osc2DetuneU = data[11].toInt();
+      noiseLevelU = data[12].toInt();
+      osc2SawLevelU = data[13].toInt();
+      osc1SawLevelU = data[14].toInt();
+      osc2PulseLevelU = data[15].toInt();
+      osc1PulseLevelU = data[16].toInt();
+      filterCutoffU = data[17].toInt();
+      filterLFOU = data[18].toInt();
+      filterResU = data[19].toInt();
       filterTypeU = data[20].toInt();
       filterdoubleLoopU = data[21].toInt();
       vcadoubleLoopU = data[22].toInt();
       LFODelayGoU = data[23].toInt();
-      filterEGlevelU = data[24].toFloat();
-      LFORateU = data[25].toFloat();
-      LFOWaveformU = data[26].toFloat();
-      filterAttackU = data[27].toFloat();
-      filterDecayU = data[28].toFloat();
-      filterSustainU = data[29].toFloat();
-      filterReleaseU = data[30].toFloat();
-      ampAttackU = data[31].toFloat();
-      ampDecayU = data[32].toFloat();
-      ampSustainU = data[33].toFloat();
-      ampReleaseU = data[34].toFloat();
-      volumeControlU = data[35].toFloat();
+      filterEGlevelU = data[24].toInt();
+      LFORateU = data[25].toInt();
+      LFOWaveformU = data[26].toInt();
+      filterAttackU = data[27].toInt();
+      filterDecayU = data[28].toInt();
+      filterSustainU = data[29].toInt();
+      filterReleaseU = data[30].toInt();
+      ampAttackU = data[31].toInt();
+      ampDecayU = data[32].toInt();
+      ampSustainU = data[33].toInt();
+      ampReleaseU = data[34].toInt();
+      volumeControlU = data[35].toInt();
       glideSWU = data[36].toInt();
-      keytrackU = data[37].toFloat();
+      keytrackU = data[37].toInt();
       filterPoleSWU = data[38].toInt();
       filterLoopU = data[39].toInt();
       filterEGinvU = data[40].toInt();
@@ -2986,24 +2957,24 @@ void setCurrentPatchData(String data[]) {
       chorus1U = data[46].toInt();
       chorus2U = data[47].toInt();
       monoMultiU = data[48].toInt();
-      modWheelLevelU = data[49].toFloat();
-      PitchBendLevelU = data[50].toFloat();
-      amDepthU = data[51].toFloat();
-      oct1AU = data[52].toFloat();
-      oct1BU = data[53].toFloat();
-      oct2AU = data[54].toFloat();
-      oct2BU = data[55].toFloat();
-      oldampAttackU = data[56].toFloat();
-      oldampDecayU = data[57].toFloat();
-      oldampSustainU = data[58].toFloat();
-      oldampReleaseU = data[59].toFloat();
+      modWheelLevelU = data[49].toInt();
+      PitchBendLevelU = data[50].toInt();
+      amDepthU = data[51].toInt();
+      oct1AU = data[52].toInt();
+      oct1BU = data[53].toInt();
+      oct2AU = data[54].toInt();
+      oct2BU = data[55].toInt();
+      oldampAttackU = data[56].toInt();
+      oldampDecayU = data[57].toInt();
+      oldampSustainU = data[58].toInt();
+      oldampReleaseU = data[59].toInt();
       AfterTouchDestU = data[60].toInt();
       filterLogLinU = data[61].toInt();
       ampLogLinU = data[62].toInt();
-      osc2TriangleLevelU = data[63].toFloat();
-      osc1SubLevelU = data[64].toFloat();
+      osc2TriangleLevelU = data[63].toInt();
+      osc1SubLevelU = data[64].toInt();
       keyTrackSWU = data[65].toInt();
-      LFODelayU = data[66].toFloat();
+      LFODelayU = data[66].toInt();
 
       oldfilterCutoffU = filterCutoffU;
     }
@@ -3272,17 +3243,24 @@ void midiCCOut(byte cc, byte value) {
   MIDI.sendControlChange(cc, value, midiChannel);  //MIDI DIN is set to Out
 }
 
-void midiCCOutCPU(byte cc, byte value, byte channel) {
+void midiCCOutCPU2(byte cc, byte value, byte channel) {
   MIDI2.sendControlChange(cc, value, channel);  //MIDI DIN is set to Out
 }
+
+void midiCCOutCPU5(byte cc, byte value, byte channel) {
+  MIDI5.sendControlChange(cc, value, channel);  //MIDI DIN is set to Out
+}
+
 
 void outputDAC(int CHIP_SELECT, uint32_t sample_data1, uint32_t sample_data2) {
   SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE1));
   digitalWriteFast(CHIP_SELECT, LOW);
   SPI.transfer32(sample_data1);
+  //delayMicroseconds(5);
   digitalWriteFast(CHIP_SELECT, HIGH);
   digitalWriteFast(CHIP_SELECT, LOW);
   SPI.transfer32(sample_data2);
+  //delayMicroseconds(5);
   digitalWriteFast(CHIP_SELECT, HIGH);
   SPI.endTransaction();
 }
@@ -3530,8 +3508,9 @@ void writeDemux() {
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
   }
-  delayMicroseconds(800);
+  delayMicroseconds(50);
   digitalWriteFast(DEMUX_EN_1, HIGH);
+  delayMicroseconds(50);
   digitalWriteFast(DEMUX_EN_2, HIGH);
 
   muxOutput++;

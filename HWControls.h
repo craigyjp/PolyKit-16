@@ -33,7 +33,6 @@ ADC *adc = new ADC();
 #define MIDICCTOPOT 8.62
 
 #define DAC_CS1 10
-#define DAC_CS2 37
 
 //Mux 1 Connections
 #define MUX1_spare0 0 			// 2V
@@ -201,8 +200,8 @@ ADC *adc = new ADC();
 #define FILTERPOLE_LED 7
 
 #define FILTERLOOP_LED 8
-#define FILTERVEL_LED 9
-#define FILTERINV_LED 10
+#define FILTERINV_LED 9
+#define FILTERVEL_LED 10
 #define UPPER_LED 11
 #define SAVE_LED 12
 #define WHOLE_LED 13
@@ -225,8 +224,8 @@ ADC *adc = new ADC();
 #define FILTERPOLE_SW 7
 
 #define FILTERLOOP_SW 8
-#define FILTERVEL_SW 9
-#define FILTERINV_SW 10
+#define FILTERINV_SW 9
+#define FILTERVEL_SW 10
 #define UPPER_SW 11
 
 #define WHOLE_SW 14
@@ -292,8 +291,6 @@ void setupHardware()
 
   pinMode(DAC_CS1, OUTPUT);
   digitalWrite(DAC_CS1, HIGH);
-  pinMode(DAC_CS2, OUTPUT);
-  digitalWrite(DAC_CS2, HIGH);
 
   pinMode(MUX_0, OUTPUT);
   pinMode(MUX_1, OUTPUT);
