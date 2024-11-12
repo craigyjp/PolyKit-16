@@ -156,10 +156,6 @@ ADC *adc = new ADC();
 #define FILTER_LIN_LOG_UPPER 14
 #define AMP_LIN_LOG_UPPER 15
 
-#define OCT1A_UPPER 16
-#define OCT1B_UPPER 17
-#define OCT2A_UPPER 18
-#define OCT2B_UPPER 19
 #define FILTER_KEYTRACK_UPPER 20
 #define UPPER1 21
 
