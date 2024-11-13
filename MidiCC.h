@@ -40,8 +40,8 @@
 #define   CCfilterDoubleLoop 51
 #define   CCfilterLoop 52
 #define   CCfilterEGlevel 53
-#define   CCosc1Range 54
-#define   CCosc2Range 55
+#define   CCosc1Range 55
+#define   CCosc2Range 54
 #define   CCampRelease 57
 #define   CCampAttack 58
 #define   CCampSustain 59
