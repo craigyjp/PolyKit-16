@@ -1,5 +1,5 @@
 /*
-  PolyKit 16 MUX - Firmware Rev 1.7
+  PolyKit 16 MUX - Firmware Rev 1.8
 
   Includes code by:
     Dave Benn - Handling MUXs, a few other bits and original inspiration  https://www.notesandvolts.com/2019/01/teensy-synth-part-10-hardware.html
@@ -29,19 +29,29 @@
 #include "HWControls.h"
 #include "EepromMgr.h"
 #include "Settings.h"
+
 #include <RoxMux.h>
+#include <AceButton.h>
+using namespace ace_button;
 
+String getPatchName(uint16_t patchNo);
 
-#define PARAMETER 0      //The main page for displaying the current patch and control (parameter) changes
-#define RECALL 1         //Patches list
-#define SAVE 2           //Save patch page
-#define REINITIALISE 3   // Reinitialise message
-#define PATCH 4          // Show current patch bypassing PARAMETER
-#define PATCHNAMING 5    // Patch naming page
-#define DELETE 6         //Delete patch page
-#define DELETEMSG 7      //Delete patch message page
-#define SETTINGS 8       //Settings page
-#define SETTINGSVALUE 9  //Settings page
+CircularBuffer<Performance, 128> performances;
+
+#define PARAMETER 0
+#define RECALL 1
+#define SAVE 2
+#define REINITIALISE 3
+#define PATCH 4
+#define PATCHNAMING 5
+#define DELETE 6
+#define DELETEMSG 7
+#define SETTINGS 8
+#define SETTINGSVALUE 9
+#define PERFORMANCE 10
+#define SAVE_PERFORMANCE 11
+#define DELETE_PERFORMANCE 12
+#define PERFORMANCENAMING 13
 
 unsigned int state = PARAMETER;
 
@@ -101,9 +111,7 @@ MIDI_CREATE_INSTANCE(HardwareSerial, Serial5, MIDI5);  //TX - Pin 24
 int count = 0;  //For MIDI Clk Sync
 int DelayForSH3 = 50;
 int midioutfrig = 8;
-int patchNo = 0;
-int patchNoU = 0;
-int patchNoL = 0;
+
 int voiceToReturn = -1;        //Initialise
 long earliestTime = millis();  //For voice allocation - initialise to now
 unsigned long buttonDebounce = 0;
@@ -135,18 +143,34 @@ Rox74HC595<SR_TOTAL> sr;
 #define PIN_LOAD 49  // pin 1 on 74HC165 (LOAD)
 #define PIN_CLK 51   // pin 2 on 74HC165 (CLK))
 
+//RoxButton save_button;
+ButtonConfig saveButtonConfig;
+AceButton saveButton(&saveButtonConfig, SAVE_SW);  // SAVE_SW is your pin 24
+
 void setup() {
   SPI.begin();
   SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE0));
   octoswitch.begin(PIN_DATA, PIN_LOAD, PIN_CLK);
   octoswitch.setCallback(onButtonPress);
+  octoswitch.setIgnoreAfterHold(UPPER_SW, true);
 
   srp.begin(SRP_DATA, SRP_LATCH, SRP_CLK, SRP_PWM);
   sr.begin(SR_DATA, SR_LATCH, SR_CLK, SR_PWM);
 
+  delay(100);
+
   setupDisplay();
   setUpSettings();
   setupHardware();
+
+  //save_button.begin();
+  //save_button.setDoublePressThreshold(450);  // Double press timing forgiving
+
+  saveButtonConfig.setEventHandler(handleSaveButtonEvent);
+  saveButtonConfig.setFeature(ButtonConfig::kFeatureDoubleClick);
+  saveButtonConfig.setFeature(ButtonConfig::kFeatureLongPress);
+  saveButtonConfig.setLongPressDelay(500);    // Optional: Faster long press
+  saveButtonConfig.setDoubleClickDelay(400);  // Optional: Tweak if needed
 
   SPI.beginTransaction(SPISettings(2000000, MSBFIRST, SPI_MODE1));
   digitalWrite(DAC_CS1, LOW);
@@ -166,6 +190,7 @@ void setup() {
       savePatch("1", INITPATCH);
       loadPatches();
     }
+    loadPerformances();
   } else {
     //Serial.println("SD card is not connected or unusable");
     reinitialiseToPanel();
@@ -202,10 +227,10 @@ void setup() {
   MIDI5.turnThruOn(midi::Thru::Mode::Off);
 
   //Read Aftertouch from EEPROM, this can be set individually by each patch.
-  AfterTouchDestU = getAfterTouchU();
-  oldAfterTouchDestU = AfterTouchDestU;
-  AfterTouchDestL = getAfterTouchL();
-  oldAfterTouchDestL = AfterTouchDestL;
+  upperData[P_AfterTouchDest] = getAfterTouchU();
+  oldAfterTouchDestU = upperData[P_AfterTouchDest];
+  lowerData[P_AfterTouchDest] = getAfterTouchL();
+  oldAfterTouchDestL = lowerData[P_AfterTouchDest];
 
   newsplitPoint = getSplitPoint();
 
@@ -220,22 +245,22 @@ void setup() {
 
   //Read Encoder Direction from EEPROM
   encCW = getEncoderDir();
-  monoMultiL = getMonoMultiL();
-  oldmonoMultiL = monoMultiL;
-  monoMultiU = getMonoMultiU();
-  oldmonoMultiU = monoMultiU;
-  filterLogLinU = getFilterEnvU();
-  oldfilterLogLinU = filterLogLinU;
-  filterLogLinL = getFilterEnvL();
-  oldfilterLogLinL = filterLogLinL;
-  ampLogLinU = getAmpEnvU();
-  oldampLogLinU = ampLogLinU;
-  ampLogLinL = getAmpEnvL();
-  oldampLogLinL = ampLogLinL;
-  keyTrackSWU = getKeyTrackU();
-  oldkeyTrackSWU = keyTrackSWU;
-  keyTrackSWL = getKeyTrackL();
-  oldkeyTrackSWL = keyTrackSWL;
+  lowerData[P_monoMulti] = getMonoMultiL();
+  oldmonoMultiL = lowerData[P_monoMulti];
+  upperData[P_monoMulti] = getMonoMultiU();
+  oldmonoMultiU = upperData[P_monoMulti];
+  upperData[P_filterLogLin] = getFilterEnvU();
+  oldfilterLogLinU = upperData[P_filterLogLin];
+  lowerData[P_filterLogLin] = getFilterEnvL();
+  oldfilterLogLinL = lowerData[P_filterLogLin];
+  upperData[P_ampLogLin] = getAmpEnvU();
+  oldampLogLinU = upperData[P_ampLogLin];
+  lowerData[P_ampLogLin] = getAmpEnvL();
+  oldampLogLinL = lowerData[P_ampLogLin];
+  upperData[P_keyTrackSW] = getKeyTrackU();
+  oldkeyTrackSWU = upperData[P_keyTrackSW];
+  upperData[P_keyTrackSW] = getKeyTrackL();
+  oldkeyTrackSWL = upperData[P_keyTrackSW];
 
   //setupDisplay();
   //delay(3000);
@@ -247,6 +272,363 @@ void setup() {
   upperSW = 0;
   recallPatch(patchNoL);  //Load first patch
   updatewholemode();
+}
+
+// SaveButton Event Handler
+void handleSaveButtonEvent(AceButton* button, uint8_t eventType, uint8_t buttonState) {
+  switch (eventType) {
+
+    case AceButton::kEventClicked:
+      Serial.println("[DEBUG] Single Click Detected");
+
+      if (inPerformanceMode) {
+        // Save Performance
+        switch (state) {
+          case PARAMETER:
+            if (performances.size() < PERFORMANCE_LIMIT) {
+              resetPerformancesOrdering();
+              performances.push({ (uint16_t)(performances.size() + 1),
+                                  INITPERFORMANCENAME,
+                                  (uint16_t)patchNoU,
+                                  (uint16_t)patchNoL,
+                                  (uint8_t)(wholemode ? 0 : dualmode ? 1
+                                                                     : 2),
+                                  newsplitPoint });
+              state = SAVE_PERFORMANCE;
+            }
+            break;
+          case SAVE_PERFORMANCE:
+            savePerformance(String(performances.last().performanceNo).c_str(), performances.last());
+            loadPerformances();  // <<< reload performances after saving
+            setPerformancesOrdering(performanceNo);
+            renamedPerformance = "";
+            showPerformancePage(performances.last().performanceNo, performances.last().name,
+                                performances.last().upperPatchNo, performances.last().lowerPatchNo);
+            state = PARAMETER;
+            break;
+        }
+      } else {
+        // Save Patch
+        switch (state) {
+          case PARAMETER:
+            if (patches.size() < PATCHES_LIMIT) {
+              resetPatchesOrdering();
+              patches.push({ patches.size() + 1, INITPATCHNAME });
+              state = SAVE;
+            }
+            break;
+          case SAVE:
+            if (upperSW) {
+              patchNameU = patches.last().patchName;
+              savePatch(String(patches.last().patchNo).c_str(), getCurrentPatchData());
+              showPatchPage(patches.last().patchNo, patches.last().patchName, "", "");
+              patchNoU = patches.last().patchNo;
+              loadPatches();
+              setPatchesOrdering(patchNoU);
+              renamedPatch = "";
+              state = PARAMETER;
+            } else {
+              patchNameL = patches.last().patchName;
+              savePatch(String(patches.last().patchNo).c_str(), getCurrentPatchData());
+              showPatchPage(patches.last().patchNo, patches.last().patchName, "", "");
+              patchNoL = patches.last().patchNo;
+              loadPatches();
+              setPatchesOrdering(patchNoL);
+              renamedPatch = "";
+              state = PARAMETER;
+            }
+            break;
+        }
+      }
+      break;
+
+    case AceButton::kEventDoubleClicked:
+      Serial.println("[DEBUG] Double Click Detected");
+
+      if (!inPerformanceMode) {
+        // Save new Performance
+        if (performances.size() < PERFORMANCE_LIMIT) {
+          resetPerformancesOrdering();
+
+          Performance newPerf;
+          newPerf.performanceNo = performances.size() + 1;
+          strcpy(newPerf.name, INITPERFORMANCENAME);
+          newPerf.upperPatchNo = patchNoU;
+          newPerf.lowerPatchNo = patchNoL;
+          newPerf.keyboardMode = wholemode ? 0 : dualmode ? 1
+                                                          : 2;
+          newPerf.newsplitPoint = newsplitPoint;
+
+          performances.push(newPerf);
+
+          savePerformance(String(newPerf.performanceNo).c_str(), newPerf);
+          loadPerformances();  // <<< reload after saving
+          setPerformancesOrdering(newPerf.performanceNo);
+
+          performanceNo = newPerf.performanceNo;
+          renamedPerformance = "";
+
+          showPerformancePage(newPerf.performanceNo, newPerf.name,
+                              newPerf.upperPatchNo, newPerf.lowerPatchNo);
+
+          timer = millis();
+          state = PARAMETER;
+        }
+      }
+      break;
+
+    case AceButton::kEventLongPressed:
+      Serial.println("[DEBUG] Long Press Detected");
+
+      if (inPerformanceMode) {
+        switch (state) {
+          case PARAMETER:
+            state = DELETE_PERFORMANCE;
+            break;
+        }
+      } else {
+        switch (state) {
+          case PARAMETER:
+          case PATCH:
+            state = DELETE;
+            break;
+        }
+      }
+      break;
+  }
+}
+
+void savePerformance(const char* fileName, const Performance& perf) {
+  String path = "/perf/" + String(fileName) + ".perf";
+
+  if (SD.exists(path.c_str())) {
+    SD.remove(path.c_str());
+  }
+
+  File file = SD.open(path.c_str(), FILE_WRITE);
+  if (file) {
+    file.print(perf.upperPatchNo);
+    file.print(",");
+    file.print(perf.lowerPatchNo);
+    file.print(",");
+    file.print(perf.name);
+    file.print(",");
+    file.print(perf.keyboardMode);
+    file.print(",");
+    file.println(perf.newsplitPoint);
+    file.close();
+    Serial.println("[DEBUG] Performance saved as CSV to SD card.");
+  } else {
+    Serial.print("[ERROR] Failed to open file for saving: ");
+    Serial.println(path);
+  }
+}
+
+void applyPerformance(const Performance& perf) {
+  // update global state
+  performanceNo = perf.performanceNo;
+  patchNoU = perf.upperPatchNo;
+  patchNoL = perf.lowerPatchNo;
+  wholemode = (perf.keyboardMode == 0);
+  dualmode = (perf.keyboardMode == 1);
+  splitmode = (perf.keyboardMode == 2);
+  newsplitPoint = perf.newsplitPoint;
+
+  // actually load the patches, modes and update the display
+  recallPatch(patchNoU);
+  recallPatch(patchNoL);
+  setKeyboardMode(perf.keyboardMode);
+  setSplitPoint(newsplitPoint);
+  showPerformancePage(perf.performanceNo,
+                      perf.name,
+                      perf.upperPatchNo,
+                      perf.lowerPatchNo);
+}
+
+void recallPerformance(uint16_t performanceNo) {
+  char filename[32];
+  sprintf(filename, "/perf/%d.perf", performanceNo);
+
+  File file = SD.open(filename, FILE_READ);
+  if (!file) {
+    Serial.print("[ERROR] Cannot open performance file: ");
+    Serial.println(filename);
+    return;
+  }
+
+  String dataLine = file.readStringUntil('\n');
+  file.close();
+
+  if (dataLine.length() > 0) {
+    int comma1 = dataLine.indexOf(',');
+    int comma2 = dataLine.indexOf(',', comma1 + 1);
+    int comma3 = dataLine.indexOf(',', comma2 + 1);
+    int comma4 = dataLine.indexOf(',', comma3 + 1);
+
+    if (comma1 == -1 || comma2 == -1 || comma3 == -1 || comma4 == -1) {
+      Serial.println("[ERROR] Invalid performance file format");
+      return;
+    }
+
+    Performance perf;
+    perf.performanceNo = performanceNo;
+    perf.upperPatchNo = dataLine.substring(0, comma1).toInt();
+    perf.lowerPatchNo = dataLine.substring(comma1 + 1, comma2).toInt();
+    dataLine.substring(comma2 + 1, comma3).toCharArray(perf.name, sizeof(perf.name));
+    perf.keyboardMode = dataLine.substring(comma3 + 1, comma4).toInt();
+    perf.newsplitPoint = dataLine.substring(comma4 + 1).toInt();
+
+    // Apply performance
+    patchNoU = perf.upperPatchNo;
+    patchNoL = perf.lowerPatchNo;
+    wholemode = (perf.keyboardMode == 0);
+    dualmode = (perf.keyboardMode == 1);
+    splitmode = (perf.keyboardMode == 2);
+    newsplitPoint = perf.newsplitPoint;
+
+    recallPatch(patchNoU);
+    recallPatch(patchNoL);
+
+    setKeyboardMode(perf.keyboardMode);
+    setSplitPoint(perf.newsplitPoint);
+
+    showPerformancePage(perf.performanceNo, perf.name, perf.upperPatchNo, perf.lowerPatchNo);
+  }
+}
+
+void deletePerformance(const char* filename) {
+  SD.remove((String("/perf/") + filename + ".perf").c_str());
+}
+
+void loadPerformances() {
+  performances.clear();  // Clear old performances first
+
+  File dir = SD.open("/perf");
+  if (!dir || !dir.isDirectory()) {
+    Serial.println("[ERROR] /perf directory not found or not a directory");
+    return;
+  }
+
+  while (true) {
+    File file = dir.openNextFile();
+    if (!file) {
+      break;  // No more files
+    }
+
+    if (file.isDirectory()) {
+      file.close();
+      continue;
+    }
+
+    String dataLine = file.readStringUntil('\n');
+    file.close();
+
+    dataLine.trim();  // <-- strip any \r or whitespace
+
+    if (dataLine.length() > 0) {
+      int comma1 = dataLine.indexOf(',');
+      int comma2 = dataLine.indexOf(',', comma1 + 1);
+      int comma3 = dataLine.indexOf(',', comma2 + 1);
+      int comma4 = dataLine.indexOf(',', comma3 + 1);
+
+      if (comma1 == -1 || comma2 == -1 || comma3 == -1 || comma4 == -1) {
+        Serial.println("[WARNING] Invalid performance line, skipping...");
+        continue;
+      }
+
+      Performance perf;
+      perf.performanceNo = performances.size() + 1;  // Auto assign
+
+      perf.upperPatchNo = dataLine.substring(0, comma1).toInt();
+      perf.lowerPatchNo = dataLine.substring(comma1 + 1, comma2).toInt();
+
+      String nameStr = dataLine.substring(comma2 + 1, comma3);
+      nameStr.trim();  // <- extra safe
+      nameStr.toCharArray(perf.name, sizeof(perf.name));
+
+      perf.keyboardMode = dataLine.substring(comma3 + 1, comma4).toInt();
+      perf.newsplitPoint = dataLine.substring(comma4 + 1).toInt();
+
+      performances.push(perf);
+    }
+  }
+
+  if (performances.size() == 0) {
+    Serial.println("[INFO] No performances found, creating default");
+
+    Performance defaultPerf = { 1, INITPERFORMANCENAME, 1, 1, 0, 60 };
+    savePerformance("1", defaultPerf);
+    loadPerformances();  // Reload after creating default
+  }
+}
+
+String getPatchName(uint16_t patchNo) {
+  for (uint8_t i = 0; i < patches.size(); i++) {
+    auto p = patches[i];  // p is your Patch struct
+    if (p.patchNo == patchNo) {
+      return p.patchName;  // p.patchName is a String
+    }
+  }
+  return String("Unknown");
+}
+
+void renumberPerformancesOnSD() {
+  File perfFolder = SD.open("/perf");
+  if (!perfFolder) {
+    return;  // No perf folder
+  }
+
+  // Temporary list to hold file names
+  String filenames[PERFORMANCE_LIMIT];
+  int count = 0;
+
+  // Read all .perf files into filenames array
+  while (true) {
+    File entry = perfFolder.openNextFile();
+    if (!entry) {
+      break;
+    }
+    String name = entry.name();
+    if (name.endsWith(".perf")) {
+      filenames[count++] = name;
+    }
+    entry.close();
+  }
+  perfFolder.close();
+
+  // Now renumber them sequentially
+  for (int i = 0; i < count; i++) {
+    String oldName = filenames[i];
+    char newName[32];
+    sprintf(newName, "/perf/%d.perf", i + 1);  // 001.perf, 002.perf, etc.
+
+    // If the name is already correct, skip
+    if (oldName != String(newName)) {
+      // First rename to a temporary name to avoid conflicts
+      String tempName = String("/perf/temp_") + String(i + 1) + ".perf";
+      SD.rename(oldName.c_str(), tempName.c_str());
+    }
+  }
+  // Second pass to rename temp names to final names
+  for (int i = 0; i < count; i++) {
+    String tempName = String("/perf/temp_") + String(i + 1) + ".perf";
+    char newName[32];
+    sprintf(newName, "/perf/%d.perf", i + 1);
+
+    if (SD.exists(tempName.c_str())) {
+      SD.rename(tempName.c_str(), newName);
+    }
+  }
+}
+
+void setKeyboardMode(uint8_t mode) {
+  wholemode = (mode == 0);
+  dualmode = (mode == 1);
+  splitmode = (mode == 2);
+}
+
+void setSplitPoint(uint8_t note) {
+  newsplitPoint = note;
 }
 
 void setTranspose(int splitTrans) {
@@ -283,7 +665,7 @@ void LFODelayHandle() {
   getDelayTime();
 
   unsigned long currentMillisU = millis();
-  if (monoMultiU && !LFODelayGoU) {
+  if (upperData[P_monoMulti] && !upperData[P_LFODelayGo]) {
     if (oldnumberOfNotesU < numberOfNotesU) {
       previousMillisU = currentMillisU;
       oldnumberOfNotesU = numberOfNotesU;
@@ -291,17 +673,17 @@ void LFODelayHandle() {
   }
   if (numberOfNotesU > 0) {
     if (currentMillisU - previousMillisU >= intervalU) {
-      LFODelayGoU = 1;
+      upperData[P_LFODelayGo] = 1;
     } else {
-      LFODelayGoU = 0;
+      upperData[P_LFODelayGo] = 0;
     }
   } else {
-    LFODelayGoU = 1;
+    upperData[P_LFODelayGo] = 1;
     previousMillisU = currentMillisU;  //reset timer so its ready for the next time
   }
 
   unsigned long currentMillisL = millis();
-  if (monoMultiL && !LFODelayGoL) {
+  if (lowerData[P_monoMulti] && !lowerData[P_LFODelayGo]) {
     if (oldnumberOfNotesL < numberOfNotesL) {
       previousMillisL = currentMillisL;
       oldnumberOfNotesL = numberOfNotesL;
@@ -309,12 +691,12 @@ void LFODelayHandle() {
   }
   if (numberOfNotesL > 0) {
     if (currentMillisL - previousMillisL >= intervalL) {
-      LFODelayGoL = 1;
+      lowerData[P_LFODelayGo] = 1;
     } else {
-      LFODelayGoL = 0;
+      lowerData[P_LFODelayGo] = 0;
     }
   } else {
-    LFODelayGoL = 1;
+    lowerData[P_LFODelayGo] = 1;
     previousMillisL = currentMillisL;  //reset timer so its ready for the next time
   }
 }
@@ -502,13 +884,13 @@ void DinHandlePitchBend(byte channel, int pitch) {
 }
 
 void getDelayTime() {
-  delaytimeL = LFODelayL;
+  delaytimeL = lowerData[P_LFODelay];
   if (delaytimeL <= 0) {
     delaytimeL = 0.1;
   }
   intervalL = (delaytimeL * 10);
 
-  delaytimeU = LFODelayU;
+  delaytimeU = upperData[P_LFODelay];
   if (delaytimeU <= 0) {
     delaytimeU = 0.1;
   }
@@ -524,38 +906,82 @@ void allNotesOff() {
   }
 }
 
-void updatepwLFO() {
-  showCurrentParameterPage("PWM Rate", int(pwLFOstr));
+void updatepwLFO(boolean announce) {
+
+  if (announce) {
+    showCurrentParameterPage("PWM Rate", int(pwLFOstr));
+    if (upperSW) {
+      midiCCOut(CCpwLFO, upperData[P_pwLFO] / midioutfrig);
+    } else {
+      midiCCOut(CCpwLFO, lowerData[P_pwLFO] / midioutfrig);
+    }
+  }
 }
 
-void updatefmDepth() {
-  showCurrentParameterPage("FM Depth", int(fmDepthstr));
+void updatefmDepth(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("FM Depth", int(fmDepthstr));
+    if (upperSW) {
+      midiCCOut(CCfmDepth, (upperData[P_fmDepth] / midioutfrig));
+    } else {
+      midiCCOut(CCfmDepth, (lowerData[P_fmDepth] / midioutfrig));
+    }
+  }
 }
 
-void updateosc2PW() {
-  showCurrentParameterPage("OSC2 PW", String(osc2PWstr) + " %");
+void updateOsc1PW(boolean announce) {
+
+  if (announce) {
+    showCurrentParameterPage("OSC1 PW", String(osc1PWstr) + " %");
+    if (upperSW) {
+      midiCCOut(CCosc1PW, (upperData[P_osc1PW] / midioutfrig));
+    } else {
+      midiCCOut(CCosc1PW, (lowerData[P_osc1PW] / midioutfrig));
+    }
+  }
 }
 
-void updateosc2PWM() {
-  showCurrentParameterPage("OSC2 PWM", int(osc2PWMstr));
+void updateOsc2PW(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("OSC2 PW", String(osc2PWstr) + " %");
+    if (upperSW) {
+      midiCCOut(CCosc2PW, (upperData[P_osc2PW] / midioutfrig));
+    } else {
+      midiCCOut(CCosc2PW, (lowerData[P_osc2PW] / midioutfrig));
+    }
+  }
 }
 
-void updateosc1PW() {
-  showCurrentParameterPage("OSC1 PW", String(osc1PWstr) + " %");
+void updateOsc2PWM(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("OSC2 PWM", int(osc2PWMstr));
+    if (upperSW) {
+      midiCCOut(CCosc2PWM, (upperData[P_osc2PWM] / midioutfrig));
+    } else {
+      midiCCOut(CCosc2PWM, (lowerData[P_osc2PWM] / midioutfrig));
+    }
+  }
 }
 
-void updateosc1PWM() {
-  showCurrentParameterPage("OSC1 PWM", int(osc1PWMstr));
+void updateOsc1PWM(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("OSC1 PWM", int(osc1PWMstr));
+    if (upperSW) {
+      midiCCOut(CCosc1PWM, (upperData[P_osc1PWM] / midioutfrig));
+    } else {
+      midiCCOut(CCosc1PWM, (lowerData[P_osc1PWM] / midioutfrig));
+    }
+  }
 }
 
-void updateosc1Range(boolean announce) {
+void updateOsc1Range(boolean announce) {
   if (upperSW) {
-    if (osc1Rangestr > 100) {
+    if (upperData[P_osc1Range] > 600) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("8"));
       }
       midiCCOutCPU5(CCosc1Range, 127, 1);
-    } else if (osc1Rangestr < 100 && osc1Rangestr > 33) {
+    } else if (upperData[P_osc1Range] < 600 && upperData[P_osc1Range] > 400) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("16"));
       }
@@ -567,7 +993,7 @@ void updateosc1Range(boolean announce) {
       midiCCOutCPU5(CCosc1Range, 0, 1);
     }
   } else {
-    if (osc1Rangestr > 100) {
+    if (lowerData[P_osc1Range] > 600) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("8"));
       }
@@ -575,7 +1001,7 @@ void updateosc1Range(boolean announce) {
       if (wholemode) {
         midiCCOutCPU5(CCosc1Range, 127, 1);
       }
-    } else if (osc1Rangestr < 100 && osc1Rangestr > 33) {
+    } else if (lowerData[P_osc1Range] < 600 && lowerData[P_osc1Range] > 400) {
       if (announce) {
         showCurrentParameterPage("Osc1 Range", String("16"));
       }
@@ -595,43 +1021,15 @@ void updateosc1Range(boolean announce) {
   }
 }
 
-void updateosc1Foot() {
-  if (upperSW) {
-    if (osc1RangeU > 700) {
-      midiCCOutCPU5(CCosc1Range, 127, 1);
-    } else if (osc1RangeU < 700 && osc1RangeU > 300) {
-      midiCCOutCPU5(CCosc1Range, 63, 1);
-    } else {
-      midiCCOutCPU5(CCosc1Range, 0, 1);
-    }
-  } else {
-    if (osc1RangeL > 700) {
-      midiCCOutCPU2(CCosc1Range, 127, 1);
-      if (wholemode) {
-        midiCCOutCPU5(CCosc1Range, 127, 1);
-      }
-    } else if (osc1RangeL < 700 && osc1RangeL > 300) {
-      midiCCOutCPU2(CCosc1Range, 63, 1);
-      if (wholemode) {
-        midiCCOutCPU5(CCosc1Range, 63, 1);
-      }
-    } else {
-      midiCCOutCPU2(CCosc1Range, 0, 1);
-      if (wholemode) {
-        midiCCOutCPU5(CCosc1Range, 0, 1);
-      }
-    }
-  }
-}
+void updateOsc2Range(boolean announce) {
 
-void updateosc2Range(boolean announce) {
   if (upperSW) {
-    if (osc2Rangestr > 100) {
+    if (upperData[P_osc2Range] > 600) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("8"));
       }
       midiCCOutCPU5(CCosc2Range, 127, 1);
-    } else if (osc2Rangestr < 100 && osc2Rangestr > 33) {
+    } else if (upperData[P_osc2Range] < 600 && upperData[P_osc2Range] > 400) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("16"));
       }
@@ -643,7 +1041,7 @@ void updateosc2Range(boolean announce) {
       midiCCOutCPU5(CCosc2Range, 0, 1);
     }
   } else {
-    if (osc2Rangestr > 100) {
+    if (lowerData[P_osc2Range] > 600) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("8"));
       }
@@ -651,7 +1049,7 @@ void updateosc2Range(boolean announce) {
       if (wholemode) {
         midiCCOutCPU5(CCosc2Range, 127, 1);
       }
-    } else if (osc2Rangestr < 100 && osc2Rangestr > 33) {
+    } else if (lowerData[P_osc2Range] < 600 && lowerData[P_osc2Range] > 400) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("16"));
       }
@@ -663,35 +1061,6 @@ void updateosc2Range(boolean announce) {
       if (announce) {
         showCurrentParameterPage("Osc2 Range", String("32"));
       }
-      midiCCOutCPU2(CCosc2Range, 0, 1);
-      if (wholemode) {
-        midiCCOutCPU5(CCosc2Range, 0, 1);
-      }
-    }
-  }
-}
-
-void updateosc2Foot() {
-  if (upperSW) {
-    if (osc2RangeU > 700) {
-      midiCCOutCPU5(CCosc2Range, 127, 1);
-    } else if (osc2RangeU < 700 && osc2RangeU > 300) {
-      midiCCOutCPU5(CCosc2Range, 63, 1);
-    } else {
-      midiCCOutCPU5(CCosc2Range, 0, 1);
-    }
-  } else {
-    if (osc2RangeL > 700) {
-      midiCCOutCPU2(CCosc2Range, 127, 1);
-      if (wholemode) {
-        midiCCOutCPU5(CCosc2Range, 127, 1);
-      }
-    } else if (osc2RangeL < 700 && osc2RangeL > 300) {
-      midiCCOutCPU2(CCosc2Range, 63, 1);
-      if (wholemode) {
-        midiCCOutCPU5(CCosc2Range, 63, 1);
-      }
-    } else {
       midiCCOutCPU2(CCosc2Range, 0, 1);
       if (wholemode) {
         midiCCOutCPU5(CCosc2Range, 0, 1);
@@ -736,63 +1105,162 @@ void updatestack() {
   }
 }
 
-void updateglideTime() {
-  showCurrentParameterPage("Glide Time", String(glideTimestr * 10) + " Seconds");
+void updateglideTime(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("Glide Time", String(glideTimestr * 10) + " Seconds");
+    if (upperSW) {
+      midiCCOut(CCglideTime, upperData[P_glideTime] / midioutfrig);
+    } else {
+      midiCCOut(CCglideTime, lowerData[P_glideTime] / midioutfrig);
+    }
+  }
+  if (upperSW) {
+    midiCCOutCPU5(CCglideTime, (upperData[P_glideTime] / midioutfrig), 1);
+  } else {
+    midiCCOutCPU2(CCglideTime, (lowerData[P_glideTime] / midioutfrig), 1);
+    if (wholemode) {
+      midiCCOutCPU5(CCglideTime, (upperData[P_glideTime] / midioutfrig), 1);
+    }
+  }
 }
 
-void updateosc2Detune() {
-  showCurrentParameterPage("OSC2 Detune", String(osc2Detunestr));
+void updateOsc2Detune(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("OSC2 Detune", String(osc2Detunestr));
+    if (upperSW) {
+      midiCCOut(CCosc2Detune, (upperData[P_osc2Detune] / midioutfrig));
+    } else {
+      midiCCOut(CCosc2Detune, (lowerData[P_osc2Detune] / midioutfrig));
+    }
+  }
 }
 
-void updatenoiseLevel() {
-  showCurrentParameterPage("Noise Level", String(noiseLevelstr));
+void updatenoiseLevel(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("Noise Level", String(noiseLevelstr));
+    if (upperSW) {
+      midiCCOut(CCnoiseLevel, upperData[P_noiseLevel] / midioutfrig);
+    } else {
+      midiCCOut(CCnoiseLevel, lowerData[P_noiseLevel] / midioutfrig);
+    }
+  }
 }
 
-void updateOsc2SawLevel() {
-  showCurrentParameterPage("OSC2 Saw", int(osc2SawLevelstr));
+void updateOsc2SawLevel(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("OSC2 Saw", int(osc2SawLevelstr));
+    if (upperSW) {
+      midiCCOut(CCosc2SawLevel, (upperData[P_osc2SawLevel] / midioutfrig));
+    } else {
+      midiCCOut(CCosc2SawLevel, (lowerData[P_osc2SawLevel] / midioutfrig));
+    }
+  }
 }
 
-void updateOsc1SawLevel() {
-  showCurrentParameterPage("OSC1 Saw", int(osc1SawLevelstr));
+void updateOsc1SawLevel(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("OSC1 Saw", int(osc1SawLevelstr));
+    if (upperSW) {
+      midiCCOut(CCosc1SawLevel, (upperData[P_osc1SawLevel] / midioutfrig));
+    } else {
+      midiCCOut(CCosc1SawLevel, (lowerData[P_osc1SawLevel] / midioutfrig));
+    }
+  }
 }
 
-void updateosc2PulseLevel() {
-  showCurrentParameterPage("OSC2 Pulse", int(osc2PulseLevelstr));
+void updateOsc2PulseLevel(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("OSC2 Pulse", int(osc2PulseLevelstr));
+    if (upperSW) {
+      midiCCOut(CCosc2PulseLevel, (upperData[P_osc2PulseLevel] / midioutfrig));
+    } else {
+      midiCCOut(CCosc2PulseLevel, (lowerData[P_osc2PulseLevel] / midioutfrig));
+    }
+  }
 }
 
-void updateOsc1PulseLevel() {
-  showCurrentParameterPage("OSC1 Pulse", int(osc1PulseLevelstr));
+void updateOsc1PulseLevel(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("OSC1 Pulse", int(osc1PulseLevelstr));
+    if (upperSW) {
+      midiCCOut(CCosc1PulseLevel, (upperData[P_osc1PulseLevel] / midioutfrig));
+    } else {
+      midiCCOut(CCosc1PulseLevel, (lowerData[P_osc1PulseLevel] / midioutfrig));
+    }
+  }
 }
 
-void updateosc2TriangleLevel() {
-  showCurrentParameterPage("OSC2 Triangle", int(osc2TriangleLevelstr));
+void updateOsc2TriangleLevel(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("OSC2 Triangle", int(osc2TriangleLevelstr));
+    if (upperSW) {
+      midiCCOut(CCosc2TriangleLevel, (upperData[P_osc2TriangleLevel] / midioutfrig));
+    } else {
+      midiCCOut(CCosc2TriangleLevel, (lowerData[P_osc2TriangleLevel] / midioutfrig));
+    }
+  }
 }
 
-void updateOsc1SubLevel() {
-  showCurrentParameterPage("OSC1 Sub", int(osc1SubLevelstr));
+void updateOsc1SubLevel(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("OSC1 Sub", int(osc1SubLevelstr));
+    if (upperSW) {
+      midiCCOut(CCosc1SubLevel, (upperData[P_osc1SubLevel] / midioutfrig));
+    } else {
+      midiCCOut(CCosc1SubLevel, (lowerData[P_osc1SubLevel] / midioutfrig));
+    }
+  }
 }
 
-void updateamDepth() {
-  showCurrentParameterPage("AM Depth", int(amDepthstr));
+void updateamDepth(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("AM Depth", int(amDepthstr));
+    if (upperSW) {
+      midiCCOut(CCamDepth, upperData[P_amDepth] / midioutfrig);
+    } else {
+      midiCCOut(CCamDepth, lowerData[P_amDepth] / midioutfrig);
+    }
+  }
 }
 
-void updateFilterCutoff() {
-  showCurrentParameterPage("Cutoff", String(filterCutoffstr) + " Hz");
+void updateFilterCutoff(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("Cutoff", String(filterCutoffstr) + " Hz");
+    if (upperSW) {
+      midiCCOut(CCfilterCutoff, (upperData[P_filterCutoff] / midioutfrig));
+    } else {
+      midiCCOut(CCfilterCutoff, (lowerData[P_filterCutoff] / midioutfrig));
+    }
+  }
 }
 
-void updatefilterLFO() {
-  showCurrentParameterPage("TM depth", int(filterLFOstr));
+void updatefilterLFO(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("TM depth", int(filterLFOstr));
+    if (upperSW) {
+      midiCCOut(CCfilterLFO, upperData[P_filterLFO] / midioutfrig);
+    } else {
+      midiCCOut(CCfilterLFO, lowerData[P_filterLFO] / midioutfrig);
+    }
+  }
 }
 
-void updatefilterRes() {
-  showCurrentParameterPage("Resonance", int(filterResstr));
+void updatefilterRes(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("Resonance", int(filterResstr));
+    if (upperSW) {
+      midiCCOut(CCfilterRes, upperData[P_filterRes] / midioutfrig);
+    } else {
+      midiCCOut(CCfilterRes, lowerData[P_filterRes] / midioutfrig);
+    }
+  }
 }
 
 void updateFilterType(boolean announce) {
   if (upperSW) {
-    switch (filterTypeU) {
+    switch (upperData[P_filterType]) {
       case 0:
-        if (filterPoleSWU == 1) {
+        if (upperData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("3P LowPass"));
           }
@@ -807,7 +1275,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 1:
-        if (filterPoleSWU == 1) {
+        if (upperData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("1P LowPass"));
           }
@@ -822,7 +1290,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 2:
-        if (filterPoleSWU == 1) {
+        if (upperData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("3P HP + 1P LP"));
           }
@@ -837,7 +1305,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 3:
-        if (filterPoleSWU == 1) {
+        if (upperData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("1P HP + 1P LP"));
           }
@@ -852,7 +1320,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 4:
-        if (filterPoleSWU == 1) {
+        if (upperData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("2P HP + 1P LP"));
           }
@@ -867,7 +1335,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 5:
-        if (filterPoleSWU == 1) {
+        if (upperData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("2P BP + 1P LP"));
           }
@@ -882,7 +1350,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 6:
-        if (filterPoleSWU == 1) {
+        if (upperData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("3P AP + 1P LP"));
           }
@@ -897,7 +1365,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 7:
-        if (filterPoleSWU == 1) {
+        if (upperData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("2P Notch + LP"));
           }
@@ -912,9 +1380,9 @@ void updateFilterType(boolean announce) {
         break;
     }
   } else {
-    switch (filterTypeL) {
+    switch (lowerData[P_filterType]) {
       case 0:
-        if (filterPoleSWL == 1) {
+        if (lowerData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("3P LowPass"));
           }
@@ -934,7 +1402,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 1:
-        if (filterPoleSWL == 1) {
+        if (lowerData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("1P LowPass"));
           }
@@ -954,7 +1422,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 2:
-        if (filterPoleSWL == 1) {
+        if (lowerData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("3P HP + 1P LP"));
           }
@@ -974,7 +1442,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 3:
-        if (filterPoleSWL == 1) {
+        if (lowerData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("1P HP + 1P LP"));
           }
@@ -994,7 +1462,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 4:
-        if (filterPoleSWL == 1) {
+        if (lowerData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("2P HP + 1P LP"));
           }
@@ -1014,7 +1482,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 5:
-        if (filterPoleSWL == 1) {
+        if (lowerData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("2P BP + 1P LP"));
           }
@@ -1035,7 +1503,7 @@ void updateFilterType(boolean announce) {
 
 
       case 6:
-        if (filterPoleSWL == 1) {
+        if (lowerData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("3P AP + 1P LP"));
           }
@@ -1055,7 +1523,7 @@ void updateFilterType(boolean announce) {
         break;
 
       case 7:
-        if (filterPoleSWL == 1) {
+        if (lowerData[P_filterPoleSW] == 1) {
           if (announce) {
             showCurrentParameterPage("Filter Type", String("2P Notch + LP"));
           }
@@ -1077,163 +1545,317 @@ void updateFilterType(boolean announce) {
   }
 }
 
-void updatefilterEGlevel() {
-  showCurrentParameterPage("EG Depth", int(filterEGlevelstr));
-}
-
-void updatekeytrack() {
-  showCurrentParameterPage("Keytrack", int(keytrackstr));
-}
-
-void updateLFORate() {
-  showCurrentParameterPage("LFO Rate", String(LFORatestr) + " Hz");
-}
-
-void updateLFODelay() {
-  showCurrentParameterPage("LFO Delay", String(LFODelaystr));
-}
-
-void updateStratusLFOWaveform() {
-  if (lfoAlt == 1) {
-    switch (LFOWaveformstr) {
-      case 0:
-        StratusLFOWaveform = "Saw +Oct";
-        break;
-
-      case 1:
-        StratusLFOWaveform = "Quad Saw";
-        break;
-
-      case 2:
-        StratusLFOWaveform = "Quad Pulse";
-        break;
-
-      case 3:
-        StratusLFOWaveform = "Tri Step";
-        break;
-
-      case 4:
-        StratusLFOWaveform = "Sine +Oct";
-        break;
-
-      case 5:
-        StratusLFOWaveform = "Sine +3rd";
-        break;
-
-      case 6:
-        StratusLFOWaveform = "Sine +4th";
-        break;
-
-      case 7:
-        StratusLFOWaveform = "Rand Slopes";
-        break;
+void updatefilterEGlevel(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("EG Depth", int(filterEGlevelstr));
+    if (upperSW) {
+      midiCCOut(CCfilterEGlevel, upperData[P_filterEGlevel] / midioutfrig);
+    } else {
+      midiCCOut(CCfilterEGlevel, lowerData[P_filterEGlevel] / midioutfrig);
     }
+  }
+}
+
+void updatekeytrack(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("Keytrack", int(keytrackstr));
+  }
+  if (upperSW) {
+    midiCCOut(CCkeyTrack, upperData[P_keytrack] / midioutfrig);
+    midiCCOutCPU5(CCkeyTrack, (upperData[P_keytrack] / 16), 1);
   } else {
-    switch (LFOWaveformstr) {
+    midiCCOut(CCkeyTrack, lowerData[P_keytrack] / midioutfrig);
+    midiCCOutCPU2(CCkeyTrack, (lowerData[P_keytrack] / 16), 1);
+    if (wholemode) {
+      midiCCOutCPU5(CCkeyTrack, (upperData[P_keytrack] / 16), 1);
+    }
+  }
+}
+
+void updateLFORate(boolean announce) {
+
+  if (announce) {
+    showCurrentParameterPage("LFO Rate", String(LFORatestr) + " Hz");
+    if (upperSW) {
+      midiCCOut(CCLFORate, upperData[P_LFORate] / midioutfrig);
+    } else {
+      midiCCOut(CCLFORate, lowerData[P_LFORate] / midioutfrig);
+    }
+  }
+}
+
+void updateLFODelay(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("LFO Delay", String(LFODelaystr));
+    if (upperSW) {
+      midiCCOut(CCLFODelay, upperData[P_LFODelay] / midioutfrig);
+    } else {
+      midiCCOut(CCLFODelay, lowerData[P_LFODelay] / midioutfrig);
+    }
+  }
+}
+
+void updateStratusLFOWaveform(boolean announce) {
+
+  if (upperSW) {
+    panelData[P_LFOWaveform] = map(upperData[P_LFOWaveform], 0, 1023, 0, 7);
+    panelData[P_lfoAlt] = upperData[P_lfoAlt];
+  } else {
+    panelData[P_LFOWaveform] = map(lowerData[P_LFOWaveform], 0, 1023, 0, 7);
+    panelData[P_lfoAlt] = lowerData[P_lfoAlt];
+  }
+
+  if (panelData[P_lfoAlt]) {
+    switch (panelData[P_LFOWaveform]) {
       case 0:
         StratusLFOWaveform = "Sawtooth Up";
+        LFOWaveCV = 10;
         break;
-
 
       case 1:
         StratusLFOWaveform = "Sawtooth Down";
+        LFOWaveCV = 160;
         break;
 
       case 2:
         StratusLFOWaveform = "Squarewave";
+        LFOWaveCV = 280;
         break;
 
       case 3:
         StratusLFOWaveform = "Triangle";
+        LFOWaveCV = 400;
         break;
 
       case 4:
         StratusLFOWaveform = "Sinewave";
+        LFOWaveCV = 592;
         break;
 
       case 5:
         StratusLFOWaveform = "Sweeps";
+        LFOWaveCV = 720;
         break;
 
       case 6:
         StratusLFOWaveform = "Lumps";
+        LFOWaveCV = 840;
         break;
 
       case 7:
         StratusLFOWaveform = "Sample & Hold";
+        LFOWaveCV = 968;
+        break;
+    }
+  } else {
+    switch (panelData[P_LFOWaveform]) {
+      case 0:
+        StratusLFOWaveform = "Saw +Oct";
+        LFOWaveCV = 10;
+        break;
+
+      case 1:
+        StratusLFOWaveform = "Quad Saw";
+        LFOWaveCV = 160;
+        break;
+
+      case 2:
+        StratusLFOWaveform = "Quad Pulse";
+        LFOWaveCV = 280;
+        break;
+
+      case 3:
+        StratusLFOWaveform = "Tri Step";
+        LFOWaveCV = 400;
+        break;
+
+      case 4:
+        StratusLFOWaveform = "Sine +Oct";
+        LFOWaveCV = 592;
+        break;
+
+      case 5:
+        StratusLFOWaveform = "Sine +3rd";
+        LFOWaveCV = 720;
+        break;
+
+      case 6:
+        StratusLFOWaveform = "Sine +4th";
+        LFOWaveCV = 840;
+        break;
+
+      case 7:
+        StratusLFOWaveform = "Rand Slopes";
+        LFOWaveCV = 968;
         break;
     }
   }
-  showCurrentParameterPage("LFO Wave", StratusLFOWaveform);
-}
-
-void updatefilterAttack() {
-  if (filterAttackstr < 1000) {
-    showCurrentParameterPage("VCF Attack", String(int(filterAttackstr)) + " ms", FILTER_ENV);
+  if (announce) {
+    showCurrentParameterPage("LFO Wave", StratusLFOWaveform);
+  }
+  if (upperSW) {
+    LFOWaveCVupper = LFOWaveCV;
   } else {
-    showCurrentParameterPage("VCF Attack", String(filterAttackstr * 0.001) + " s", FILTER_ENV);
+    LFOWaveCVlower = LFOWaveCV;
+    if (wholemode) {
+      LFOWaveCVupper = LFOWaveCV;
+    }
   }
 }
 
-void updatefilterDecay() {
-  if (filterDecaystr < 1000) {
-    showCurrentParameterPage("VCF Decay", String(int(filterDecaystr)) + " ms", FILTER_ENV);
-  } else {
-    showCurrentParameterPage("VCF Decay", String(filterDecaystr * 0.001) + " s", FILTER_ENV);
+void updatefilterAttack(boolean announce) {
+  if (announce) {
+    if (filterAttackstr < 1000) {
+      showCurrentParameterPage("VCF Attack", String(int(filterAttackstr)) + " ms", FILTER_ENV);
+    } else {
+      showCurrentParameterPage("VCF Attack", String(filterAttackstr * 0.001) + " s", FILTER_ENV);
+    }
+    if (upperSW) {
+      midiCCOut(CCfilterAttack, upperData[P_filterAttack] / midioutfrig);
+    } else {
+      midiCCOut(CCfilterAttack, lowerData[P_filterAttack] / midioutfrig);
+    }
   }
 }
 
-void updatefilterSustain() {
-  showCurrentParameterPage("VCF Sustain", String(filterSustainstr), FILTER_ENV);
-}
-
-void updatefilterRelease() {
-  if (filterReleasestr < 1000) {
-    showCurrentParameterPage("VCF Release", String(int(filterReleasestr)) + " ms", FILTER_ENV);
-  } else {
-    showCurrentParameterPage("VCF Release", String(filterReleasestr * 0.001) + " s", FILTER_ENV);
+void updatefilterDecay(boolean announce) {
+  if (announce) {
+    if (filterDecaystr < 1000) {
+      showCurrentParameterPage("VCF Decay", String(int(filterDecaystr)) + " ms", FILTER_ENV);
+    } else {
+      showCurrentParameterPage("VCF Decay", String(filterDecaystr * 0.001) + " s", FILTER_ENV);
+    }
+    if (upperSW) {
+      midiCCOut(CCfilterDecay, upperData[P_filterDecay] / midioutfrig);
+    } else {
+      midiCCOut(CCfilterDecay, lowerData[P_filterDecay] / midioutfrig);
+    }
   }
 }
 
-void updateampAttack() {
-  if (ampAttackstr < 1000) {
-    showCurrentParameterPage("VCA Attack", String(int(ampAttackstr)) + " ms", AMP_ENV);
-  } else {
-    showCurrentParameterPage("VCA Attack", String(ampAttackstr * 0.001) + " s", AMP_ENV);
+void updatefilterSustain(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("VCF Sustain", String(filterSustainstr), FILTER_ENV);
+    if (upperSW) {
+      midiCCOut(CCfilterSustain, upperData[P_filterSustain] / midioutfrig);
+    } else {
+      midiCCOut(CCfilterSustain, lowerData[P_filterSustain] / midioutfrig);
+    }
   }
 }
 
-void updateampDecay() {
-  if (ampDecaystr < 1000) {
-    showCurrentParameterPage("VCA Decay", String(int(ampDecaystr)) + " ms", AMP_ENV);
-  } else {
-    showCurrentParameterPage("VCA Decay", String(ampDecaystr * 0.001) + " s", AMP_ENV);
+void updatefilterRelease(boolean announce) {
+  if (announce) {
+    if (filterReleasestr < 1000) {
+      showCurrentParameterPage("VCF Release", String(int(filterReleasestr)) + " ms", FILTER_ENV);
+    } else {
+      showCurrentParameterPage("VCF Release", String(filterReleasestr * 0.001) + " s", FILTER_ENV);
+    }
+    if (upperSW) {
+      midiCCOut(CCfilterRelease, upperData[P_filterRelease] / midioutfrig);
+    } else {
+      midiCCOut(CCfilterRelease, lowerData[P_filterRelease] / midioutfrig);
+    }
   }
 }
 
-void updateampSustain() {
-  showCurrentParameterPage("VCA Sustain", String(ampSustainstr), AMP_ENV);
-}
-
-void updateampRelease() {
-  if (ampReleasestr < 1000) {
-    showCurrentParameterPage("VCA Release", String(int(ampReleasestr)) + " ms", AMP_ENV);
-  } else {
-    showCurrentParameterPage("VCA Release", String(ampReleasestr * 0.001) + " s", AMP_ENV);
+void updateampAttack(boolean announce) {
+  if (announce) {
+    if (ampAttackstr < 1000) {
+      showCurrentParameterPage("VCA Attack", String(int(ampAttackstr)) + " ms", AMP_ENV);
+    } else {
+      showCurrentParameterPage("VCA Attack", String(ampAttackstr * 0.001) + " s", AMP_ENV);
+    }
+    if (upperSW) {
+      midiCCOut(CCampAttack, upperData[P_ampAttack] / midioutfrig);
+    } else {
+      midiCCOut(CCampAttack, lowerData[P_ampAttack] / midioutfrig);
+    }
   }
 }
 
-void updatevolumeControl() {
-  showCurrentParameterPage("Volume", int(volumeControlstr));
+void updateampDecay(boolean announce) {
+  if (announce) {
+    if (ampDecaystr < 1000) {
+      showCurrentParameterPage("VCA Decay", String(int(ampDecaystr)) + " ms", AMP_ENV);
+    } else {
+      showCurrentParameterPage("VCA Decay", String(ampDecaystr * 0.001) + " s", AMP_ENV);
+    }
+    if (upperSW) {
+      midiCCOut(CCampDecay, upperData[P_ampDecay] / midioutfrig);
+    } else {
+      midiCCOut(CCampDecay, lowerData[P_ampDecay] / midioutfrig);
+    }
+  }
+}
+
+void updateampSustain(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("VCA Sustain", String(ampSustainstr), AMP_ENV);
+    if (upperSW) {
+      midiCCOut(CCampSustain, upperData[P_ampSustain] / midioutfrig);
+    } else {
+      midiCCOut(CCampSustain, lowerData[P_ampSustain] / midioutfrig);
+    }
+  }
+}
+
+void updateampRelease(boolean announce) {
+  if (announce) {
+    if (ampReleasestr < 1000) {
+      showCurrentParameterPage("VCA Release", String(int(ampReleasestr)) + " ms", AMP_ENV);
+    } else {
+      showCurrentParameterPage("VCA Release", String(ampReleasestr * 0.001) + " s", AMP_ENV);
+    }
+    if (upperSW) {
+      midiCCOut(CCampRelease, upperData[P_ampRelease] / midioutfrig);
+    } else {
+      midiCCOut(CCampRelease, lowerData[P_ampRelease] / midioutfrig);
+    }
+  }
+}
+
+void updatevolumeControl(boolean announce) {
+  if (announce) {
+    showCurrentParameterPage("Volume", int(volumeControlstr));
+    if (upperSW) {
+      midiCCOut(CCvolumeControl, upperData[P_volumeControl] / midioutfrig);
+    } else {
+      midiCCOut(CCvolumeControl, lowerData[P_volumeControl] / midioutfrig);
+    }
+  }
 }
 
 ////////////////////////////////////////////////////////////////
 
 void updateglideSW(boolean announce) {
   if (upperSW) {
-    if (glideSWU == 0) {
+    if (upperData[P_glideSW] == 0) {
       if (announce) {
         showCurrentParameterPage("Glide", "Off");
+      }
+      midiCCOutCPU5(CCglideSW, 1, 1);
+      delay(1);
+      midiCCOutCPU5(CCglideTime, 0, 1);
+      sr.writePin(GLIDE_LED, LOW);  // LED off
+    } else {
+      if (announce) {
+        showCurrentParameterPage("Glide", "On");
+      }
+      midiCCOutCPU5(CCglideTime, int(upperData[P_glideTime] / 8), 1);
+      delay(1);
+      midiCCOutCPU5(CCglideSW, 127, 1);
+      sr.writePin(GLIDE_LED, HIGH);  // LED on
+    }
+  } else {
+    if (lowerData[P_glideSW] == 0) {
+      if (announce) {
+        showCurrentParameterPage("Glide", "Off");
+      }
+      midiCCOutCPU2(CCglideSW, 1, 1);
+      delay(1);
+      midiCCOutCPU2(CCglideTime, 0, 1);
+      if (wholemode) {
         midiCCOutCPU5(CCglideSW, 1, 1);
         delay(1);
         midiCCOutCPU5(CCglideTime, 0, 1);
@@ -1242,37 +1864,14 @@ void updateglideSW(boolean announce) {
     } else {
       if (announce) {
         showCurrentParameterPage("Glide", "On");
-        midiCCOutCPU5(CCglideTime, int(glideTimeU / 8), 1);
-        delay(1);
+      }
+      midiCCOutCPU2(CCglideTime, int(lowerData[P_glideTime] / 8), 1);
+      delay(1);
+      midiCCOutCPU2(CCglideSW, 127, 1);
+      if (wholemode) {
         midiCCOutCPU5(CCglideSW, 127, 1);
-      }
-      sr.writePin(GLIDE_LED, HIGH);  // LED on
-    }
-  } else {
-    if (glideSWL == 0) {
-      if (announce) {
-        showCurrentParameterPage("Glide", "Off");
-        midiCCOutCPU2(CCglideSW, 1, 1);
         delay(1);
-        midiCCOutCPU2(CCglideTime, 0, 1);
-        if (wholemode) {
-          midiCCOutCPU5(CCglideSW, 1, 1);
-          delay(1);
-          midiCCOutCPU5(CCglideTime, 0, 1);
-        }
-      }
-      sr.writePin(GLIDE_LED, LOW);  // LED off
-    } else {
-      if (announce) {
-        showCurrentParameterPage("Glide", "On");
-        midiCCOutCPU2(CCglideTime, int(glideTimeL / 8), 1);
-        delay(1);
-        midiCCOutCPU2(CCglideSW, 127, 1);
-        if (wholemode) {
-          midiCCOutCPU5(CCglideSW, 127, 1);
-          delay(1);
-          midiCCOutCPU5(CCglideTime, int(glideTimeU / 8), 1);
-        }
+        midiCCOutCPU5(CCglideTime, int(upperData[P_glideTime] / 8), 1);
       }
       sr.writePin(GLIDE_LED, HIGH);  // LED on
     }
@@ -1281,30 +1880,29 @@ void updateglideSW(boolean announce) {
 
 void updatefilterPoleSwitch(boolean announce) {
   if (upperSW) {
-    if (filterPoleSWU == 1) {
+    if (upperData[P_filterPoleSW] == 1) {
       if (announce) {
-        //showCurrentParameterPage("VCF Pole", "On");
         updateFilterType(1);
         midiCCOut(CCfilterPoleSW, 127);
       }
+      updateFilterType(0);
       sr.writePin(FILTERPOLE_LED, HIGH);
       srp.writePin(FILTER_POLE_UPPER, HIGH);
     } else {
-      if (announce) {
-        //showCurrentParameterPage("VCF Pole", "Off");
-        updateFilterType(1);
+      if (announce)
         midiCCOut(CCfilterPoleSW, 1);
-      }
-      sr.writePin(FILTERPOLE_LED, LOW);
-      srp.writePin(FILTER_POLE_UPPER, LOW);
+      updateFilterType(1);
     }
+    updateFilterType(0);
+    sr.writePin(FILTERPOLE_LED, LOW);
+    srp.writePin(FILTER_POLE_UPPER, LOW);
   } else {
-    if (filterPoleSWL == 1) {
+    if (lowerData[P_filterPoleSW] == 1) {
       if (announce) {
-        //showCurrentParameterPage("VCF Pole", "On");
-        updateFilterType(1);
         midiCCOut(CCfilterPoleSW, 127);
+        updateFilterType(1);
       }
+      updateFilterType(0);
       sr.writePin(FILTERPOLE_LED, HIGH);
       srp.writePin(FILTER_POLE_LOWER, HIGH);
       if (wholemode) {
@@ -1312,10 +1910,10 @@ void updatefilterPoleSwitch(boolean announce) {
       }
     } else {
       if (announce) {
-        //showCurrentParameterPage("VCF Pole", "Off");
         updateFilterType(1);
         midiCCOut(CCfilterPoleSW, 1);
       }
+      updateFilterType(0);
       sr.writePin(FILTERPOLE_LED, LOW);
       srp.writePin(FILTER_POLE_LOWER, LOW);
       if (wholemode) {
@@ -1327,7 +1925,7 @@ void updatefilterPoleSwitch(boolean announce) {
 
 void updatefilterLoop(boolean announce) {
   if (upperSW) {
-    switch (statefilterLoopU) {
+    switch (upperData[P_statefilterLoop]) {
       case 1:
         if (announce) {
           showCurrentParameterPage("VCF Key Loop", "On");
@@ -1337,7 +1935,7 @@ void updatefilterLoop(boolean announce) {
         sr.writePin(FILTERLOOP_DOUBLE_LED, LOW);  // LED on
         srp.writePin(FILTER_MODE_BIT0_UPPER, LOW);
         srp.writePin(FILTER_MODE_BIT1_UPPER, HIGH);
-        oldfilterLoop = statefilterLoopU;
+        oldfilterLoop = upperData[P_statefilterLoop];
         break;
 
       case 2:
@@ -1349,7 +1947,7 @@ void updatefilterLoop(boolean announce) {
         sr.writePin(FILTERLOOP_LED, LOW);
         srp.writePin(FILTER_MODE_BIT0_UPPER, HIGH);
         srp.writePin(FILTER_MODE_BIT1_UPPER, HIGH);
-        oldfilterLoop = statefilterLoopU;
+        oldfilterLoop = upperData[P_statefilterLoop];
         break;
 
       default:
@@ -1365,7 +1963,7 @@ void updatefilterLoop(boolean announce) {
         break;
     }
   } else {
-    switch (statefilterLoopL) {
+    switch (lowerData[P_statefilterLoop]) {
       case 1:
         if (announce) {
           showCurrentParameterPage("VCF Key Loop", "On");
@@ -1379,7 +1977,7 @@ void updatefilterLoop(boolean announce) {
           srp.writePin(FILTER_MODE_BIT0_UPPER, LOW);
           srp.writePin(FILTER_MODE_BIT1_UPPER, HIGH);
         }
-        oldfilterLoop = statefilterLoopL;
+        oldfilterLoop = lowerData[P_statefilterLoop];
         break;
 
       case 2:
@@ -1395,7 +1993,7 @@ void updatefilterLoop(boolean announce) {
           srp.writePin(FILTER_MODE_BIT0_UPPER, LOW);
           srp.writePin(FILTER_MODE_BIT1_UPPER, LOW);
         }
-        oldfilterLoop = statefilterLoopL;
+        oldfilterLoop = lowerData[P_statefilterLoop];
         break;
 
       default:
@@ -1419,7 +2017,7 @@ void updatefilterLoop(boolean announce) {
 
 void updatefilterEGinv(boolean announce) {
   if (upperSW) {
-    if (filterEGinvU == 0) {
+    if (upperData[P_filterEGinv] == 0) {
       if (announce) {
         showCurrentParameterPage("Filter Env", "Positive");
         midiCCOut(CCfilterEGinv, 1);
@@ -1435,7 +2033,7 @@ void updatefilterEGinv(boolean announce) {
       srp.writePin(FILTER_EG_INV_UPPER, HIGH);
     }
   } else {
-    if (filterEGinvL == 0) {
+    if (lowerData[P_filterEGinv] == 0) {
       if (announce) {
         showCurrentParameterPage("Filter Env", "Positive");
         midiCCOut(CCfilterEGinv, 1);
@@ -1461,7 +2059,7 @@ void updatefilterEGinv(boolean announce) {
 
 void updatefilterVel(boolean announce) {
   if (upperSW) {
-    if (filterVelU == 0) {
+    if (upperData[P_filterVel] == 0) {
       if (announce) {
         showCurrentParameterPage("VCF Velocity", "Off");
         midiCCOut(CCfilterVel, 1);
@@ -1477,7 +2075,7 @@ void updatefilterVel(boolean announce) {
       srp.writePin(FILTER_VELOCITY_UPPER, HIGH);
     }
   } else {
-    if (filterVelL == 0) {
+    if (lowerData[P_filterVel] == 0) {
       if (announce) {
         showCurrentParameterPage("VCF Velocity", "Off");
         midiCCOut(CCfilterVel, 1);
@@ -1503,7 +2101,7 @@ void updatefilterVel(boolean announce) {
 
 void updatevcaLoop(boolean announce) {
   if (upperSW) {
-    switch (statevcaLoopU) {
+    switch (upperData[P_statevcaLoop]) {
       case 1:
         if (announce) {
           showCurrentParameterPage("VCA Key Loop", "On");
@@ -1513,7 +2111,7 @@ void updatevcaLoop(boolean announce) {
         sr.writePin(VCALOOP_DOUBLE_LED, LOW);  // LED on
         srp.writePin(AMP_MODE_BIT0_UPPER, LOW);
         srp.writePin(AMP_MODE_BIT1_UPPER, HIGH);
-        oldvcaLoop = statevcaLoopU;
+        oldvcaLoop = upperData[P_statevcaLoop];
         break;
 
       case 2:
@@ -1525,7 +2123,7 @@ void updatevcaLoop(boolean announce) {
         sr.writePin(VCALOOP_LED, LOW);
         srp.writePin(AMP_MODE_BIT0_UPPER, HIGH);
         srp.writePin(AMP_MODE_BIT1_UPPER, HIGH);
-        oldvcaLoop = statevcaLoopU;
+        oldvcaLoop = upperData[P_statevcaLoop];
         break;
 
       default:
@@ -1541,7 +2139,7 @@ void updatevcaLoop(boolean announce) {
         break;
     }
   } else {
-    switch (statevcaLoopL) {
+    switch (lowerData[P_statevcaLoop]) {
       case 1:
         if (announce) {
           showCurrentParameterPage("VCA Key Loop", "On");
@@ -1555,7 +2153,7 @@ void updatevcaLoop(boolean announce) {
           srp.writePin(AMP_MODE_BIT0_UPPER, LOW);
           srp.writePin(AMP_MODE_BIT1_UPPER, HIGH);
         }
-        oldvcaLoop = statevcaLoopL;
+        oldvcaLoop = lowerData[P_statevcaLoop];
         break;
 
       case 2:
@@ -1571,7 +2169,7 @@ void updatevcaLoop(boolean announce) {
           srp.writePin(AMP_MODE_BIT0_UPPER, LOW);
           srp.writePin(AMP_MODE_BIT1_UPPER, LOW);
         }
-        oldvcaLoop = statevcaLoopL;
+        oldvcaLoop = lowerData[P_statevcaLoop];
         break;
 
       default:
@@ -1595,7 +2193,7 @@ void updatevcaLoop(boolean announce) {
 
 void updatevcaVel(boolean announce) {
   if (upperSW) {
-    if (vcaVelU == 0) {
+    if (upperData[P_vcaVel] == 0) {
       if (announce) {
         showCurrentParameterPage("VCA Velocity", "Off");
         midiCCOut(CCvcaVel, 1);
@@ -1611,7 +2209,7 @@ void updatevcaVel(boolean announce) {
       srp.writePin(AMP_VELOCITY_UPPER, HIGH);
     }
   } else {
-    if (vcaVelL == 0) {
+    if (lowerData[P_vcaVel] == 0) {
       if (announce) {
         showCurrentParameterPage("VCA Velocity", "Off");
         midiCCOut(CCvcaVel, 1);
@@ -1638,43 +2236,43 @@ void updatevcaVel(boolean announce) {
 
 void updatevcaGate(boolean announce) {
   if (upperSW) {
-    if (vcaGateU == 0) {
+    if (upperData[P_vcaGate] == 0) {
       if (announce) {
         showCurrentParameterPage("VCA Gate", "Off");
         midiCCOut(CCvcaGate, 1);
       }
       sr.writePin(VCAGATE_LED, LOW);  // LED off
-      ampAttackU = oldampAttackU;
-      ampDecayU = oldampDecayU;
-      ampSustainU = oldampSustainU;
-      ampReleaseU = oldampReleaseU;
+      upperData[P_ampAttack] = upperData[P_oldampAttack];
+      upperData[P_ampDecay] = upperData[P_oldampDecay];
+      upperData[P_ampSustain] = upperData[P_oldampSustain];
+      upperData[P_ampRelease] = upperData[P_oldampRelease];
     } else {
       if (announce) {
         showCurrentParameterPage("VCA Gate", "On");
         midiCCOut(CCvcaGate, 127);
       }
       sr.writePin(VCAGATE_LED, HIGH);  // LED on
-      ampAttackU = 0;
-      ampDecayU = 0;
-      ampSustainU = 1023;
-      ampReleaseU = 0;
+      upperData[P_ampAttack] = 0;
+      upperData[P_ampDecay] = 0;
+      upperData[P_ampSustain] = 1023;
+      upperData[P_ampRelease] = 0;
     }
   } else {
-    if (vcaGateL == 0) {
+    if (lowerData[P_vcaGate] == 0) {
       if (announce) {
         showCurrentParameterPage("VCA Gate", "Off");
         midiCCOut(CCvcaGate, 1);
       }
       sr.writePin(VCAGATE_LED, LOW);  // LED off
-      ampAttackL = oldampAttackL;
-      ampDecayL = oldampDecayL;
-      ampSustainL = oldampSustainL;
-      ampReleaseL = oldampReleaseL;
+      lowerData[P_ampAttack] = lowerData[P_oldampAttack];
+      lowerData[P_ampDecay] = lowerData[P_oldampDecay];
+      lowerData[P_ampSustain] = lowerData[P_oldampSustain];
+      lowerData[P_ampRelease] = lowerData[P_oldampRelease];
       if (wholemode) {
-        ampAttackU = oldampAttackU;
-        ampDecayU = oldampDecayU;
-        ampSustainU = oldampSustainU;
-        ampReleaseU = oldampReleaseU;
+        upperData[P_ampAttack] = upperData[P_oldampAttack];
+        upperData[P_ampDecay] = upperData[P_oldampDecay];
+        upperData[P_ampSustain] = upperData[P_oldampSustain];
+        upperData[P_ampRelease] = upperData[P_oldampRelease];
       }
     } else {
       if (announce) {
@@ -1682,69 +2280,51 @@ void updatevcaGate(boolean announce) {
         midiCCOut(CCvcaGate, 127);
       }
       sr.writePin(VCAGATE_LED, HIGH);  // LED on
-      ampAttackL = 0;
-      ampDecayL = 0;
-      ampSustainL = 1023;
-      ampReleaseL = 0;
+      lowerData[P_ampAttack] = 0;
+      lowerData[P_ampDecay] = 0;
+      lowerData[P_ampSustain] = 1023;
+      lowerData[P_ampRelease] = 0;
       if (wholemode) {
-        ampAttackU = 0;
-        ampDecayU = 0;
-        ampSustainU = 1023;
-        ampReleaseU = 0;
+        upperData[P_ampAttack] = 0;
+        upperData[P_ampDecay] = 0;
+        upperData[P_ampSustain] = 1023;
+        upperData[P_ampRelease] = 0;
       }
     }
   }
 }
 
 void updatelfoAlt(boolean announce) {
-  if (upperSW) {
-    if (lfoAltU == 0) {
-      if (announce) {
-        //showCurrentParameterPage("LFO Waveform", String("Original"));
-        updateStratusLFOWaveform();
-        midiCCOut(CClfoAlt, 1);
-      }
-      sr.writePin(LFO_ALT_LED, LOW);  // LED off
-      srp.writePin(LFO_ALT_UPPER, HIGH);
-    } else {
-      if (announce) {
-        //showCurrentParameterPage("LFO Waveform", String("Alternate"));
-        updateStratusLFOWaveform();
-        midiCCOut(CClfoAlt, 127);
-      }
-      sr.writePin(LFO_ALT_LED, HIGH);  // LED on
-      srp.writePin(LFO_ALT_UPPER, LOW);
-    }
+  bool isUpper = upperSW;
+  bool lfoAltState = isUpper ? upperData[P_lfoAlt] : lowerData[P_lfoAlt];
+
+  // Send MIDI CC messages
+  midiCCOut(CClfoAlt, lfoAltState ? 127 : 0);
+
+  // Update LFO waveform
+  if (announce) {
+    updateStratusLFOWaveform(1);
   } else {
-    if (lfoAltL == 0) {
-      if (announce) {
-        //showCurrentParameterPage("LFO Waveform", String("Original"));
-        updateStratusLFOWaveform();
-        midiCCOut(CClfoAlt, 1);
-      }
-      sr.writePin(LFO_ALT_LED, LOW);  // LED off
-      srp.writePin(LFO_ALT_LOWER, HIGH);
-      if (wholemode) {
-        srp.writePin(LFO_ALT_UPPER, HIGH);
-      }
-    } else {
-      if (announce) {
-        //showCurrentParameterPage("LFO Waveform", String("Alternate"));
-        updateStratusLFOWaveform();
-        midiCCOut(CClfoAlt, 127);
-      }
-      sr.writePin(LFO_ALT_LED, HIGH);  // LED on
-      srp.writePin(LFO_ALT_LOWER, LOW);
-      if (wholemode) {
-        srp.writePin(LFO_ALT_UPPER, LOW);
-      }
+    updateStratusLFOWaveform(0);
+  }
+
+  // Set pin states
+  if (isUpper) {
+    srp.writePin(LFO_ALT_UPPER, lfoAltState ? HIGH : LOW);
+    sr.writePin(LFO_ALT_LED, lfoAltState ? LOW : HIGH);
+  } else {
+    srp.writePin(LFO_ALT_LOWER, lfoAltState ? HIGH : LOW);
+    sr.writePin(LFO_ALT_LED, lfoAltState ? LOW : HIGH);
+    if (wholemode) {
+      srp.writePin(LFO_ALT_UPPER, lfoAltState ? HIGH : LOW);
+      sr.writePin(LFO_ALT_LED, lfoAltState ? LOW : HIGH);
     }
   }
 }
 
 void updatekeyTrackSW(boolean announce) {
   if (upperSW) {
-    if (keyTrackSWU == 0) {
+    if (upperData[P_keyTrackSW] == 0) {
       srp.writePin(FILTER_KEYTRACK_UPPER, LOW);
       midiCCOutCPU5(CCkeyTrackSW, 0, 1);
       delay(1);
@@ -1753,10 +2333,10 @@ void updatekeyTrackSW(boolean announce) {
       srp.writePin(FILTER_KEYTRACK_UPPER, HIGH);
       midiCCOutCPU5(CCkeyTrackSW, 127, 1);
       delay(1);
-      midiCCOutCPU5(CCkeyTrack, keytrackU / 16, 1);
+      midiCCOutCPU5(CCkeyTrack, upperData[P_keytrack] / 16, 1);
     }
   } else {
-    if (keyTrackSWL == 0) {
+    if (lowerData[P_keyTrackSW] == 0) {
       srp.writePin(FILTER_KEYTRACK_LOWER, LOW);
       midiCCOutCPU2(CCkeyTrackSW, 0, 1);
       delay(1);
@@ -1771,12 +2351,12 @@ void updatekeyTrackSW(boolean announce) {
       srp.writePin(FILTER_KEYTRACK_LOWER, HIGH);
       midiCCOutCPU2(CCkeyTrackSW, 127, 1);
       delay(1);
-      midiCCOutCPU2(CCkeyTrack, keytrackL / 16, 1);
+      midiCCOutCPU2(CCkeyTrack, lowerData[P_keytrack] / 16, 1);
       if (wholemode) {
         srp.writePin(FILTER_KEYTRACK_UPPER, HIGH);
         midiCCOutCPU5(CCkeyTrackSW, 127, 1);
         delay(1);
-        midiCCOutCPU5(CCkeyTrack, keytrackU / 16, 1);
+        midiCCOutCPU5(CCkeyTrack, upperData[P_keytrack] / 16, 1);
       }
     }
   }
@@ -1786,13 +2366,14 @@ void updateupperLower() {
   if (!wholemode) {
     if (upperSW) {
       // upper mode upperSW will be true
-      sr.writePin(UPPER_LED, HIGH);  // LED off
+      sr.writePin(UPPER_LED, HIGH);  // upper LED on
+      sr.writePin(LOWER_LED, LOW);   // LED off
       //srp.writePin(UPPER2, LOW);
       setAllButtons();
     } else {
       // lower mode upperSW will be false
-      sr.writePin(UPPER_LED, LOW);  // LED off
-      //srp.writePin(UPPER2, HIGH);
+      sr.writePin(UPPER_LED, LOW);   // LED off
+      sr.writePin(LOWER_LED, HIGH);  // lower LED on
       setAllButtons();
     }
   } else {
@@ -1807,7 +2388,9 @@ void updatewholemode() {
   sr.writePin(DUAL_LED, LOW);    // LED off
   sr.writePin(SPLIT_LED, LOW);   // LED off
   sr.writePin(UPPER_LED, LOW);   // LED off
+  sr.writePin(LOWER_LED, HIGH);  // LED on
   srp.writePin(UPPER2, HIGH);
+  srp.writePin(UPPER1, HIGH);
   upperSW = 0;
   setAllButtons();
   dualmode = false;
@@ -1821,6 +2404,7 @@ void updatedualmode() {
   sr.writePin(WHOLE_LED, LOW);  // LED off
   sr.writePin(SPLIT_LED, LOW);  // LED off
   srp.writePin(UPPER2, LOW);
+  srp.writePin(UPPER1, LOW);
   wholemode = false;
   splitmode = false;
 }
@@ -1832,13 +2416,14 @@ void updatesplitmode() {
   sr.writePin(WHOLE_LED, LOW);   // LED off
   sr.writePin(DUAL_LED, LOW);    // LED off
   srp.writePin(UPPER2, LOW);
+  srp.writePin(UPPER1, LOW);
   wholemode = false;
   dualmode = false;
 }
 
 void updatechorus1(boolean announce) {
   if (upperSW) {
-    if (!chorus1U) {
+    if (!upperData[P_chorus1]) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("Off"));
         midiCCOut(CCchorus1, 1);
@@ -1846,7 +2431,7 @@ void updatechorus1(boolean announce) {
       sr.writePin(CHORUS1_LED, LOW);  // LED off
       srp.writePin(CHORUS1_OUT_UPPER, LOW);
     }
-    if (chorus1U) {
+    if (upperData[P_chorus1]) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("On"));
         midiCCOut(CCchorus1, 127);
@@ -1856,7 +2441,7 @@ void updatechorus1(boolean announce) {
     }
   }
   if (!upperSW) {
-    if (!chorus1L) {
+    if (!lowerData[P_chorus1]) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("Off"));
         midiCCOut(CCchorus1, 1);
@@ -1867,7 +2452,7 @@ void updatechorus1(boolean announce) {
         srp.writePin(CHORUS1_OUT_UPPER, LOW);
       }
     }
-    if (chorus1L) {
+    if (lowerData[P_chorus1]) {
       if (announce) {
         showCurrentParameterPage("Chorus 1", String("On"));
         midiCCOut(CCchorus1, 127);
@@ -1883,7 +2468,7 @@ void updatechorus1(boolean announce) {
 
 void updatechorus2(boolean announce) {
   if (upperSW) {
-    if (!chorus2U) {
+    if (!upperData[P_chorus2]) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("Off"));
         midiCCOut(CCchorus2, 1);
@@ -1891,7 +2476,7 @@ void updatechorus2(boolean announce) {
       sr.writePin(CHORUS2_LED, LOW);  // LED off
       srp.writePin(CHORUS2_OUT_UPPER, LOW);
     }
-    if (chorus2U) {
+    if (upperData[P_chorus2]) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("On"));
         midiCCOut(CCchorus2, 127);
@@ -1901,7 +2486,7 @@ void updatechorus2(boolean announce) {
     }
   }
   if (!upperSW) {
-    if (!chorus2L) {
+    if (!lowerData[P_chorus2]) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("Off"));
         midiCCOut(CCchorus2, 1);
@@ -1912,7 +2497,7 @@ void updatechorus2(boolean announce) {
         srp.writePin(CHORUS2_OUT_UPPER, LOW);
       }
     }
-    if (chorus2L) {
+    if (lowerData[P_chorus2]) {
       if (announce) {
         showCurrentParameterPage("Chorus 2", String("On"));
         midiCCOut(CCchorus2, 127);
@@ -1927,12 +2512,12 @@ void updatechorus2(boolean announce) {
 }
 
 void updateFilterEnv(boolean announce) {
-  if (filterLogLinU == 0) {
+  if (upperData[P_filterLogLin] == 0) {
     srp.writePin(FILTER_LIN_LOG_UPPER, LOW);
   } else {
     srp.writePin(FILTER_LIN_LOG_UPPER, HIGH);
   }
-  if (filterLogLinL == 0) {
+  if (lowerData[P_filterLogLin] == 0) {
     srp.writePin(FILTER_LIN_LOG_LOWER, LOW);
     if (wholemode) {
       srp.writePin(FILTER_LIN_LOG_UPPER, LOW);
@@ -1946,12 +2531,12 @@ void updateFilterEnv(boolean announce) {
 }
 
 void updateAmpEnv(boolean announce) {
-  if (ampLogLinU == 0) {
+  if (upperData[P_ampLogLin] == 0) {
     srp.writePin(AMP_LIN_LOG_UPPER, LOW);
   } else {
     srp.writePin(AMP_LIN_LOG_UPPER, HIGH);
   }
-  if (ampLogLinL == 0) {
+  if (lowerData[P_ampLogLin] == 0) {
     srp.writePin(AMP_LIN_LOG_LOWER, LOW);
     if (wholemode) {
       srp.writePin(AMP_LIN_LOG_UPPER, LOW);
@@ -1966,7 +2551,7 @@ void updateAmpEnv(boolean announce) {
 
 void updateMonoMulti(boolean announce) {
   if (upperSW) {
-    if (monoMultiU == 0) {
+    if (upperData[P_monoMulti] == 0) {
       if (announce) {
         showCurrentParameterPage("LFO Retrigger", "Off");
       }
@@ -1976,7 +2561,7 @@ void updateMonoMulti(boolean announce) {
       }
     }
   } else {
-    if (monoMultiL == 0) {
+    if (lowerData[P_monoMulti] == 0) {
       if (announce) {
         showCurrentParameterPage("LFO Retrigger", "Off");
       }
@@ -2010,115 +2595,113 @@ void myControlChange(byte channel, byte control, int value) {
   switch (control) {
     case CCpwLFO:
       if (upperSW) {
-        pwLFOU = value;
+        upperData[P_pwLFO] = value;
       } else {
-        pwLFOL = value;
+        lowerData[P_pwLFO] = value;
         if (wholemode) {
-          pwLFOU = value;
+          upperData[P_pwLFO] = value;
         }
       }
       pwLFOstr = value / midioutfrig;  // for display
-      updatepwLFO();
+      updatepwLFO(1);
       break;
 
     case CCfmDepth:
       if (upperSW) {
-        fmDepthU = value;
+        upperData[P_fmDepth] = value;
       } else {
-        fmDepthL = value;
+        lowerData[P_fmDepth] = value;
         if (wholemode) {
-          fmDepthU = value;
+          upperData[P_fmDepth] = value;
         }
       }
       fmDepthstr = value / midioutfrig;
-      updatefmDepth();
+      updatefmDepth(1);
       break;
 
     case CCosc2PW:
       if (upperSW) {
-        osc2PWU = value;
+        upperData[P_osc2PW] = value;
       } else {
-        osc2PWL = value;
+        lowerData[P_osc2PW] = value;
         if (wholemode) {
-          osc2PWU = value;
+          upperData[P_osc2PW] = value;
         }
       }
       osc2PWstr = PULSEWIDTH[value / midioutfrig];
-      updateosc2PW();
+      updateOsc2PW(1);
       break;
 
     case CCosc2PWM:
       if (upperSW) {
-        osc2PWMU = value;
+        upperData[P_osc2PWM] = value;
       } else {
-        osc2PWML = value;
+        lowerData[P_osc2PWM] = value;
         if (wholemode) {
-          osc2PWMU = value;
+          upperData[P_osc2PWM] = value;
         }
       }
       osc2PWMstr = value / midioutfrig;
-      updateosc2PWM();
+      updateOsc2PWM(1);
       break;
 
     case CCosc1PW:
       if (upperSW) {
-        osc1PWU = value;
+        upperData[P_osc1PW] = value;
       } else {
-        osc1PWL = value;
+        lowerData[P_osc1PW] = value;
         if (wholemode) {
-          osc1PWU = value;
+          upperData[P_osc1PW] = value;
         }
       }
       osc1PWstr = PULSEWIDTH[value / midioutfrig];
-      updateosc1PW();
+      updateOsc1PW(1);
       break;
 
     case CCosc1PWM:
       if (upperSW) {
-        osc1PWMU = value;
+        upperData[P_osc1PWM] = value;
       } else {
-        osc1PWML = value;
+        lowerData[P_osc1PWM] = value;
         if (wholemode) {
-          osc1PWMU = value;
+          upperData[P_osc1PWM] = value;
         }
       }
       osc1PWMstr = value / midioutfrig;
-      updateosc1PWM();
+      updateOsc1PWM(1);
       break;
 
     case CCosc1Range:
       if (upperSW) {
-        osc1RangeU = value;
+        upperData[P_osc1Range] = value;
       } else {
-        osc1RangeL = value;
+        lowerData[P_osc1Range] = value;
         if (wholemode) {
-          osc1RangeU = value;
+          upperData[P_osc1Range] = value;
         }
       }
-      osc1Rangestr = value / midioutfrig;
-      updateosc1Range(1);
+      updateOsc1Range(1);
       break;
 
     case CCosc2Range:
       if (upperSW) {
-        osc2RangeU = value;
+        upperData[P_osc2Range] = value;
       } else {
-        osc2RangeL = value;
+        lowerData[P_osc2Range] = value;
         if (wholemode) {
-          osc2RangeU = value;
+          upperData[P_osc2Range] = value;
         }
       }
-      osc2Rangestr = value / midioutfrig;
-      updateosc2Range(1);
+      updateOsc2Range(1);
       break;
 
     case CCstack:
       if (upperSW) {
-        stackU = value;
+        upperData[P_stack] = value;
       } else {
-        stackL = value;
+        lowerData[P_stack] = value;
         if (wholemode) {
-          stackU = value;
+          upperData[P_stack] = value;
         }
       }
       stackstr = value >> 7;
@@ -2127,186 +2710,183 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CCglideTime:
       if (upperSW) {
-        glideTimeU = value;
-        midiCCOutCPU5(CCglideTime, (glideTimeU / midioutfrig), 1);
+        upperData[P_glideTime] = value;
       } else {
-        glideTimeL = value;
-        midiCCOutCPU2(CCglideTime, (glideTimeL / midioutfrig), 1);
+        lowerData[P_glideTime] = value;
         if (wholemode) {
-          glideTimeU = value;
-          midiCCOutCPU5(CCglideTime, (glideTimeU / midioutfrig), 1);
+          upperData[P_glideTime] = value;
         }
       }
       glideTimestr = LINEAR[value / midioutfrig];
-      updateglideTime();
+      updateglideTime(1);
       break;
 
     case CCosc2Detune:
       if (upperSW) {
-        osc2DetuneU = value;
+        upperData[P_osc2Detune] = value;
       } else {
-        osc2DetuneL = value;
+        lowerData[P_osc2Detune] = value;
         if (wholemode) {
-          osc2DetuneU = value;
+          upperData[P_osc2Detune] = value;
         }
       }
       osc2Detunestr = PULSEWIDTH[value / midioutfrig];
-      updateosc2Detune();
+      updateOsc2Detune(1);
       break;
 
     case CCnoiseLevel:
       if (upperSW) {
-        noiseLevelU = value;
+        upperData[P_noiseLevel] = value;
       } else {
-        noiseLevelL = value;
+        lowerData[P_noiseLevel] = value;
         if (wholemode) {
-          noiseLevelU = value;
+          upperData[P_noiseLevel] = value;
         }
       }
       noiseLevelstr = LINEARCENTREZERO[value / midioutfrig];
-      updatenoiseLevel();
+      updatenoiseLevel(1);
       break;
 
     case CCosc2SawLevel:
       if (upperSW) {
-        osc2SawLevelU = value;
+        upperData[P_osc2SawLevel] = value;
       } else {
-        osc2SawLevelL = value;
+        lowerData[P_osc2SawLevel] = value;
         if (wholemode) {
-          osc2SawLevelU = value;
+          upperData[P_osc2SawLevel] = value;
         }
       }
       osc2SawLevelstr = value / midioutfrig;  // for display
-      updateOsc2SawLevel();
+      updateOsc2SawLevel(1);
       break;
 
     case CCosc1SawLevel:
       if (upperSW) {
-        osc1SawLevelU = value;
+        upperData[P_osc1SawLevel] = value;
       } else {
-        osc1SawLevelL = value;
+        lowerData[P_osc1SawLevel] = value;
         if (wholemode) {
-          osc1SawLevelU = value;
+          upperData[P_osc1SawLevel] = value;
         }
       }
       osc1SawLevelstr = value / midioutfrig;  // for display
-      updateOsc1SawLevel();
+      updateOsc1SawLevel(1);
       break;
 
     case CCosc2PulseLevel:
       if (upperSW) {
-        osc2PulseLevelU = value;
+        upperData[P_osc2PulseLevel] = value;
       } else {
-        osc2PulseLevelL = value;
+        lowerData[P_osc2PulseLevel] = value;
         if (wholemode) {
-          osc2PulseLevelU = value;
+          upperData[P_osc2PulseLevel] = value;
         }
       }
       osc2PulseLevelstr = value / midioutfrig;  // for display
-      updateosc2PulseLevel();
+      updateOsc2PulseLevel(1);
       break;
 
     case CCosc1PulseLevel:
       if (upperSW) {
-        osc1PulseLevelU = value;
+        upperData[P_osc1PulseLevel] = value;
       } else {
-        osc1PulseLevelL = value;
+        lowerData[P_osc1PulseLevel] = value;
         if (wholemode) {
-          osc1PulseLevelU = value;
+          upperData[P_osc1PulseLevel] = value;
         }
       }
       osc1PulseLevelstr = value / midioutfrig;  // for display
-      updateOsc1PulseLevel();
+      updateOsc1PulseLevel(1);
       break;
 
     case CCosc2TriangleLevel:
       if (upperSW) {
-        osc2TriangleLevelU = value;
+        upperData[P_osc2TriangleLevel] = value;
       } else {
-        osc2TriangleLevelL = value;
+        lowerData[P_osc2TriangleLevel] = value;
         if (wholemode) {
-          osc2TriangleLevelU = value;
+          upperData[P_osc2TriangleLevel] = value;
         }
       }
       osc2TriangleLevelstr = value / midioutfrig;  // for display
-      updateosc2TriangleLevel();
+      updateOsc2TriangleLevel(1);
       break;
 
     case CCosc1SubLevel:
       if (upperSW) {
-        osc1SubLevelU = value;
+        upperData[P_osc1SubLevel] = value;
       } else {
-        osc1SubLevelL = value;
+        lowerData[P_osc1SubLevel] = value;
         if (wholemode) {
-          osc1SubLevelU = value;
+          upperData[P_osc1SubLevel] = value;
         }
       }
       osc1SubLevelstr = value / midioutfrig;  // for display
-      updateOsc1SubLevel();
+      updateOsc1SubLevel(1);
       break;
 
     case CCLFODelay:
       if (upperSW) {
-        LFODelayU = value;
+        upperData[P_LFODelay] = value;
       } else {
-        LFODelayL = value;
+        lowerData[P_LFODelay] = value;
         if (wholemode) {
-          LFODelayU = value;
+          upperData[P_LFODelay] = value;
         }
       }
       LFODelaystr = value / midioutfrig;  // for display
-      updateLFODelay();
+      updateLFODelay(1);
       break;
 
     case CCfilterCutoff:
       if (upperSW) {
-        filterCutoffU = value;
+        upperData[P_filterCutoff] = value;
         oldfilterCutoffU = value;
       } else {
-        filterCutoffL = value;
+        lowerData[P_filterCutoff] = value;
         oldfilterCutoffL = value;
         if (wholemode) {
-          filterCutoffU = value;
+          upperData[P_filterCutoff] = value;
           oldfilterCutoffU = value;
         }
       }
       filterCutoffstr = FILTERCUTOFF[value / midioutfrig];
-      updateFilterCutoff();
+      updateFilterCutoff(1);
       break;
 
     case CCfilterLFO:
       if (upperSW) {
-        filterLFOU = value;
+        upperData[P_filterLFO] = value;
       } else {
-        filterLFOL = value;
+        lowerData[P_filterLFO] = value;
         if (wholemode) {
-          filterLFOU = value;
+          upperData[P_filterLFO] = value;
         }
       }
       filterLFOstr = value / midioutfrig;
-      updatefilterLFO();
+      updatefilterLFO(1);
       break;
 
     case CCfilterRes:
       if (upperSW) {
-        filterResU = value;
+        upperData[P_filterRes] = value;
       } else {
-        filterResL = value;
+        lowerData[P_filterRes] = value;
         if (wholemode) {
-          filterResU = value;
+          upperData[P_filterRes] = value;
         }
       }
       filterResstr = int(value / midioutfrig);
-      updatefilterRes();
+      updatefilterRes(1);
       break;
 
     case CCfilterType:
       if (upperSW) {
-        filterTypeU = value >> 7;
+        upperData[P_filterType] = value >> 7;
       } else {
-        filterTypeL = value >> 7;
+        lowerData[P_filterType] = value >> 7;
         if (wholemode) {
-          filterTypeU = value >> 7;
+          upperData[P_filterType] = value >> 7;
         }
       }
       updateFilterType(1);
@@ -2314,291 +2894,287 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CCfilterEGlevel:
       if (upperSW) {
-        filterEGlevelU = value;
+        upperData[P_filterEGlevel] = value;
       } else {
-        filterEGlevelL = value;
+        lowerData[P_filterEGlevel] = value;
         if (wholemode) {
-          filterEGlevelU = value;
+          upperData[P_filterEGlevel] = value;
         }
       }
       filterEGlevelstr = int(value / midioutfrig);
-      updatefilterEGlevel();
+      updatefilterEGlevel(1);
       break;
 
     case CCLFORate:
       if (upperSW) {
-        LFORateU = value;
+        upperData[P_LFORate] = value;
       } else {
-        LFORateL = value;
+        lowerData[P_LFORate] = value;
         if (wholemode) {
-          LFORateU = value;
+          upperData[P_LFORate] = value;
         }
       }
       LFORatestr = LFOTEMPO[value / midioutfrig];  // for display
-      updateLFORate();
+      updateLFORate(1);
       break;
 
     case CCLFOWaveform:
       if (upperSW) {
-        LFOWaveformU = value;
+        upperData[P_LFOWaveform] = value;
       } else {
-        LFOWaveformL = value;
+        lowerData[P_LFOWaveform] = value;
         if (wholemode) {
-          LFOWaveformU = value;
+          upperData[P_LFOWaveform] = value;
         }
       }
-      LFOWaveformstr = value >> 7;
-      updateStratusLFOWaveform();
+      updateStratusLFOWaveform(1);
       break;
 
     case CCfilterAttack:
       if (upperSW) {
-        filterAttackU = value;
+        upperData[P_filterAttack] = value;
       } else {
-        filterAttackL = value;
+        lowerData[P_filterAttack] = value;
         if (wholemode) {
-          filterAttackU = value;
+          upperData[P_filterAttack] = value;
         }
       }
       filterAttackstr = ENVTIMES[value / midioutfrig];
-      updatefilterAttack();
+      updatefilterAttack(1);
       break;
 
     case CCfilterDecay:
       if (upperSW) {
-        filterDecayU = value;
+        upperData[P_filterDecay] = value;
       } else {
-        filterDecayL = value;
+        lowerData[P_filterDecay] = value;
         if (wholemode) {
-          filterDecayU = value;
+          upperData[P_filterDecay] = value;
         }
       }
       filterDecaystr = ENVTIMES[value / midioutfrig];
-      updatefilterDecay();
+      updatefilterDecay(1);
       break;
 
     case CCfilterSustain:
       if (upperSW) {
-        filterSustainU = value;
+        upperData[P_filterSustain] = value;
       } else {
-        filterSustainL = value;
+        lowerData[P_filterSustain] = value;
         if (wholemode) {
-          filterSustainU = value;
+          upperData[P_filterSustain] = value;
         }
       }
       filterSustainstr = LINEAR_FILTERMIXERSTR[value / midioutfrig];
-      updatefilterSustain();
+      updatefilterSustain(1);
       break;
 
     case CCfilterRelease:
       if (upperSW) {
-        filterReleaseU = value;
+        upperData[P_filterRelease] = value;
       } else {
-        filterReleaseL = value;
+        lowerData[P_filterRelease] = value;
         if (wholemode) {
-          filterReleaseU = value;
+          upperData[P_filterRelease] = value;
         }
       }
       filterReleasestr = ENVTIMES[value / midioutfrig];
-      updatefilterRelease();
+      updatefilterRelease(1);
       break;
 
     case CCampAttack:
       if (upperSW) {
-        ampAttackU = value;
-        oldampAttackU = value;
+        upperData[P_ampAttack] = value;
+        upperData[P_oldampAttack] = value;
       } else {
-        ampAttackL = value;
-        oldampAttackL = value;
+        lowerData[P_ampAttack] = value;
+        lowerData[P_oldampAttack] = value;
         if (wholemode) {
-          ampAttackU = value;
-          oldampAttackU = value;
+          upperData[P_ampAttack] = value;
+          upperData[P_oldampAttack] = value;
         }
       }
       ampAttackstr = ENVTIMES[value / midioutfrig];
-      updateampAttack();
+      updateampAttack(1);
       break;
 
     case CCampDecay:
       if (upperSW) {
-        ampDecayU = value;
-        oldampDecayU = value;
+        upperData[P_ampDecay] = value;
+        upperData[P_oldampDecay] = value;
       } else {
-        ampDecayL = value;
-        oldampDecayL = value;
+        lowerData[P_ampDecay] = value;
+        lowerData[P_oldampDecay] = value;
         if (wholemode) {
-          ampDecayU = value;
-          oldampDecayU = value;
+          upperData[P_ampDecay] = value;
+          upperData[P_oldampDecay] = value;
         }
       }
       ampDecaystr = ENVTIMES[value / midioutfrig];
-      updateampDecay();
+      updateampDecay(1);
       break;
 
     case CCampSustain:
       if (upperSW) {
-        ampSustainU = value;
-        oldampSustainU = value;
+        upperData[P_ampSustain] = value;
+        upperData[P_oldampSustain] = value;
       } else {
-        ampSustainL = value;
-        oldampSustainL = value;
+        lowerData[P_ampSustain] = value;
+        lowerData[P_oldampSustain] = value;
         if (wholemode) {
-          ampSustainU = value;
-          oldampSustainU = value;
+          upperData[P_ampSustain] = value;
+          upperData[P_oldampSustain] = value;
         }
       }
       ampSustainstr = LINEAR_FILTERMIXERSTR[value / midioutfrig];
-      updateampSustain();
+      updateampSustain(1);
       break;
 
     case CCampRelease:
       if (upperSW) {
-        ampReleaseU = value;
-        oldampReleaseU = value;
+        upperData[P_ampRelease] = value;
+        upperData[P_oldampRelease] = value;
       } else {
-        ampReleaseL = value;
-        oldampReleaseL = value;
+        lowerData[P_ampRelease] = value;
+        lowerData[P_oldampRelease] = value;
         if (wholemode) {
-          ampReleaseU = value;
-          oldampReleaseU = value;
+          upperData[P_ampRelease] = value;
+          upperData[P_oldampRelease] = value;
         }
       }
       ampReleasestr = ENVTIMES[value / midioutfrig];
-      updateampRelease();
+      updateampRelease(1);
       break;
 
     case CCvolumeControl:
       if (upperSW) {
-        volumeControlU = value;
+        upperData[P_volumeControl] = value;
       } else {
-        volumeControlL = value;
+        lowerData[P_volumeControl] = value;
         if (wholemode) {
-          volumeControlU = value;
+          upperData[P_volumeControl] = value;
         }
       }
       volumeControlstr = value / midioutfrig;
-      updatevolumeControl();
+      updatevolumeControl(1);
       break;
 
     case CCkeyTrack:
       if (upperSW) {
-        keytrackU = value;
-        midiCCOutCPU5(CCkeyTrack, (keytrackU / 16), 1);
+        upperData[P_keytrack] = value;
       } else {
-        keytrackL = value;
-        midiCCOutCPU2(CCkeyTrack, (keytrackL / 16), 1);
+        lowerData[P_keytrack] = value;
         if (wholemode) {
-          keytrackU = value;
-          midiCCOutCPU5(CCkeyTrack, (keytrackU / 15), 1);
+          upperData[P_keytrack] = value;
         }
       }
       keytrackstr = value / midioutfrig;
-      updatekeytrack();
+      updatekeytrack(1);
       break;
 
 
     case CCamDepth:
       if (upperSW) {
-        amDepthU = value;
+        upperData[P_amDepth] = value;
       } else {
-        amDepthL = value;
+        lowerData[P_amDepth] = value;
         if (wholemode) {
-          amDepthU = value;
+          upperData[P_amDepth] = value;
         }
       }
       amDepth = value;
       amDepthstr = value / midioutfrig;
-      updateamDepth();
+      updateamDepth(1);
       break;
 
       ////////////////////////////////////////////////
 
     case CCglideSW:
       if (upperSW) {
-        glideSWU = !glideSWU;
+        upperData[P_glideSW] = !upperData[P_glideSW];
       } else {
-        glideSWL = !glideSWL;
+        lowerData[P_glideSW] = !lowerData[P_glideSW];
       }
       updateglideSW(1);
       break;
 
     case CCfilterPoleSW:
       if (upperSW) {
-        filterPoleSWU = !filterPoleSWU;
+        upperData[P_filterPoleSW] = !upperData[P_filterPoleSW];
       } else {
-        filterPoleSWL = !filterPoleSWL;
+        lowerData[P_filterPoleSW] = !lowerData[P_filterPoleSW];
       }
       updatefilterPoleSwitch(1);
       break;
 
     case CCfilterVel:
       if (upperSW) {
-        filterVelU = !filterVelU;
+        upperData[P_filterVel] = !upperData[P_filterVel];
       } else {
-        filterVelL = !filterVelL;
+        lowerData[P_filterVel] = !lowerData[P_filterVel];
       }
       updatefilterVel(1);
       break;
 
     case CCfilterEGinv:
       if (upperSW) {
-        filterEGinvU = !filterEGinvU;
+        upperData[P_filterEGinv] = !upperData[P_filterEGinv];
       } else {
-        filterEGinvL = !filterEGinvL;
+        lowerData[P_filterEGinv] = !lowerData[P_filterEGinv];
       }
       updatefilterEGinv(1);
       break;
 
     case CCfilterLoop:
       if (upperSW) {
-        statefilterLoopU = statefilterLoop;
+        upperData[P_statefilterLoop] = statefilterLoop;
       } else {
-        statefilterLoopL = statefilterLoop;
+        lowerData[P_statefilterLoop] = statefilterLoop;
       }
       updatefilterLoop(1);
       break;
 
     case CCvcaLoop:
       if (upperSW) {
-        statevcaLoopU = statevcaLoop;
+        upperData[P_statevcaLoop] = statevcaLoop;
       } else {
-        statevcaLoopL = statevcaLoop;
+        lowerData[P_statevcaLoop] = statevcaLoop;
       }
       updatevcaLoop(1);
       break;
 
     case CCvcaVel:
       if (upperSW) {
-        vcaVelU = !vcaVelU;
+        upperData[P_vcaVel] = !upperData[P_vcaVel];
       } else {
-        vcaVelL = !vcaVelL;
+        lowerData[P_vcaVel] = !lowerData[P_vcaVel];
       }
       updatevcaVel(1);
       break;
 
     case CCvcaGate:
       if (upperSW) {
-        vcaGateU = !vcaGateU;
+        upperData[P_vcaGate] = !upperData[P_vcaGate];
       } else {
-        vcaGateL = !vcaGateL;
+        lowerData[P_vcaGate] = !lowerData[P_vcaGate];
       }
       updatevcaGate(1);
       break;
 
     case CCchorus1:
       if (upperSW) {
-        chorus1U = !chorus1U;
+        upperData[P_chorus1] = !upperData[P_chorus1];
       } else {
-        chorus1L = !chorus1L;
+        lowerData[P_chorus1] = !lowerData[P_chorus1];
       }
       updatechorus1(1);
       break;
 
     case CCchorus2:
       if (upperSW) {
-        chorus2U = !chorus2U;
+        upperData[P_chorus2] = !upperData[P_chorus2];
       } else {
-        chorus2L = !chorus2L;
+        lowerData[P_chorus2] = !lowerData[P_chorus2];
       }
       updatechorus2(1);
       break;
@@ -2632,9 +3208,9 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CClfoAlt:
       if (upperSW) {
-        value > 0 ? lfoAltU = 1 : lfoAltU = 0;
+        upperData[P_lfoAlt] = !upperData[P_lfoAlt];
       } else {
-        value > 0 ? lfoAltL = 1 : lfoAltL = 0;
+        lowerData[P_lfoAlt] = !lowerData[P_lfoAlt];
       }
       updatelfoAlt(1);
       break;
@@ -2649,62 +3225,62 @@ void myControlChange(byte channel, byte control, int value) {
       switch (modWheelDepth) {
         case 1:
           modWheelLevel = ((value) / 5);
-          fmDepthU = int(modWheelLevel);
-          fmDepthL = int(modWheelLevel);
+          upperData[P_fmDepth] = int(modWheelLevel);
+          lowerData[P_fmDepth] = int(modWheelLevel);
           break;
 
         case 2:
           modWheelLevel = ((value) / 4);
-          fmDepthU = int(modWheelLevel);
-          fmDepthL = int(modWheelLevel);
+          upperData[P_fmDepth] = int(modWheelLevel);
+          lowerData[P_fmDepth] = int(modWheelLevel);
           break;
 
         case 3:
           modWheelLevel = ((value) / 3.5);
-          fmDepthU = int(modWheelLevel);
-          fmDepthL = int(modWheelLevel);
+          upperData[P_fmDepth] = int(modWheelLevel);
+          lowerData[P_fmDepth] = int(modWheelLevel);
           break;
 
         case 4:
           modWheelLevel = ((value) / 3);
-          fmDepthU = int(modWheelLevel);
-          fmDepthL = int(modWheelLevel);
+          upperData[P_fmDepth] = int(modWheelLevel);
+          lowerData[P_fmDepth] = int(modWheelLevel);
           break;
 
         case 5:
           modWheelLevel = ((value) / 2.5);
-          fmDepthU = int(modWheelLevel);
-          fmDepthL = int(modWheelLevel);
+          upperData[P_fmDepth] = int(modWheelLevel);
+          lowerData[P_fmDepth] = int(modWheelLevel);
           break;
 
         case 6:
           modWheelLevel = ((value) / 2);
-          fmDepthU = int(modWheelLevel);
-          fmDepthL = int(modWheelLevel);
+          upperData[P_fmDepth] = int(modWheelLevel);
+          lowerData[P_fmDepth] = int(modWheelLevel);
           break;
 
         case 7:
           modWheelLevel = ((value) / 1.75);
-          fmDepthU = int(modWheelLevel);
-          fmDepthL = int(modWheelLevel);
+          upperData[P_fmDepth] = int(modWheelLevel);
+          lowerData[P_fmDepth] = int(modWheelLevel);
           break;
 
         case 8:
           modWheelLevel = ((value) / 1.5);
-          fmDepthU = int(modWheelLevel);
-          fmDepthL = int(modWheelLevel);
+          upperData[P_fmDepth] = int(modWheelLevel);
+          lowerData[P_fmDepth] = int(modWheelLevel);
           break;
 
         case 9:
           modWheelLevel = ((value) / 1.25);
-          fmDepthU = int(modWheelLevel);
-          fmDepthL = int(modWheelLevel);
+          upperData[P_fmDepth] = int(modWheelLevel);
+          lowerData[P_fmDepth] = int(modWheelLevel);
           break;
 
         case 10:
           modWheelLevel = (value);
-          fmDepthU = int(modWheelLevel);
-          fmDepthL = int(modWheelLevel);
+          upperData[P_fmDepth] = int(modWheelLevel);
+          lowerData[P_fmDepth] = int(modWheelLevel);
           break;
       }
       break;
@@ -2724,320 +3300,207 @@ void myProgramChange(byte channel, byte program) {
 
 void myAfterTouch(byte channel, byte value) {
   afterTouch = int(value * MIDICCTOPOT);
-  switch (AfterTouchDestU) {
+  switch (upperData[P_AfterTouchDest]) {
     case 1:
-      fmDepthU = afterTouch;
+      upperData[P_fmDepth] = afterTouch;
       break;
     case 2:
-      filterCutoffU = (oldfilterCutoffU + afterTouch);
+      upperData[P_filterCutoff] = (oldfilterCutoffU + afterTouch);
       if (afterTouch < 10) {
-        filterCutoffU = oldfilterCutoffU;
+        upperData[P_filterCutoff] = oldfilterCutoffU;
       }
-      if (filterCutoffU > 1023) {
-        filterCutoffU = 1023;
+      if (upperData[P_filterCutoff] > 1023) {
+        upperData[P_filterCutoff] = 1023;
       }
       break;
     case 3:
-      filterLFOU = afterTouch;
+      upperData[P_filterLFO] = afterTouch;
       break;
     case 4:
-      amDepthU = afterTouch;
+      upperData[P_amDepth] = afterTouch;
       break;
   }
-  switch (AfterTouchDestL) {
+  switch (lowerData[AfterTouchDest]) {
     case 1:
-      fmDepthL = afterTouch;
+      lowerData[P_fmDepth] = afterTouch;
       break;
     case 2:
-      filterCutoffL = (oldfilterCutoffL + afterTouch);
+      lowerData[P_filterCutoff] = (oldfilterCutoffL + afterTouch);
       if (afterTouch < 10) {
-        filterCutoffL = oldfilterCutoffL;
+        lowerData[P_filterCutoff] = oldfilterCutoffL;
       }
-      if (filterCutoffL > 1023) {
-        filterCutoffL = 1023;
+      if (lowerData[P_filterCutoff] > 1023) {
+        lowerData[P_filterCutoff] = 1023;
       }
       break;
     case 3:
-      filterLFOL = afterTouch;
+      lowerData[P_filterLFO] = afterTouch;
       break;
     case 4:
-      amDepthL = afterTouch;
+      lowerData[P_amDepth] = afterTouch;
       break;
   }
 }
 
 void recallPatch(int patchNo) {
-  //allNotesOff();
+  allNotesOff();
+
   File patchFile = SD.open(String(patchNo).c_str());
   if (!patchFile) {
-    //Serial.println("File not found");
+    Serial.println("File not found");
   } else {
-    String data[NO_OF_PARAMS];  //Array of data read in
+    String data[NO_OF_PARAMS];
     recallPatchData(patchFile, data);
-    setCurrentPatchData(data);
     patchFile.close();
-    if (upperSW) {
-      storeLastPatchU(patchNoU);
-      upperpatchtag = patchNoU;
-    } else {
-      storeLastPatchL(patchNoL);
-      lowerpatchtag = patchNoL;
+
+    // Find matching patch in the circular buffer to set name and number
+    for (int i = 0; i < patches.size(); i++) {
+
+      if (patches[i].patchNo == patchNo) {
+        if (upperSW) {
+          //upperPatchIndex = i;
+          currentPgmNumU = String(patches[i].patchNo);
+          currentPatchNameU = patches[i].patchName;
+          //storeLastPatchU(currentPgmNumU)
+        } else {
+          //lowerPatchIndex = i;
+          currentPgmNumL = String(patches[i].patchNo);
+          currentPatchNameL = patches[i].patchName;
+          //storeLastPatchL(currentPgmNumL)
+        }
+
+        break;
+      }
     }
+
+    setCurrentPatchData(data);
   }
 }
 
 void setCurrentPatchData(String data[]) {
+  int tempData[65];  // Temporary array for converted integers
+
+  // Convert data from String to int once
+  for (int i = 1; i <= 64; i++) {
+    tempData[i] = data[i].toInt();
+  }
+
   if (upperSW) {
     patchNameU = data[0];
-    pwLFOU = data[1].toInt();
-    fmDepthU = data[2].toInt();
-    osc2PWU = data[3].toInt();
-    osc2PWMU = data[4].toInt();
-    osc1PWU = data[5].toInt();
-    osc1PWMU = data[6].toInt();
-    osc1RangeU = data[7].toInt();
-    osc2RangeU = data[8].toInt();
-    stackU = data[9].toInt();
-    glideTimeU = data[10].toInt();
-    osc2DetuneU = data[11].toInt();
-    noiseLevelU = data[12].toInt();
-    osc2SawLevelU = data[13].toInt();
-    osc1SawLevelU = data[14].toInt();
-    osc2PulseLevelU = data[15].toInt();
-    osc1PulseLevelU = data[16].toInt();
-    filterCutoffU = data[17].toInt();
-    filterLFOU = data[18].toInt();
-    filterResU = data[19].toInt();
-    filterTypeU = data[20].toInt();
-    filterdoubleLoopU = data[21].toInt();
-    vcadoubleLoopU = data[22].toInt();
-    LFODelayGoU = data[23].toInt();
-    filterEGlevelU = data[24].toInt();
-    LFORateU = data[25].toInt();
-    LFOWaveformU = data[26].toInt();
-    filterAttackU = data[27].toInt();
-    filterDecayU = data[28].toInt();
-    filterSustainU = data[29].toInt();
-    filterReleaseU = data[30].toInt();
-    ampAttackU = data[31].toInt();
-    ampDecayU = data[32].toInt();
-    ampSustainU = data[33].toInt();
-    ampReleaseU = data[34].toInt();
-    volumeControlU = data[35].toInt();
-    glideSWU = data[36].toInt();
-    keytrackU = data[37].toInt();
-    filterPoleSWU = data[38].toInt();
-    filterLoopU = data[39].toInt();
-    filterEGinvU = data[40].toInt();
-    filterVelU = data[41].toInt();
-    vcaLoopU = data[42].toInt();
-    vcaVelU = data[43].toInt();
-    vcaGateU = data[44].toInt();
-    lfoAltU = data[45].toInt();
-    chorus1U = data[46].toInt();
-    chorus2U = data[47].toInt();
-    monoMultiU = data[48].toInt();
-    modWheelLevelU = data[49].toInt();
-    PitchBendLevelU = data[50].toInt();
-    amDepthU = data[51].toInt();
-    oldampAttackU = data[52].toInt();
-    oldampDecayU = data[53].toInt();
-    oldampSustainU = data[54].toInt();
-    oldampReleaseU = data[55].toInt();
-    AfterTouchDestU = data[56].toInt();
-    filterLogLinU = data[57].toInt();
-    ampLogLinU = data[58].toInt();
-    osc2TriangleLevelU = data[59].toInt();
-    osc1SubLevelU = data[60].toInt();
-    keyTrackSWU = data[61].toInt();
-    LFODelayU = data[62].toInt();
+    tempData[0] = 1;
+    memcpy(upperData, tempData, sizeof(tempData));
 
-    oldfilterCutoffU = filterCutoffU;
+    // Update previous values and pick-up flags
+    for (int i = 1; i <= 64; i++) {
+      prevUpperData[i] = upperData[i];  // Store previous value
+      upperPickUp[i] = true;            // Enable pick-up flag
+    }
 
+    oldfilterCutoffU = upperData[P_filterCutoff];
+    upperParamsToDisplay();
+    setAllButtons();
   } else {
     patchNameL = data[0];
-    pwLFOL = data[1].toInt();
-    fmDepthL = data[2].toInt();
-    osc2PWL = data[3].toInt();
-    osc2PWML = data[4].toInt();
-    osc1PWL = data[5].toInt();
-    osc1PWML = data[6].toInt();
-    osc1RangeL = data[7].toInt();
-    osc2RangeL = data[8].toInt();
-    stackL = data[9].toInt();
-    glideTimeL = data[10].toInt();
-    osc2DetuneL = data[11].toInt();
-    noiseLevelL = data[12].toInt();
-    osc2SawLevelL = data[13].toInt();
-    osc1SawLevelL = data[14].toInt();
-    osc2PulseLevelL = data[15].toInt();
-    osc1PulseLevelL = data[16].toInt();
-    filterCutoffL = data[17].toInt();
-    filterLFOL = data[18].toInt();
-    filterResL = data[19].toInt();
-    filterTypeL = data[20].toInt();
-    filterdoubleLoopL = data[21].toInt();
-    vcadoubleLoopL = data[22].toInt();
-    LFODelayGoL = data[23].toInt();
-    filterEGlevelL = data[24].toInt();
-    LFORateL = data[25].toInt();
-    LFOWaveformL = data[26].toInt();
-    filterAttackL = data[27].toInt();
-    filterDecayL = data[28].toInt();
-    filterSustainL = data[29].toInt();
-    filterReleaseL = data[30].toInt();
-    ampAttackL = data[31].toInt();
-    ampDecayL = data[32].toInt();
-    ampSustainL = data[33].toInt();
-    ampReleaseL = data[34].toInt();
-    volumeControlL = data[35].toInt();
-    glideSWL = data[36].toInt();
-    keytrackL = data[37].toInt();
-    filterPoleSWL = data[38].toInt();
-    filterLoopL = data[39].toInt();
-    filterEGinvL = data[40].toInt();
-    filterVelL = data[41].toInt();
-    vcaLoopL = data[42].toInt();
-    vcaVelL = data[43].toInt();
-    vcaGateL = data[44].toInt();
-    lfoAltL = data[45].toInt();
-    chorus1L = data[46].toInt();
-    chorus2L = data[47].toInt();
-    monoMultiL = data[48].toInt();
-    modWheelLevelL = data[49].toInt();
-    PitchBendLevelL = data[50].toInt();
-    amDepthL = data[51].toInt();
-    oldampAttackL = data[52].toInt();
-    oldampDecayL = data[53].toInt();
-    oldampSustainL = data[54].toInt();
-    oldampReleaseL = data[55].toInt();
-    AfterTouchDestL = data[56].toInt();
-    filterLogLinL = data[57].toInt();
-    ampLogLinL = data[58].toInt();
-    osc2TriangleLevelL = data[59].toInt();
-    osc1SubLevelL = data[60].toInt();
-    keyTrackSWL = data[61].toInt();
-    LFODelayL = data[62].toInt();
+    tempData[0] = 1;
+    memcpy(lowerData, tempData, sizeof(tempData));
 
-    oldfilterCutoffL = filterCutoffL;
+    // Update previous values and pick-up flags
+    for (int i = 1; i <= 64; i++) {
+      prevLowerData[i] = lowerData[i];  // Store previous value
+      lowerPickUp[i] = true;            // Enable pick-up flag
+    }
+
+    oldfilterCutoffL = lowerData[P_filterCutoff];
+    lowerParamsToDisplay();
+    setAllButtons();
 
     if (wholemode) {
-      patchNameU = data[0];
-      pwLFOU = data[1].toInt();
-      fmDepthU = data[2].toInt();
-      osc2PWU = data[3].toInt();
-      osc2PWMU = data[4].toInt();
-      osc1PWU = data[5].toInt();
-      osc1PWMU = data[6].toInt();
-      osc1RangeU = data[7].toInt();
-      osc2RangeU = data[8].toInt();
-      stackU = data[9].toInt();
-      glideTimeU = data[10].toInt();
-      osc2DetuneU = data[11].toInt();
-      noiseLevelU = data[12].toInt();
-      osc2SawLevelU = data[13].toInt();
-      osc1SawLevelU = data[14].toInt();
-      osc2PulseLevelU = data[15].toInt();
-      osc1PulseLevelU = data[16].toInt();
-      filterCutoffU = data[17].toInt();
-      filterLFOU = data[18].toInt();
-      filterResU = data[19].toInt();
-      filterTypeU = data[20].toInt();
-      filterdoubleLoopU = data[21].toInt();
-      vcadoubleLoopU = data[22].toInt();
-      LFODelayGoU = data[23].toInt();
-      filterEGlevelU = data[24].toInt();
-      LFORateU = data[25].toInt();
-      LFOWaveformU = data[26].toInt();
-      filterAttackU = data[27].toInt();
-      filterDecayU = data[28].toInt();
-      filterSustainU = data[29].toInt();
-      filterReleaseU = data[30].toInt();
-      ampAttackU = data[31].toInt();
-      ampDecayU = data[32].toInt();
-      ampSustainU = data[33].toInt();
-      ampReleaseU = data[34].toInt();
-      volumeControlU = data[35].toInt();
-      glideSWU = data[36].toInt();
-      keytrackU = data[37].toInt();
-      filterPoleSWU = data[38].toInt();
-      filterLoopU = data[39].toInt();
-      filterEGinvU = data[40].toInt();
-      filterVelU = data[41].toInt();
-      vcaLoopU = data[42].toInt();
-      vcaVelU = data[43].toInt();
-      vcaGateU = data[44].toInt();
-      lfoAltU = data[45].toInt();
-      chorus1U = data[46].toInt();
-      chorus2U = data[47].toInt();
-      monoMultiU = data[48].toInt();
-      modWheelLevelU = data[49].toInt();
-      PitchBendLevelU = data[50].toInt();
-      amDepthU = data[51].toInt();
-      oldampAttackU = data[52].toInt();
-      oldampDecayU = data[53].toInt();
-      oldampSustainU = data[54].toInt();
-      oldampReleaseU = data[55].toInt();
-      AfterTouchDestU = data[56].toInt();
-      filterLogLinU = data[57].toInt();
-      ampLogLinU = data[58].toInt();
-      osc2TriangleLevelU = data[59].toInt();
-      osc1SubLevelU = data[60].toInt();
-      keyTrackSWU = data[61].toInt();
-      LFODelayU = data[62].toInt();
 
-      oldfilterCutoffU = filterCutoffU;
+      // Update previous values and pick-up flags
+      for (int i = 1; i <= 64; i++) {
+        upperData[i] = lowerData[i];  // Store previous value
+        //upperPickUp[i] = true;            // Enable pick-up flag
+      }
+
+      oldfilterCutoffU = upperData[P_filterCutoff];
+      upperParamsToDisplay();
+      setAllButtons();
     }
   }
 
-  if (wholemode) {
-    //Switches
-    oldupperSW = upperSW;
-    for (upperSW = 0; upperSW < 2; upperSW++) {
-      updatefilterPoleSwitch(0);
-      updatefilterLoop(0);
-      updatefilterEGinv(0);
-      updatefilterVel(0);
-      updatevcaLoop(0);
-      updatevcaVel(0);
-      updatevcaGate(0);
-      updatelfoAlt(0);
-      updatechorus1(0);
-      updatechorus2(0);
-      updateosc1Foot();
-      updateosc2Foot();
-      updateFilterType(0);
-      updateMonoMulti(0);
-      updateFilterEnv(0);
-      updateAmpEnv(0);
-      updateglideSW(0);
-      updatekeyTrackSW(0);
-    }
-    upperSW = oldupperSW;
-
-  } else {
-    updatefilterPoleSwitch(0);
-    updatefilterLoop(0);
-    updatefilterEGinv(0);
-    updatefilterVel(0);
-    updatevcaLoop(0);
-    updatevcaVel(0);
-    updatevcaGate(0);
-    updatelfoAlt(0);
-    updatechorus1(0);
-    updatechorus2(0);
-    updateosc1Foot();
-    updateosc2Foot();
-    updateFilterType(0);
-    updateMonoMulti(0);
-    updateFilterEnv(0);
-    updateAmpEnv(0);
-    updateglideSW(0);
-    updatekeyTrackSW(0);
-  }
-
-  //Patchname
   updatePatchname();
+}
+
+void upperParamsToDisplay() {
+  updateglideTime(0);
+  updateOsc1PW(0);
+  updateOsc1PWM(0);
+  updateOsc1SawLevel(0);
+  updateOsc1PulseLevel(0);
+  updateOsc1SubLevel(0);
+  updatefmDepth(0);
+  updateOsc2PW(0);
+  updateOsc2PWM(0);
+  updateOsc2SawLevel(0);
+  updateOsc2PulseLevel(0);
+  updateOsc2TriangleLevel(0);
+  updateOsc2Detune(0);
+  updateFilterCutoff(0);
+  updatefilterRes(0);
+  updatefilterEGlevel(0);
+  updatekeytrack(0);
+  updatefilterLFO(0);
+  updatefilterAttack(0);
+  updatefilterDecay(0);
+  updatefilterSustain(0);
+  updatefilterRelease(0);
+  updateampAttack(0);
+  updateampDecay(0);
+  updateampSustain(0);
+  updateampRelease(0);
+  updateLFORate(0);
+  updateLFODelay(0);
+  updatepwLFO(0);
+  updatenoiseLevel(0);
+  updatevolumeControl(0);
+  updateamDepth(0);
+  //updateStratusLFOWaveform(0);
+}
+
+void lowerParamsToDisplay() {
+  updateglideTime(0);
+  updateOsc1PW(0);
+  updateOsc1PWM(0);
+  updateOsc1SawLevel(0);
+  updateOsc1PulseLevel(0);
+  updateOsc1SubLevel(0);
+  updatefmDepth(0);
+  updateOsc2PW(0);
+  updateOsc2PWM(0);
+  updateOsc2SawLevel(0);
+  updateOsc2PulseLevel(0);
+  updateOsc2TriangleLevel(0);
+  updateOsc2Detune(0);
+  updateFilterCutoff(0);
+  updatefilterRes(0);
+  updatefilterEGlevel(0);
+  updatekeytrack(0);
+  updatefilterLFO(0);
+  updatefilterAttack(0);
+  updatefilterDecay(0);
+  updatefilterSustain(0);
+  updatefilterRelease(0);
+  updateampAttack(0);
+  updateampDecay(0);
+  updateampSustain(0);
+  updateampRelease(0);
+  updateLFORate(0);
+  updateLFODelay(0);
+  updatepwLFO(0);
+  updatenoiseLevel(0);
+  updatevolumeControl(0);
+  updateamDepth(0);
+  //updateStratusLFOWaveform(0);
 }
 
 void setAllButtons() {
@@ -3056,9 +3519,27 @@ void setAllButtons() {
 
 String getCurrentPatchData() {
   if (upperSW) {
-    return patchNameU + "," + String(pwLFOU) + "," + String(fmDepthU) + "," + String(osc2PWU) + "," + String(osc2PWMU) + "," + String(osc1PWU) + "," + String(osc1PWMU) + "," + String(osc1RangeU) + "," + String(osc2RangeU) + "," + String(stackU) + "," + String(glideTimeU) + "," + String(osc2DetuneU) + "," + String(noiseLevelU) + "," + String(osc2SawLevelU) + "," + String(osc1SawLevelU) + "," + String(osc2PulseLevelU) + "," + String(osc1PulseLevelU) + "," + String(filterCutoffU) + "," + String(filterLFOU) + "," + String(filterResU) + "," + String(filterTypeU) + "," + String(filterdoubleLoopU) + "," + String(vcadoubleLoopU) + "," + String(LFODelayGoU) + "," + String(filterEGlevelU) + "," + String(LFORateU) + "," + String(LFOWaveformU) + "," + String(filterAttackU) + "," + String(filterDecayU) + "," + String(filterSustainU) + "," + String(filterReleaseU) + "," + String(ampAttackU) + "," + String(ampDecayU) + "," + String(ampSustainU) + "," + String(ampReleaseU) + "," + String(volumeControlU) + "," + String(glideSWU) + "," + String(keytrackU) + "," + String(filterPoleSWU) + "," + String(filterLoopU) + "," + String(filterEGinvU) + "," + String(filterVelU) + "," + String(vcaLoopU) + "," + String(vcaVelU) + "," + String(vcaGateU) + "," + String(lfoAltU) + "," + String(chorus1U) + "," + String(chorus2U) + "," + String(monoMultiU) + "," + String(modWheelLevelU) + "," + String(PitchBendLevelU) + "," + String(amDepthU) + "," + String(oldampAttackU) + "," + String(oldampDecayU) + "," + String(oldampSustainU) + "," + String(oldampReleaseU) + "," + String(AfterTouchDestU) + "," + String(filterLogLinU) + "," + String(ampLogLinU) + "," + String(osc2TriangleLevelU) + "," + String(osc1SubLevelU) + "," + String(keyTrackSWU) + "," + String(LFODelayU);
+    return patchNameU + "," + String(upperData[P_pwLFO]) + "," + String(upperData[P_fmDepth]) + "," + String(upperData[P_osc2PW]) + "," + String(upperData[P_osc2PWM]) + "," + String(upperData[P_osc1PW]) + "," + String(upperData[P_osc1PWM]) + "," + String(upperData[P_osc1Range])
+           + "," + String(upperData[P_osc2Range]) + "," + String(upperData[P_stack]) + "," + String(upperData[P_glideTime]) + "," + String(upperData[P_osc2Detune]) + "," + String(upperData[P_noiseLevel]) + "," + String(upperData[P_osc2SawLevel]) + "," + String(upperData[P_osc1SawLevel])
+           + "," + String(upperData[P_osc2PulseLevel]) + "," + String(upperData[P_osc1PulseLevel]) + "," + String(upperData[P_filterCutoff]) + "," + String(upperData[P_filterLFO]) + "," + String(upperData[P_filterRes]) + "," + String(upperData[P_filterType]) + "," + String(upperData[P_filterdoubleLoop])
+           + "," + String(upperData[P_vcadoubleLoop]) + "," + String(upperData[P_LFODelayGo]) + "," + String(upperData[P_filterEGlevel]) + "," + String(upperData[P_LFORate]) + "," + String(upperData[P_LFOWaveform]) + "," + String(upperData[P_filterAttack]) + "," + String(upperData[P_filterDecay])
+           + "," + String(upperData[P_filterSustain]) + "," + String(upperData[P_filterRelease]) + "," + String(upperData[P_ampAttack]) + "," + String(upperData[P_ampDecay]) + "," + String(upperData[P_ampSustain]) + "," + String(upperData[P_ampRelease]) + "," + String(upperData[P_volumeControl])
+           + "," + String(upperData[P_glideSW]) + "," + String(upperData[P_keytrack]) + "," + String(upperData[P_filterPoleSW]) + "," + String(upperData[P_filterLoop]) + "," + String(upperData[P_filterEGinv]) + "," + String(upperData[P_filterVel]) + "," + String(upperData[P_vcaLoop])
+           + "," + String(upperData[P_vcaVel]) + "," + String(upperData[P_vcaGate]) + "," + String(upperData[P_lfoAlt]) + "," + String(upperData[P_chorus1]) + "," + String(upperData[P_chorus2]) + "," + String(upperData[P_monoMulti]) + "," + String(upperData[P_modWheelLevel]) + "," + String(upperData[P_PitchBendLevel])
+           + "," + String(upperData[P_amDepth]) + "," + String(upperData[P_oldampAttack]) + "," + String(upperData[P_oldampDecay]) + "," + String(upperData[P_oldampSustain]) + "," + String(upperData[P_oldampRelease]) + "," + String(upperData[P_AfterTouchDest]) + "," + String(upperData[P_filterLogLin])
+           + "," + String(upperData[P_ampLogLin]) + "," + String(upperData[P_osc2TriangleLevel]) + "," + String(upperData[P_osc1SubLevel]) + "," + String(upperData[P_keyTrackSW]) + "," + String(upperData[P_LFODelay])
+           + "," + String(upperData[P_statefilterLoop]) + "," + String(upperData[P_statevcaLoop]);
   } else {
-    return patchNameL + "," + String(pwLFOL) + "," + String(fmDepthL) + "," + String(osc2PWL) + "," + String(osc2PWML) + "," + String(osc1PWL) + "," + String(osc1PWML) + "," + String(osc1RangeL) + "," + String(osc2RangeL) + "," + String(stackL) + "," + String(glideTimeL) + "," + String(osc2DetuneL) + "," + String(noiseLevelL) + "," + String(osc2SawLevelL) + "," + String(osc1SawLevelL) + "," + String(osc2PulseLevelL) + "," + String(osc1PulseLevelL) + "," + String(filterCutoffL) + "," + String(filterLFOL) + "," + String(filterResL) + "," + String(filterTypeL) + "," + String(filterdoubleLoopL) + "," + String(vcadoubleLoopL) + "," + String(LFODelayGoL) + "," + String(filterEGlevelL) + "," + String(LFORateL) + "," + String(LFOWaveformL) + "," + String(filterAttackL) + "," + String(filterDecayL) + "," + String(filterSustainL) + "," + String(filterReleaseL) + "," + String(ampAttackL) + "," + String(ampDecayL) + "," + String(ampSustainL) + "," + String(ampReleaseL) + "," + String(volumeControlL) + "," + String(glideSWL) + "," + String(keytrackL) + "," + String(filterPoleSWL) + "," + String(filterLoopL) + "," + String(filterEGinvL) + "," + String(filterVelL) + "," + String(vcaLoopL) + "," + String(vcaVelL) + "," + String(vcaGateL) + "," + String(lfoAltL) + "," + String(chorus1L) + "," + String(chorus2L) + "," + String(monoMultiL) + "," + String(modWheelLevelL) + "," + String(PitchBendLevelL) + "," + String(amDepthL) + "," + String(oldampAttackL) + "," + String(oldampDecayL) + "," + String(oldampSustainL) + "," + String(oldampReleaseL) + "," + String(AfterTouchDestL) + "," + String(filterLogLinL) + "," + String(ampLogLinL) + "," + String(osc2TriangleLevelL) + "," + String(osc1SubLevelL) + "," + String(keyTrackSWL) + "," + String(LFODelayL);
+    return patchNameL + "," + String(lowerData[P_pwLFO]) + "," + String(lowerData[P_fmDepth]) + "," + String(lowerData[P_osc2PW]) + "," + String(lowerData[P_osc2PWM]) + "," + String(lowerData[P_osc1PW]) + "," + String(lowerData[P_osc1PWM]) + "," + String(lowerData[P_osc1Range])
+           + "," + String(lowerData[P_osc2Range]) + "," + String(lowerData[P_stack]) + "," + String(lowerData[P_glideTime]) + "," + String(lowerData[P_osc2Detune]) + "," + String(lowerData[P_noiseLevel]) + "," + String(lowerData[P_osc2SawLevel]) + "," + String(lowerData[P_osc1SawLevel])
+           + "," + String(lowerData[P_osc2PulseLevel]) + "," + String(lowerData[P_osc1PulseLevel]) + "," + String(lowerData[P_filterCutoff]) + "," + String(lowerData[P_filterLFO]) + "," + String(lowerData[P_filterRes]) + "," + String(lowerData[P_filterType]) + "," + String(lowerData[P_filterdoubleLoop])
+           + "," + String(lowerData[P_vcadoubleLoop]) + "," + String(lowerData[P_LFODelayGo]) + "," + String(lowerData[P_filterEGlevel]) + "," + String(lowerData[P_LFORate]) + "," + String(lowerData[P_LFOWaveform]) + "," + String(lowerData[P_filterAttack]) + "," + String(lowerData[P_filterDecay])
+           + "," + String(lowerData[P_filterSustain]) + "," + String(lowerData[P_filterRelease]) + "," + String(lowerData[P_ampAttack]) + "," + String(lowerData[P_ampDecay]) + "," + String(lowerData[P_ampSustain]) + "," + String(lowerData[P_ampRelease]) + "," + String(lowerData[P_volumeControl])
+           + "," + String(lowerData[P_glideSW]) + "," + String(lowerData[P_keytrack]) + "," + String(lowerData[P_filterPoleSW]) + "," + String(lowerData[P_filterLoop]) + "," + String(lowerData[P_filterEGinv]) + "," + String(lowerData[P_filterVel]) + "," + String(lowerData[P_vcaLoop])
+           + "," + String(lowerData[P_vcaVel]) + "," + String(lowerData[P_vcaGate]) + "," + String(lowerData[P_lfoAlt]) + "," + String(lowerData[P_chorus1]) + "," + String(lowerData[P_chorus2]) + "," + String(lowerData[P_monoMulti]) + "," + String(lowerData[P_modWheelLevel]) + "," + String(lowerData[P_PitchBendLevel])
+           + "," + String(lowerData[P_amDepth]) + "," + String(lowerData[P_oldampAttack]) + "," + String(lowerData[P_oldampDecay]) + "," + String(lowerData[P_oldampSustain]) + "," + String(lowerData[P_oldampRelease]) + "," + String(lowerData[P_AfterTouchDest]) + "," + String(lowerData[P_filterLogLin])
+           + "," + String(lowerData[P_ampLogLin]) + "," + String(lowerData[P_osc2TriangleLevel]) + "," + String(lowerData[P_osc1SubLevel]) + "," + String(lowerData[P_keyTrackSW]) + "," + String(lowerData[P_LFODelay])
+           + "," + String(lowerData[P_statefilterLoop]) + "," + String(lowerData[P_statevcaLoop]);
   }
 }
 
@@ -3073,63 +3554,49 @@ void checkMux() {
     mux1ValuesPrev[muxInput] = mux1Read;
     switch (muxInput) {
       case MUX1_osc1PW:
-        midiCCOut(CCosc1PW, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc1PW, mux1Read);
         break;
       case MUX1_spare0:
         break;
       case MUX1_osc2PWM:
-        midiCCOut(CCosc2PWM, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc2PWM, mux1Read);
         break;
       case MUX1_osc2PW:
-        midiCCOut(CCosc2PW, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc2PW, mux1Read);
         break;
       case MUX1_spare4:
         break;
       case MUX1_osc1PWM:
-        midiCCOut(CCosc1PWM, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc1PWM, mux1Read);
         break;
       case MUX1_pwLFO:
-        midiCCOut(CCpwLFO, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCpwLFO, mux1Read);
         break;
       case MUX1_fmDepth:
-        midiCCOut(CCfmDepth, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCfmDepth, mux1Read);
         break;
       case MUX1_osc2SawLevel:
-        midiCCOut(CCosc2SawLevel, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc2SawLevel, mux1Read);
         break;
       case MUX1_noiseLevel:
-        midiCCOut(CCnoiseLevel, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCnoiseLevel, mux1Read);
         break;
       case MUX1_osc1SawLevel:
-        midiCCOut(CCosc1SawLevel, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc1SawLevel, mux1Read);
         break;
       case MUX1_osc2Detune:
-        midiCCOut(CCosc2Detune, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc2Detune, mux1Read);
         break;
       case MUX1_osc1Range:
-        midiCCOut(CCosc1Range, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc1Range, mux1Read);
         break;
       case MUX1_glideTime:
-        midiCCOut(CCglideTime, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCglideTime, mux1Read);
         break;
       case MUX1_osc2Range:
-        midiCCOut(CCosc2Range, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCosc2Range, mux1Read);
         break;
       case MUX1_stack:
-        midiCCOut(CCstack, mux1Read / midioutfrig);
         myControlChange(midiChannel, CCstack, mux1Read);
         break;
     }
@@ -3139,67 +3606,51 @@ void checkMux() {
     mux2ValuesPrev[muxInput] = mux2Read;
     switch (muxInput) {
       case MUX2_osc2TriangleLevel:
-        midiCCOut(CCosc2TriangleLevel, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCosc2TriangleLevel, mux2Read);
         break;
       case MUX2_filterLFO:
-        midiCCOut(CCfilterLFO, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterLFO, mux2Read);
         break;
       case MUX2_filterCutoff:
-        midiCCOut(CCfilterCutoff, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterCutoff, mux2Read);
         break;
       case MUX2_LFOWaveform:
-        midiCCOut(CCLFOWaveform, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCLFOWaveform, mux2Read);
         break;
       case MUX2_osc1PulseLevel:
-        midiCCOut(CCosc1PulseLevel, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCosc1PulseLevel, mux2Read);
         break;
       case MUX2_LFODelay:
-        midiCCOut(CCLFODelay, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCLFODelay, mux2Read);
         break;
       case MUX2_osc2PulseLevel:
-        midiCCOut(CCosc2PulseLevel, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCosc2PulseLevel, mux2Read);
         break;
       case MUX2_osc1SubLevel:
-        midiCCOut(CCosc1SubLevel, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCosc1SubLevel, mux2Read);
         break;
       case MUX2_LFORate:
-        midiCCOut(CCLFORate, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCLFORate, mux2Read);
         break;
       case MUX2_filterDecay:
-        midiCCOut(CCfilterDecay, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterDecay, mux2Read);
         break;
       case MUX2_filterAttack:
-        midiCCOut(CCfilterAttack, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterAttack, mux2Read);
         break;
       case MUX2_ampAttack:
-        midiCCOut(CCampAttack, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCampAttack, mux2Read);
         break;
       case MUX2_filterRes:
-        midiCCOut(CCfilterRes, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterRes, mux2Read);
         break;
       case MUX2_filterType:
-        midiCCOut(CCfilterType, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterType, mux2Read);
         break;
       case MUX2_keyTrack:
-        midiCCOut(CCkeyTrack, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCkeyTrack, mux2Read);
         break;
       case MUX2_filterEGlevel:
-        midiCCOut(CCfilterEGlevel, mux2Read / midioutfrig);
         myControlChange(midiChannel, CCfilterEGlevel, mux2Read);
         break;
     }
@@ -3209,31 +3660,24 @@ void checkMux() {
     mux3ValuesPrev[muxInput] = mux3Read;
     switch (muxInput) {
       case MUX3_amDepth:
-        midiCCOut(CCamDepth, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCamDepth, mux3Read);
         break;
       case MUX3_ampSustain:
-        midiCCOut(CCampSustain, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCampSustain, mux3Read);
         break;
       case MUX3_ampDecay:
-        midiCCOut(CCampDecay, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCampDecay, mux3Read);
         break;
       case MUX3_volumeControl:
-        midiCCOut(CCvolumeControl, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCvolumeControl, mux3Read);
         break;
       case MUX3_filterSustain:
-        midiCCOut(CCfilterSustain, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCfilterSustain, mux3Read);
         break;
       case MUX3_filterRelease:
-        midiCCOut(CCfilterRelease, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCfilterRelease, mux3Read);
         break;
       case MUX3_ampRelease:
-        midiCCOut(CCampRelease, mux3Read / midioutfrig);
         myControlChange(midiChannel, CCampRelease, mux3Read);
         break;
     }
@@ -3279,18 +3723,18 @@ void writeDemux() {
 
   switch (muxOutput) {
     case 0:
-      switch (LFODelayGoU) {
+      switch (upperData[P_LFODelayGo]) {
         case 1:
-          sample_data1 = (channel_a & 0xFFF0000F) | (((int(fmDepthU * DACMULT)) & 0xFFFF) << 4);
+          sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_fmDepth] * DACMULT)) & 0xFFFF) << 4);
           break;
 
         case 0:
           sample_data1 = (channel_a & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
           break;
       }
-      switch (LFODelayGoL) {
+      switch (lowerData[P_LFODelayGo]) {
         case 1:
-          sample_data2 = (channel_b & 0xFFF0000F) | (((int(fmDepthL * DACMULT)) & 0xFFFF) << 4);
+          sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_fmDepth] * DACMULT)) & 0xFFFF) << 4);
           break;
 
         case 0:
@@ -3300,85 +3744,85 @@ void writeDemux() {
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterAttackU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterAttackL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterAttack] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterAttack] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 1:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc2PWMU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc2PWML * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc2PWM] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc2PWM] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterDecayU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterDecayL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterDecay] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterDecay] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 2:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc1PWMU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc1PWML * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc1PWM] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc1PWM] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterSustainU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterSustainL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterSustain] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterSustain] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 3:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(stackU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(stackL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_stack] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_stack] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterReleaseU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterReleaseL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterRelease] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterRelease] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 4:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc2DetuneU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc2DetuneL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc2Detune] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc2Detune] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(ampAttackU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(ampAttackL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_ampAttack] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_ampAttack] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 5:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(noiseLevelU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(noiseLevelL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_noiseLevel] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_noiseLevel] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(ampDecayU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(ampDecayL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_ampDecay] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_ampDecay] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 6:
-      switch (LFODelayGoU) {
+      switch (upperData[P_LFODelayGo]) {
         case 1:
-          sample_data1 = (channel_a & 0xFFF0000F) | (((int(filterLFOU * DACMULT)) & 0xFFFF) << 4);
+          sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_filterLFO] * DACMULT)) & 0xFFFF) << 4);
           break;
 
         case 0:
           sample_data1 = (channel_a & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
           break;
       }
-      switch (LFODelayGoL) {
+      switch (lowerData[P_LFODelayGo]) {
         case 1:
-          sample_data2 = (channel_b & 0xFFF0000F) | (((int(filterLFOL * DACMULT)) & 0xFFFF) << 4);
+          sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_filterLFO] * DACMULT)) & 0xFFFF) << 4);
           break;
 
         case 0:
@@ -3388,68 +3832,68 @@ void writeDemux() {
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(ampSustainU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(ampSustainL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_ampSustain] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_ampSustain] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 7:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(volumeControlU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(volumeControlL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_volumeControl] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_volumeControl] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(ampReleaseU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(ampReleaseL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_ampRelease] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_ampRelease] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 8:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc1SawLevelU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc1SawLevelL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc1SawLevel] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc1SawLevel] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(pwLFOU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(pwLFOL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_pwLFO] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_pwLFO] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 9:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc1PulseLevelU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc1PulseLevelL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc1PulseLevel] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc1PulseLevel] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(LFORateU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(LFORateL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_LFORate] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_LFORate] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 10:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc2SawLevelU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc2SawLevelL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc2SawLevel] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc2SawLevel] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(LFOWaveformU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(LFOWaveformL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(LFOWaveCVupper * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(LFOWaveCVlower * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 11:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc2PulseLevelU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc2PulseLevelL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc2PulseLevel] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc2PulseLevel] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterEGlevelU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterEGlevelL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterEGlevel] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterEGlevel] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
@@ -3460,49 +3904,49 @@ void writeDemux() {
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterCutoffU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterCutoffL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterCutoff] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterCutoff] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 13:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc1PWU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc1PWL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc1PW] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc1PW] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(filterResU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(filterResL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterRes] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterRes] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 14:
-      sample_data1 = (channel_a & 0xFFF0000F) | (((int(osc2PWU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_b & 0xFFF0000F) | (((int(osc2PWL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc2PW] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc2PW] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(osc1SubLevelU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(osc1SubLevelL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_osc1SubLevel] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_osc1SubLevel] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
 
     case 15:
-      switch (LFODelayGoU) {
+      switch (upperData[P_LFODelayGo]) {
         case 1:
-          sample_data1 = (channel_a & 0xFFF0000F) | (((int(amDepthU * DACMULT)) & 0xFFFF) << 4);
+          sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_amDepth] * DACMULT)) & 0xFFFF) << 4);
           break;
 
         case 0:
           sample_data1 = (channel_a & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
           break;
       }
-      switch (LFODelayGoL) {
+      switch (lowerData[P_LFODelayGo]) {
         case 1:
-          sample_data2 = (channel_b & 0xFFF0000F) | (((int(amDepthL * DACMULT)) & 0xFFFF) << 4);
+          sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_amDepth] * DACMULT)) & 0xFFFF) << 4);
           break;
 
         case 0:
@@ -3512,8 +3956,8 @@ void writeDemux() {
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(osc2TriangleLevelU * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(osc2TriangleLevelL * DACMULT)) & 0xFFFF) << 4);
+      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_osc2TriangleLevel] * DACMULT)) & 0xFFFF) << 4);
+      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_osc2TriangleLevel] * DACMULT)) & 0xFFFF) << 4);
       outputDAC(DAC_CS1, sample_data1, sample_data2);
       digitalWriteFast(DEMUX_EN_2, LOW);
       break;
@@ -3534,6 +3978,10 @@ void writeDemux() {
   digitalWriteFast(DEMUX_3, muxOutput & B1000);
 }
 
+// Dummy setPerformancesOrdering
+void setPerformancesOrdering(uint16_t no) {
+  // Optional: reorder performances if needed
+}
 
 void checkEeprom() {
 
@@ -3541,52 +3989,52 @@ void checkEeprom() {
     setTranspose(splitTrans);
   }
 
-  if (oldfilterLogLinU != filterLogLinU) {
+  if (oldfilterLogLinU != upperData[P_filterLogLin]) {
     updateFilterEnv(0);
-    oldfilterLogLinU = filterLogLinU;
+    oldfilterLogLinU = upperData[P_filterLogLin];
   }
 
-  if (oldfilterLogLinL != filterLogLinL) {
+  if (oldfilterLogLinL != lowerData[P_filterLogLin]) {
     updateFilterEnv(0);
-    oldfilterLogLinL = filterLogLinL;
+    oldfilterLogLinL = lowerData[P_filterLogLin];
   }
 
-  if (oldampLogLinU != ampLogLinU) {
+  if (oldampLogLinU != upperData[P_ampLogLin]) {
     updateAmpEnv(0);
-    oldampLogLinU = ampLogLinU;
+    oldampLogLinU = upperData[P_ampLogLin];
   }
 
-  if (oldampLogLinL != ampLogLinL) {
+  if (oldampLogLinL != lowerData[P_ampLogLin]) {
     updateAmpEnv(0);
-    oldampLogLinL = ampLogLinL;
+    oldampLogLinL = lowerData[P_ampLogLin];
   }
 
-  if (oldkeyTrackSWU != keyTrackSWU) {
+  if (oldkeyTrackSWU != upperData[P_keyTrackSW]) {
     updatekeyTrackSW(0);
-    oldkeyTrackSWU = keyTrackSWU;
+    oldkeyTrackSWU = upperData[P_keyTrackSW];
   }
 
-  if (oldkeyTrackSWL != keyTrackSWL) {
+  if (oldkeyTrackSWL != lowerData[P_keyTrackSW]) {
     updatekeyTrackSW(0);
-    oldkeyTrackSWL = keyTrackSWL;
+    oldkeyTrackSWL = lowerData[P_keyTrackSW];
   }
 
-  if (oldmonoMultiU != monoMultiU) {
+  if (oldmonoMultiU != upperData[P_monoMulti]) {
     updateMonoMulti(0);
-    oldmonoMultiU = monoMultiU;
+    oldmonoMultiU = upperData[P_monoMulti];
   }
 
-  if (oldmonoMultiL != monoMultiL) {
+  if (oldmonoMultiL != lowerData[P_monoMulti]) {
     updateMonoMulti(0);
-    oldmonoMultiL = monoMultiL;
+    oldmonoMultiL = lowerData[P_monoMulti];
   }
 
-  if (oldAfterTouchDestU != AfterTouchDestU) {
-    oldAfterTouchDestU = AfterTouchDestU;
+  if (oldAfterTouchDestU != upperData[P_AfterTouchDest]) {
+    oldAfterTouchDestU = upperData[P_AfterTouchDest];
   }
 
-  if (oldAfterTouchDestL != AfterTouchDestL) {
-    oldAfterTouchDestL = AfterTouchDestL;
+  if (oldAfterTouchDestL != lowerData[P_AfterTouchDest]) {
+    oldAfterTouchDestL = lowerData[P_AfterTouchDest];
   }
 }
 
@@ -3649,7 +4097,42 @@ void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
     myControlChange(midiChannel, CCfilterVel, filterVel);
   }
 
-  if (btnIndex == UPPER_SW && btnType == ROX_PRESSED) {
+  if (btnIndex == UPPER_SW && btnType == ROX_HELD) {
+
+    if (!inPerformanceMode) {
+      if (performances.size() == 0) {
+        Serial.println("[ERROR] No performances available, staying in Patch Mode");
+        showCurrentPage("No Performances!");
+        timer = millis();
+        state = PARAMETER;
+        return;
+      }
+    }
+
+    inPerformanceMode = !inPerformanceMode;
+    Serial.print("[DEBUG] Performance Mode switched to: ");
+    Serial.println(inPerformanceMode ? "ON" : "OFF");
+
+    if (inPerformanceMode) {
+      srp.writePin(UPPER_LED, LOW);
+      srp.writePin(LOWER_LED, LOW);
+      srp.update();
+      showCurrentPage("Performance Mode");
+    } else {
+      showCurrentPage("Patch Mode");
+
+      // <<< Fix: Recall patch after exiting performance mode
+      Serial.println("[DEBUG] Recalling patch after leaving performance mode...");
+      if (wholemode || upperSW) {
+        recallPatch(patchNoU);
+      } else {
+        recallPatch(patchNoL);
+      }
+
+      timer = millis();
+      state = PARAMETER;
+    }
+  } else if (btnIndex == UPPER_SW && btnType == ROX_RELEASED) {
     upperSW = !upperSW;
     myControlChange(midiChannel, CCupperSW, upperSW);
   }
@@ -3676,79 +4159,16 @@ void showSettingsPage() {
 
 void checkSwitches() {
 
-  saveButton.update();
-  if (saveButton.held()) {
-    switch (state) {
-      case PARAMETER:
-      case PATCH:
-        state = DELETE;
-        break;
-    }
-  } else if (saveButton.numClicks() == 1) {
-    switch (state) {
-      case PARAMETER:
-        if (patches.size() < PATCHES_LIMIT) {
-          resetPatchesOrdering();  //Reset order of patches from first patch
-          patches.push({ patches.size() + 1, INITPATCHNAME });
-          state = SAVE;
-        }
-        break;
-      case SAVE:
-        //Save as new patch with INITIALPATCH name or overwrite existing keeping name - bypassing patch renaming
-        if (upperSW) {
-          patchNameU = patches.last().patchName;
-          state = PATCH;
-          savePatch(String(patches.last().patchNo).c_str(), getCurrentPatchData());
-          showPatchPage(patches.last().patchNo, patches.last().patchName, "", "");
-          patchNoU = patches.last().patchNo;
-          loadPatches();  //Get rid of pushed patch if it wasn't saved
-          setPatchesOrdering(patchNoU);
-          renamedPatch = "";
-          state = PARAMETER;
-        } else {
-          patchNameL = patches.last().patchName;
-          state = PATCH;
-          savePatch(String(patches.last().patchNo).c_str(), getCurrentPatchData());
-          showPatchPage(patches.last().patchNo, patches.last().patchName, "", "");
-          patchNoL = patches.last().patchNo;
-          loadPatches();  //Get rid of pushed patch if it wasn't saved
-          setPatchesOrdering(patchNoL);
-          renamedPatch = "";
-          state = PARAMETER;
-        }
-        break;
-      case PATCHNAMING:
-        if (upperSW) {
-          if (renamedPatch.length() > 0) patchNameU = renamedPatch;  //Prevent empty strings
-          state = PATCH;
-          savePatch(String(patches.last().patchNo).c_str(), getCurrentPatchData());
-          showPatchPage(patches.last().patchNo, patchName, "", "");
-          patchNoU = patches.last().patchNo;
-          loadPatches();  //Get rid of pushed patch if it wasn't saved
-          setPatchesOrdering(patchNoU);
-          renamedPatch = "";
-          state = PARAMETER;
-        } else {
-          if (renamedPatch.length() > 0) patchNameL = renamedPatch;  //Prevent empty strings
-          state = PATCH;
-          savePatch(String(patches.last().patchNo).c_str(), getCurrentPatchData());
-          showPatchPage(patches.last().patchNo, patchNameL, "", "");
-          patchNoL = patches.last().patchNo;
-          loadPatches();  //Get rid of pushed patch if it wasn't saved
-          setPatchesOrdering(patchNoL);
-          renamedPatch = "";
-          state = PARAMETER;
-        }
-        break;
-    }
-  }
+  // Update save button
+
+  saveButton.check();
 
   settingsButton.update();
   if (settingsButton.held()) {
     //If recall held, set current patch to match current hardware state
     //Reinitialise all hardware values to force them to be re-read if different
     state = REINITIALISE;
-    reinitialiseToPanel();  //Hack
+    reinitialiseToPanel();
   } else if (settingsButton.numClicks() == 1) {
     switch (state) {
       case PARAMETER:
@@ -3765,61 +4185,29 @@ void checkSwitches() {
     }
   }
 
-  backButton.update();
-  if (backButton.held()) {
-    //If Back button held, Panic - all notes off
-    allNotesOff();  //Hack
-  } else if (backButton.numClicks() == 1) {
-    switch (state) {
-      case RECALL:
-        setPatchesOrdering(patchNo);
-        state = PARAMETER;
-        break;
-      case SAVE:
-        renamedPatch = "";
-        state = PARAMETER;
-        loadPatches();  //Remove patch that was to be saved
-        setPatchesOrdering(patchNo);
-        break;
-      case PATCHNAMING:
-        charIndex = 0;
-        renamedPatch = "";
-        state = SAVE;
-        break;
-      case DELETE:
-        setPatchesOrdering(patchNo);
-        state = PARAMETER;
-        break;
-      case SETTINGS:
-        state = PARAMETER;
-        break;
-      case SETTINGSVALUE:
-        state = SETTINGS;
-        showSettingsPage();
-        break;
-    }
-  }
-
-  //Encoder switch
   recallButton.update();
   if (recallButton.held()) {
-    //If Recall button held, return to current patch setting
-    //which clears any changes made
-    state = PATCH;
-    //Recall the current patch
-    patchNo = patches.first().patchNo;
-    recallPatch(patchNo);
+    if (inPerformanceMode) {
+      performanceNo = performances.first().performanceNo;
+      recallPerformance(performanceNo);
+    } else {
+      patchNo = patches.first().patchNo;
+      recallPatch(patchNo);
+    }
     state = PARAMETER;
   } else if (recallButton.numClicks() == 1) {
     switch (state) {
       case PARAMETER:
-        state = RECALL;  //show patch list
+        state = RECALL;
         break;
       case RECALL:
-        state = PATCH;
-        //Recall the current patch
-        patchNo = patches.first().patchNo;
-        recallPatch(patchNo);
+        if (inPerformanceMode) {
+          performanceNo = performances.first().performanceNo;
+          recallPerformance(performanceNo);
+        } else {
+          patchNo = patches.first().patchNo;
+          recallPatch(patchNo);
+        }
         state = PARAMETER;
         break;
       case SAVE:
@@ -3828,7 +4216,8 @@ void checkSwitches() {
         state = PATCHNAMING;
         break;
       case PATCHNAMING:
-        if (renamedPatch.length() < 13) {
+        if (renamedPatch.length() < 12)  //actually 12 chars
+        {
           renamedPatch.concat(String(currentCharacter));
           charIndex = 0;
           currentCharacter = CHARACTERS[charIndex];
@@ -3861,6 +4250,61 @@ void checkSwitches() {
         break;
     }
   }
+
+  backButton.update();
+  if (backButton.held()) {
+    allNotesOff();
+  } else if (backButton.numClicks() == 1) {
+    switch (state) {
+      case DELETE:
+        if (patches.size() > 1) {
+          patchNo = patches.first().patchNo;
+          patches.shift();
+          deletePatch(String(patchNo).c_str());
+          loadPatches();
+          renumberPatchesOnSD();
+          loadPatches();
+          patchNo = patches.first().patchNo;
+          recallPatch(patchNo);
+        }
+        state = PARAMETER;
+        break;
+      case DELETE_PERFORMANCE:
+        if (performances.size() > 1) {
+          performanceNo = performances.first().performanceNo;
+          performances.shift();
+          deletePerformance(String(performanceNo).c_str());
+          loadPerformances();
+          renumberPerformancesOnSD();
+          loadPerformances();
+          performanceNo = performances.first().performanceNo;
+          recallPerformance(performanceNo);
+        }
+        state = PARAMETER;
+        break;
+      case RECALL:
+        state = PARAMETER;
+        break;
+      case SAVE:
+      case SAVE_PERFORMANCE:
+        renamedPatch = "";
+        renamedPerformance = "";
+        state = PARAMETER;
+        break;
+      case SETTINGS:
+        state = PARAMETER;
+        break;
+      case SETTINGSVALUE:
+        state = SETTINGS;
+        showSettingsPage();
+        break;
+      case PATCHNAMING:
+        charIndex = 0;
+        renamedPatch = "";
+        state = SAVE;
+        break;
+    }
+  }
 }
 
 void reinitialiseToPanel() {
@@ -3878,87 +4322,110 @@ void reinitialiseToPanel() {
 }
 
 void checkEncoder() {
-  //Encoder works with relative inc and dec values
-  //Detent encoder goes up in 4 steps, hence +/-3
-
   long encRead = encoder.read();
-  if ((encCW && encRead > encPrevious + 3) || (!encCW && encRead < encPrevious - 3)) {
-    switch (state) {
-      case PARAMETER:
-        state = PATCH;
-        if (upperSW) {
+
+  bool movedCW = (encCW && encRead > encPrevious + 3)
+                 || (!encCW && encRead < encPrevious - 3);
+  bool movedCCW = (encCW && encRead < encPrevious - 3)
+                  || (!encCW && encRead > encPrevious + 3);
+
+  // Detect clockwise rotation
+  if (movedCW) {
+    if (inPerformanceMode && performances.size() > 0) {
+      performanceIndex = (performanceIndex + 1) % performances.size();
+      state = PERFORMANCE;  // trigger the thread to redraw
+      timer = millis();     // reset any timeout you use
+    } else {
+      // Normal Patch Mode CW
+      switch (state) {
+        case PARAMETER:
+          state = PATCH;
+          if (upperSW) {
+            patches.push(patches.shift());
+            patchNoU = patches.first().patchNo;
+            recallPatch(patchNoU);
+          } else {
+            patches.push(patches.shift());
+            patchNoL = patches.first().patchNo;
+            recallPatch(patchNoL);
+          }
+          state = PARAMETER;
+          break;
+        case RECALL:
           patches.push(patches.shift());
-          patchNoU = patches.first().patchNo;
-          recallPatch(patchNoU);
-        } else {
+          break;
+        case SAVE:
           patches.push(patches.shift());
-          patchNoL = patches.first().patchNo;
-          recallPatch(patchNoL);
-        }
-        state = PARAMETER;
-        break;
-      case RECALL:
-        patches.push(patches.shift());
-        break;
-      case SAVE:
-        patches.push(patches.shift());
-        break;
-      case PATCHNAMING:
-        if (charIndex == TOTALCHARS) charIndex = 0;  //Wrap around
-        currentCharacter = CHARACTERS[charIndex++];
-        showRenamingPage(renamedPatch + currentCharacter);
-        break;
-      case DELETE:
-        patches.push(patches.shift());
-        break;
-      case SETTINGS:
-        settings::increment_setting();
-        showSettingsPage();
-        break;
-      case SETTINGSVALUE:
-        settings::increment_setting_value();
-        showSettingsPage();
-        break;
+          break;
+        case PATCHNAMING:
+          if (charIndex == TOTALCHARS) charIndex = 0;
+          currentCharacter = CHARACTERS[charIndex++];
+          showRenamingPage(renamedPatch + currentCharacter);
+          break;
+        case DELETE:
+          patches.push(patches.shift());
+          break;
+        case SETTINGS:
+          settings::increment_setting();
+          showSettingsPage();
+          break;
+        case SETTINGSVALUE:
+          settings::increment_setting_value();
+          showSettingsPage();
+          break;
+      }
     }
     encPrevious = encRead;
-  } else if ((encCW && encRead < encPrevious - 3) || (!encCW && encRead > encPrevious + 3)) {
-    switch (state) {
-      case PARAMETER:
-        state = PATCH;
-        if (upperSW) {
+  }
+
+  else if (movedCCW) {
+    if (inPerformanceMode && performances.size() > 0) {
+      performanceIndex = performanceIndex == 0
+                           ? performances.size() - 1
+                           : performanceIndex - 1;
+      state = PERFORMANCE;  // trigger redraw
+      timer = millis();
+    } else {
+      // Normal Patch Mode CCW
+      switch (state) {
+        case PARAMETER:
+          state = PATCH;
+          if (upperSW) {
+            patches.unshift(patches.pop());
+            patchNoU = patches.first().patchNo;
+            recallPatch(patchNoU);
+          } else {
+            patches.unshift(patches.pop());
+            patchNoL = patches.first().patchNo;
+            recallPatch(patchNoL);
+          }
+          state = PARAMETER;
+          break;
+        case RECALL:
           patches.unshift(patches.pop());
-          patchNoU = patches.first().patchNo;
-          recallPatch(patchNoU);
-        } else {
+          break;
+        case SAVE:
           patches.unshift(patches.pop());
-          patchNoL = patches.first().patchNo;
-          recallPatch(patchNoL);
-        }
-        state = PARAMETER;
-        break;
-      case RECALL:
-        patches.unshift(patches.pop());
-        break;
-      case SAVE:
-        patches.unshift(patches.pop());
-        break;
-      case PATCHNAMING:
-        if (charIndex == -1)
-          charIndex = TOTALCHARS - 1;
-        currentCharacter = CHARACTERS[charIndex--];
-        showRenamingPage(renamedPatch + currentCharacter);
-        break;
-      case DELETE:
-        patches.unshift(patches.pop());
-        break;
-      case SETTINGS:
-        settings::decrement_setting();
-        showSettingsPage();
-        break;
-      case SETTINGSVALUE:
-        settings::decrement_setting_value();
-        showSettingsPage();
-        break;
+          break;
+        case PATCHNAMING:
+          if (charIndex == -1) {
+            charIndex = TOTALCHARS - 1;
+          }
+          currentCharacter = CHARACTERS[charIndex--];
+          showRenamingPage(renamedPatch + currentCharacter);
+          break;
+        case DELETE:
+          patches.unshift(patches.pop());
+          break;
+        case SETTINGS:
+          settings::decrement_setting();
+          showSettingsPage();
+          break;
+        case SETTINGSVALUE:
+          settings::decrement_setting_value();
+          showSettingsPage();
+          break;
+      }
     }
     encPrevious = encRead;
   }
@@ -3976,4 +4443,15 @@ void loop() {
   MIDI.read(midiChannel);
   usbMIDI.read(midiChannel);
   LFODelayHandle();
+
+
+  // Only one delayed‐recall block
+  if (pendingPerformanceRecall && (millis() - performanceScrollTimer > 100)) {
+    pendingPerformanceRecall = false;
+    // Apply the performance entirely in memory (no SD I/O here)
+    applyPerformance(performances[performanceIndex]);
+    // If you still want the thread to redraw, you can also:
+    // state = PERFORMANCE;
+    // timer = millis();
+  }
 }

@@ -74,15 +74,15 @@ void settingsSplitTrans(int index, const char *value) {
 }
 
 void settingsMonoMultiU(int index, const char *value) {
-  if (strcmp(value, "Off") == 0) monoMultiU = 0;
-  if (strcmp(value, "On") == 0) monoMultiU = 1;
-  storeMonoMultiU(monoMultiU);
+  if (strcmp(value, "Off") == 0) upperData[P_monoMulti] = 0;
+  if (strcmp(value, "On") == 0) upperData[P_monoMulti] = 1;
+  storeMonoMultiU(upperData[P_monoMulti]);
 }
 
 void settingsMonoMultiL(int index, const char *value) {
-  if (strcmp(value, "Off") == 0) monoMultiL = 0;
-  if (strcmp(value, "On") == 0) monoMultiL = 1;
-  storeMonoMultiL(monoMultiL);
+  if (strcmp(value, "Off") == 0) lowerData[P_monoMulti] = 0;
+  if (strcmp(value, "On") == 0) lowerData[P_monoMulti] = 1;
+  storeMonoMultiL(lowerData[P_monoMulti]);
 }
 
 void settingsMIDICh(int index, const char *value) {
@@ -95,21 +95,21 @@ void settingsMIDICh(int index, const char *value) {
 }
 
 void settingsAfterTouchU(int index, const char *value) {
-  if (strcmp(value, "Off") == 0) AfterTouchDestU = 0;
-  if (strcmp(value, "DCO Mod") == 0) AfterTouchDestU = 1;
-  if (strcmp(value, "CutOff Freq") == 0) AfterTouchDestU = 2;
-  if (strcmp(value, "VCF Mod") == 0) AfterTouchDestU = 3;
-  if (strcmp(value, "VCA Mod") == 0) AfterTouchDestU = 4;
-  storeAfterTouchU(AfterTouchDestU);
+  if (strcmp(value, "Off") == 0) upperData[P_AfterTouchDest] = 0;
+  if (strcmp(value, "DCO Mod") == 0) upperData[P_AfterTouchDest] = 1;
+  if (strcmp(value, "CutOff Freq") == 0) upperData[P_AfterTouchDest] = 2;
+  if (strcmp(value, "VCF Mod") == 0) upperData[P_AfterTouchDest] = 3;
+  if (strcmp(value, "VCA Mod") == 0) upperData[P_AfterTouchDest] = 4;
+  storeAfterTouchU(upperData[P_AfterTouchDest]);
 }
 
 void settingsAfterTouchL(int index, const char *value) {
-  if (strcmp(value, "Off") == 0) AfterTouchDestL = 0;
-  if (strcmp(value, "DCO Mod") == 0) AfterTouchDestL = 1;
-  if (strcmp(value, "CutOff Freq") == 0) AfterTouchDestL = 2;
-  if (strcmp(value, "VCF Mod") == 0) AfterTouchDestL = 3;
-  if (strcmp(value, "VCA Mod") == 0) AfterTouchDestL = 4;
-  storeAfterTouchL(AfterTouchDestL);
+  if (strcmp(value, "Off") == 0) lowerData[P_AfterTouchDest] = 0;
+  if (strcmp(value, "DCO Mod") == 0) lowerData[P_AfterTouchDest] = 1;
+  if (strcmp(value, "CutOff Freq") == 0) lowerData[P_AfterTouchDest] = 2;
+  if (strcmp(value, "VCF Mod") == 0) lowerData[P_AfterTouchDest] = 3;
+  if (strcmp(value, "VCA Mod") == 0) lowerData[P_AfterTouchDest] = 4;
+  storeAfterTouchL(lowerData[P_AfterTouchDest]);
 }
 
 void settingsPitchBend(int index, const char *value) {
@@ -133,50 +133,50 @@ void settingsEncoderDir(int index, const char *value) {
 
 void settingsFilterEnvU(int index, const char *value) {
   if (strcmp(value, "Log") == 0) {
-    filterLogLinU = true;
+    upperData[P_filterLogLin] = true;
   } else {
-    filterLogLinU = false;
+    upperData[P_filterLogLin] = false;
   }
-  storeFilterEnvU(filterLogLinU ? 1 : 0);
+  storeFilterEnvU(upperData[P_filterLogLin] ? 1 : 0);
 }
 
 void settingsFilterEnvL(int index, const char *value) {
   if (strcmp(value, "Log") == 0) {
-    filterLogLinL = true;
+    lowerData[P_filterLogLin] = true;
   } else {
-    filterLogLinL = false;
+    lowerData[P_filterLogLin] = false;
   }
-  storeFilterEnvL(filterLogLinL ? 1 : 0);
+  storeFilterEnvL(lowerData[P_filterLogLin] ? 1 : 0);
 }
 
 void settingsAmpEnvU(int index, const char *value) {
   if (strcmp(value, "Log") == 0) {
-    ampLogLinU = true;
+    upperData[P_ampLogLin] = true;
   } else {
-    ampLogLinU = false;
+    upperData[P_ampLogLin] = false;
   }
-  storeAmpEnvU(ampLogLinU ? 1 : 0);
+  storeAmpEnvU(upperData[P_ampLogLin] ? 1 : 0);
 }
 
 void settingsAmpEnvL(int index, const char *value) {
   if (strcmp(value, "Log") == 0) {
-    ampLogLinL = true;
+    lowerData[P_ampLogLin] = true;
   } else {
-    ampLogLinL = false;
+    lowerData[P_ampLogLin] = false;
   }
-  storeAmpEnvL(ampLogLinL ? 1 : 0);
+  storeAmpEnvL(lowerData[P_ampLogLin] ? 1 : 0);
 }
 
 void settingsKeyTrackU(int index, const char *value) {
-  if (strcmp(value, "Off") == 0) keyTrackSWU = 0;
-  if (strcmp(value, "On") == 0) keyTrackSWU = 1;
-  storeKeyTrackU(keyTrackSWU);
+  if (strcmp(value, "Off") == 0) upperData[P_keyTrackSW] = 0;
+  if (strcmp(value, "On") == 0) upperData[P_keyTrackSW] = 1;
+  storeKeyTrackU(upperData[P_keyTrackSW]);
 }
 
 void settingsKeyTrackL(int index, const char *value) {
-  if (strcmp(value, "Off") == 0) keyTrackSWL = 0;
-  if (strcmp(value, "On") == 0) keyTrackSWL = 1;
-  storeKeyTrackL(keyTrackSWL);
+  if (strcmp(value, "Off") == 0) lowerData[P_keyTrackSW] = 0;
+  if (strcmp(value, "On") == 0) lowerData[P_keyTrackSW] = 1;
+  storeKeyTrackL(lowerData[P_keyTrackSW]);
 }
 
 int currentIndexSplitTrans() {

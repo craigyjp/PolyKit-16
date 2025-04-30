@@ -46,11 +46,11 @@ ADC *adc = new ADC();
 
 #define MUX1_osc1Range 8  		// 3.3V switches
 #define MUX1_noiseLevel 9 		// 2V
-#define MUX1_osc1SawLevel 10		// 2V 
+#define MUX1_osc2SawLevel 10		// 2V 
 #define MUX1_osc2Detune 11		// 3.3V
 #define MUX1_osc2Range 12  		// 3.3V switches
 #define MUX1_stack 13			// 3.3V
-#define MUX1_osc2SawLevel 14		// 2V
+#define MUX1_osc1SawLevel 14		// 2V
 #define MUX1_glideTime 15		// MIDI CC
 
 //Mux 2 Connections
@@ -59,8 +59,8 @@ ADC *adc = new ADC();
 #define MUX2_LFODelay 2			// ? software
 #define MUX2_LFORate 3			// 5V
 #define MUX2_osc2TriangleLevel 4	// 2V
-#define MUX2_osc2PulseLevel 5 		// 2V
-#define MUX2_osc1PulseLevel 6		// 2V
+#define MUX2_osc1PulseLevel 5 		// 2V
+#define MUX2_osc2PulseLevel 6		// 2V
 #define MUX2_osc1SubLevel 7	// 2V
 
 #define MUX2_filterDecay 8		// 5V
@@ -206,6 +206,7 @@ ADC *adc = new ADC();
 
 #define VCALOOP_DOUBLE_LED 16
 #define FILTERLOOP_DOUBLE_LED 17
+#define LOWER_LED 18
 
 // Buttons
 // roxmux 74HC165
@@ -258,7 +259,7 @@ static int mux3Read = 0;
 
 static long encPrevious = 0;
 
-TButton saveButton{ SAVE_SW, LOW, HOLD_DURATION, DEBOUNCE, CLICK_DURATION };
+//TButton saveButton{ SAVE_SW, LOW, HOLD_DURATION, DEBOUNCE, CLICK_DURATION };
 TButton settingsButton{ SETTINGS_SW, LOW, HOLD_DURATION, DEBOUNCE, CLICK_DURATION };
 TButton backButton{ BACK_SW, LOW, HOLD_DURATION, DEBOUNCE, CLICK_DURATION };
 TButton recallButton{ RECALL_SW, LOW, HOLD_DURATION, DEBOUNCE, CLICK_DURATION }; // on encoder

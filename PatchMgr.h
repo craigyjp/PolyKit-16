@@ -33,7 +33,29 @@ struct PatchNoAndName
   String patchName;
 };
 
+struct Performance {
+  uint16_t performanceNo;
+  char name[17];
+  uint16_t upperPatchNo;
+  uint16_t lowerPatchNo;
+  uint8_t keyboardMode;
+  uint8_t newsplitPoint;
+};
+
+Performance getCurrentPerformanceData() {
+  Performance perf;
+  perf.performanceNo = 0; // Set later when saving
+  strcpy(perf.name, INITPERFORMANCENAME);
+  perf.upperPatchNo = patchNoU;
+  perf.lowerPatchNo = patchNoL;
+  perf.keyboardMode = wholemode ? 0 : dualmode ? 1 : 2;
+  perf.newsplitPoint = newsplitPoint;
+  return perf;
+}
+
 CircularBuffer<PatchNoAndName, PATCHES_LIMIT> patches;
+
+extern CircularBuffer<Performance, PERFORMANCE_LIMIT> performances;
 
 size_t readField(File *file, char *str, size_t size, const char *delim)
 {
@@ -85,6 +107,10 @@ void recallPatchData(File patchFile, String data[])
     //    Serial.println(str);
     data[i++] = String(str);
   }
+}
+
+void resetPerformancesOrdering() {
+  // Nothing to do yet - add later if you want sorted performances
 }
 
 int compare(const void *a, const void *b) {
