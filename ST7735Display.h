@@ -113,12 +113,12 @@ void renderCurrentPatchPage() {
   if (wholemode) {
     tft.fillScreen(ST7735_BLACK);
     tft.setFont(&FreeSansBold18pt7b);
-    tft.setCursor(5, 29);
+    tft.setCursor(5, 97);
     tft.setTextColor(ST7735_YELLOW);
     tft.setTextSize(1);
     tft.println(currentPgmNumL);
 
-    tft.setCursor(80, 19);
+    tft.setCursor(80, 87);
     tft.setFont(&FreeSans12pt7b);
     tft.setTextSize(1);
     tft.println("Whole");
@@ -129,12 +129,13 @@ void renderCurrentPatchPage() {
 
     tft.setFont(&FreeSans12pt7b);
     tft.setTextColor(ST7735_YELLOW);
-    tft.setCursor(1, 55);
+    tft.setCursor(1, 122);
     tft.setTextColor(ST7735_WHITE);
     tft.println(currentPatchNameL);
 
   } else {
-
+    
+    // upper patch
     tft.fillScreen(ST7735_BLACK);
     tft.setFont(&FreeSansBold18pt7b);
     tft.setCursor(5, 29);
@@ -157,6 +158,7 @@ void renderCurrentPatchPage() {
     tft.setTextColor(ST7735_WHITE);
     tft.println(currentPatchNameU);
 
+    // lower patch
     tft.setFont(&FreeSansBold18pt7b);
     tft.setCursor(5, 97);
     tft.setTextColor(ST7735_YELLOW);
@@ -383,15 +385,15 @@ void renderCurrentParameterPage() {
         }
       } else {
         if (wholemode) {
-          //upper whole mode patch
+          //lower whole mode patch lower ection
           tft.fillScreen(ST7735_BLACK);
           tft.setFont(&FreeSansBold18pt7b);
-          tft.setCursor(5, 29);
+          tft.setCursor(5, 97);
           tft.setTextColor(ST7735_YELLOW);
           tft.setTextSize(1);
           tft.println(currentPgmNumL);
 
-          tft.setCursor(80, 19);
+          tft.setCursor(80, 87);
           tft.setFont(&FreeSans12pt7b);
           tft.setTextSize(1);
           tft.println("Whole");
@@ -402,18 +404,18 @@ void renderCurrentParameterPage() {
 
           tft.setFont(&FreeSans12pt7b);
           tft.setTextColor(ST7735_YELLOW);
-          tft.setCursor(1, 55);
+          tft.setCursor(1, 122);
           tft.setTextColor(ST7735_WHITE);
           tft.println(currentPatchNameL);
 
-          // parameter in lower section
+          // parameter in upper section
           tft.setFont(&FreeSans12pt7b);
-          tft.setCursor(0, 97);
+          tft.setCursor(0, 29);
           tft.setTextColor(ST7735_YELLOW);
           tft.setTextSize(1);
           tft.println(currentParameter);
           tft.drawFastHLine(0, 63, tft.width(), ST7735_RED);
-          tft.setCursor(1, 122);
+          tft.setCursor(1, 55);
           tft.setTextColor(ST7735_WHITE);
           tft.println(currentValue);
 
