@@ -28,6 +28,16 @@
 
 ST7735_t3 tft = ST7735_t3(cs, dc, 26, 27, rst);
 
+extern Performance currentPerformance;
+extern CircularBuffer<Performance, PERFORMANCE_LIMIT> performances;
+
+String currentPerfNum = "";
+String currentPerfName = "";
+int currentUpperPatchNo = 0;
+String currentUpperPatchName = "";
+int currentLowerPatchNo = 0;
+String currentLowerPatchName = "";
+
 String currentParameter = "";
 String currentValue = "";
 float currentFloatValue = 0.0;
@@ -45,11 +55,6 @@ int paramType = PARAMETER;
 boolean MIDIClkSignal = false;
 
 unsigned long timer = 0;
-
-// MIDI note 0 = C-1, so note 48 = C3, 60 = C4
-static const char * NOTE_NAMES[12] = {
-  "C","C#","D","D#","E","F","F#","G","G#","A","A#","B"
-};
 
 void startTimer() {
   if (state == PARAMETER) {
@@ -80,106 +85,57 @@ void renderBootUpPage() {
   tft.println(VERSION);
 }
 
-void showPerformancePage(uint16_t performanceNo, const String &name, uint16_t upperPatchNo, uint16_t lowerPatchNo) {
-  tft.fillScreen(ST7735_BLACK);
-  tft.setCursor(0, 0);
-  tft.setTextSize(1);
-
-  tft.print("Performance ");
-  if (performanceNo < 100) tft.print('0');
-  if (performanceNo < 10) tft.print('0');
-  tft.println(performanceNo);
-
-  tft.println();
-
-  tft.println(name);
-
-  tft.println();
-
-  tft.print("Upper: ");
-  if (upperPatchNo < 100) tft.print('0');
-  if (upperPatchNo < 10) tft.print('0');
-  tft.println(upperPatchNo);
-
-  tft.print("Lower: ");
-  if (lowerPatchNo < 100) tft.print('0');
-  if (lowerPatchNo < 10) tft.print('0');
-  tft.println(lowerPatchNo);
-
-  tft.updateScreen();
-}
-
 void renderCurrentPatchPage() {
-  if (wholemode) {
-    tft.fillScreen(ST7735_BLACK);
-    tft.setFont(&FreeSansBold18pt7b);
-    tft.setCursor(5, 97);
-    tft.setTextColor(ST7735_YELLOW);
-    tft.setTextSize(1);
-    tft.println(currentPgmNumL);
+  tft.fillScreen(ST7735_BLACK);
 
-    tft.setCursor(80, 87);
-    tft.setFont(&FreeSans12pt7b);
-    tft.setTextSize(1);
-    tft.println("Whole");
-
-    tft.setTextColor(ST7735_BLACK);
-    tft.setFont(&Org_01);
-    tft.drawFastHLine(0, 63, tft.width(), ST7735_RED);
-
-    tft.setFont(&FreeSans12pt7b);
-    tft.setTextColor(ST7735_YELLOW);
-    tft.setCursor(1, 122);
-    tft.setTextColor(ST7735_WHITE);
-    tft.println(currentPatchNameL);
-
-  } else {
-    
-    // upper patch
-    tft.fillScreen(ST7735_BLACK);
+  // ─── Patch Display ─────────────────────────
+  if (!wholemode) {
+    // Upper patch block
     tft.setFont(&FreeSansBold18pt7b);
     tft.setCursor(5, 29);
     tft.setTextColor(ST7735_YELLOW);
     tft.setTextSize(1);
     tft.println(currentPgmNumU);
-
     tft.setCursor(80, 19);
     tft.setFont(&FreeSans12pt7b);
     tft.setTextSize(1);
     tft.println("Upper");
-
-    tft.setTextColor(ST7735_BLACK);
-    tft.setFont(&Org_01);
-    tft.drawFastHLine(0, 63, tft.width(), ST7735_RED);
-
     tft.setFont(&FreeSans12pt7b);
     tft.setTextColor(ST7735_YELLOW);
     tft.setCursor(1, 55);
     tft.setTextColor(ST7735_WHITE);
     tft.println(currentPatchNameU);
-
-    // lower patch
-    tft.setFont(&FreeSansBold18pt7b);
-    tft.setCursor(5, 97);
-    tft.setTextColor(ST7735_YELLOW);
-    tft.setTextSize(1);
-    tft.println(currentPgmNumL);
-
-    tft.setCursor(80, 87);
-    tft.setFont(&FreeSans12pt7b);
-    tft.setTextSize(1);
-    tft.println("Lower");
-
-    tft.setTextColor(ST7735_BLACK);
-    tft.setFont(&Org_01);
-    tft.drawFastHLine(0, 63, tft.width(), ST7735_RED);
-
-    tft.setFont(&FreeSans12pt7b);
-    tft.setTextColor(ST7735_YELLOW);
-    tft.setCursor(1, 122);
-    tft.setTextColor(ST7735_WHITE);
-    tft.println(currentPatchNameL);
   }
+
+  // Lower patch block (always shown)
+  //lower whole mode patch lower ection
+  tft.setFont(&FreeSansBold18pt7b);
+  tft.setCursor(5, 97);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.setTextSize(1);
+  tft.println(currentPgmNumL);
+
+  if (wholemode) {
+  tft.setCursor(80, 87);
+  tft.setFont(&FreeSans12pt7b);
+  tft.setTextSize(1);
+  tft.println("Whole");
+  } else {
+  tft.setCursor(80, 87);
+  tft.setFont(&FreeSans12pt7b);
+  tft.setTextSize(1);
+  tft.println("Lower");
+  }
+
+  tft.setTextColor(ST7735_BLACK);
+  tft.setFont(&Org_01);
+  tft.drawFastHLine(0, 63, tft.width(), ST7735_RED);
+
+  tft.setFont(&FreeSans12pt7b);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.setCursor(1, 122);
+  tft.setTextColor(ST7735_WHITE);
+  tft.println(currentPatchNameL);
 }
 
 void renderEnv(float att, float dec, float sus, float rel) {
@@ -196,154 +152,97 @@ void renderEnv(float att, float dec, float sus, float rel) {
   }
 }
 
-void renderRecallPerformancePage() {
+void renderPerformancePage() {
   tft.fillScreen(ST7735_BLACK);
-  tft.setCursor(0, 0);
-  tft.setFont(&FreeSans12pt7b);
-  tft.setTextSize(1);
-  tft.println("Recall Performance:");
-  tft.println();
-  if (!performances.isEmpty()) {
-    tft.println(performances.first().name);
-  }
-}
+  tft.drawFastHLine(0, 40, tft.width(), ST7735_RED);
+  tft.drawFastHLine(0, 140, tft.width(), ST7735_RED);
 
-void renderSavePerformancePage() {
-  tft.fillScreen(ST7735_BLACK);
-  tft.setCursor(0, 0);
-  tft.setFont(&FreeSans12pt7b);
-  tft.setTextSize(1);
-  tft.println("Save Performance:");
-  tft.println();
-  if (!performances.isEmpty()) {
-    tft.println(performances.last().name);
-  }
-}
-
-void renderDeletePerformancePage() {
-  tft.fillScreen(ST7735_BLACK);
-  tft.setCursor(0, 0);
-  tft.setFont(&FreeSans12pt7b);
-  tft.setTextSize(1);
-  tft.println("Delete Performance:");
-  tft.println();
-  if (!performances.isEmpty()) {
-    tft.println(performances.first().name);
-  }
-}
-
-void renderCurrentPerformancePage() {
-  tft.fillScreen(ST7735_BLACK);
-
-  // ─── Header ─────────────────────────────────────────
-  tft.setFont(&FreeSans12pt7b);
-  tft.setTextSize(1);
-  tft.setCursor(5, 20);
-  tft.setTextColor(ST7735_CYAN);
-  tft.print("P: ");
   tft.setTextColor(ST7735_YELLOW);
-  tft.println(performanceIndex + 1);
-
-  // Mode label (Whole / Dual / Split) top-right
-  {
-    Performance perf = performances[performanceIndex];
-    tft.setFont(&FreeSans9pt7b);
-    tft.setTextColor(ST7735_WHITE);
-    tft.setCursor(80, 20);
-
-    switch (perf.keyboardMode) {
-      case 0:
-        tft.print("Whole");
-        break;
-      case 1:
-        tft.print("Dual");
-        break;
-      case 2:
-        {
-          // Display “Split” and then the mapped note name
-          tft.print("Split ");
-
-          // 1) map 0–24 → 48–60
-          int midiNote = map(perf.newsplitPoint, 0, 24, 48, 60);
-
-          // 2) look up name + octave
-          int nameIndex = midiNote % 12;
-          int octave = (midiNote / 12) - 1;
-
-          // 3) draw it
-          tft.print(NOTE_NAMES[nameIndex]);
-          tft.print(octave);
-          break;
-        }
-    }
-  }
-
-  tft.drawFastHLine(0, 28, tft.width(), ST7735_RED);
-  tft.drawFastHLine(0, 60, tft.width(), ST7735_RED);
-
-  if (!performances.isEmpty()) {
-    Performance perf = performances[performanceIndex];
-
-    // ─── Performance name centered ─────────────────────
-    tft.setFont(&FreeSansBold12pt7b);
-    tft.setTextColor(ST7735_YELLOW);
-    String nameStr = String(perf.name);
-    int16_t x1, y1;
-    uint16_t w, h;
-    tft.getTextBounds(nameStr, 0, 0, &x1, &y1, &w, &h);
-    tft.setCursor((tft.width() - w) / 2, 52);
-    tft.println(nameStr);
-
-    // ─── Upper patch # and name ───────────────────────
-    if (perf.keyboardMode != 0) {
-      tft.setFont(&FreeSans9pt7b);
-      tft.setTextColor(ST7735_WHITE);
-      tft.setCursor(2, 88);
-      tft.print("U:");
-
-      tft.setTextColor(ST7735_YELLOW);
-      tft.setCursor(20, 88);
-      tft.print(perf.upperPatchNo);
-
-      tft.setFont(&FreeSans9pt7b);
-      tft.setTextColor(ST7735_WHITE);
-      tft.setCursor(50, 88);
-      tft.println(getPatchName(perf.upperPatchNo));
-    }
-    // ─── Lower patch # and name ───────────────────────
-
-    tft.setFont(&FreeSans9pt7b);
-    tft.setTextColor(ST7735_WHITE);
-    tft.setCursor(2, 116);
-    tft.print("L:");
-
-    tft.setTextColor(ST7735_YELLOW);
-    tft.setCursor(20, 116);
-    tft.print(perf.lowerPatchNo);
-
-    tft.setFont(&FreeSans9pt7b);
-    tft.setTextColor(ST7735_WHITE);
-    tft.setCursor(50, 116);
-    tft.println(getPatchName(perf.lowerPatchNo));
-
-  } else {
-    tft.setFont(&FreeSans12pt7b);
-    tft.setTextSize(1);
-    tft.setCursor(5, 65);
-    tft.setTextColor(ST7735_WHITE);
-    tft.println("No Performances Saved");
-  }
-
-  tft.updateScreen();
-}
-
-void showCurrentPage(const String &text) {
-  tft.fillScreen(ST7735_BLACK);
-  tft.setCursor(0, 0);
   tft.setFont(&FreeSans12pt7b);
   tft.setTextSize(1);
-  tft.println(text);
-  tft.updateScreen();
+  tft.setCursor(5, 10);
+  tft.println("Perf No");
+
+  tft.setCursor(100, 10);
+  tft.println("Name");
+
+  tft.setCursor(5, 70);
+  tft.setTextSize(3);
+  tft.println(currentPerfNum);
+
+  tft.setCursor(100, 75);
+  tft.setFont(&FreeSans9pt7b);
+  tft.setTextSize(2);
+  tft.setTextColor(ST7735_WHITE);
+  tft.println(currentPerfName);
+
+  tft.setCursor(5, 160);
+  tft.setTextSize(2);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.println("Upp:");
+
+  tft.setCursor(100, 160);
+  tft.setTextColor(ST7735_WHITE);
+  tft.println(String(currentUpperPatchNo) + " " + currentUpperPatchName);
+
+  tft.setCursor(5, 200);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.println("Low:");
+
+  tft.setCursor(100, 200);
+  tft.setTextColor(ST7735_WHITE);
+  tft.println(String(currentLowerPatchNo) + " " + currentLowerPatchName);
+}
+
+void renderPerformanceNamingPage() {
+  tft.fillScreen(ST7735_BLACK);
+  tft.setFont(&FreeSansBold18pt7b);
+  tft.setCursor(10, 20);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.setTextSize(1);
+  tft.println("Rename Perf");
+  tft.drawFastHLine(10, 50, tft.width() - 20, ST7735_RED);
+
+  tft.setTextSize(2);
+  tft.setFont(&FreeSans9pt7b);
+  tft.setTextColor(ST7735_WHITE);
+  tft.setCursor(10, 80);
+  tft.println(newPatchName);  // reused for performance too
+}
+
+void renderPerformanceDeletePage() {
+  tft.fillScreen(ST7735_BLACK);
+  tft.setFont(&FreeSansBold18pt7b);
+  tft.setCursor(10, 20);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.setTextSize(1);
+  tft.println("Delete Perf?");
+  tft.drawFastHLine(10, 50, tft.width() - 20, ST7735_RED);
+
+  tft.setTextSize(2);
+  tft.setFont(&FreeSans9pt7b);
+  tft.setCursor(10, 80);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.println(performances.last().performanceNo);
+  tft.setCursor(100, 80);
+  tft.setTextColor(ST7735_WHITE);
+  tft.println(performances.last().name);
+
+  tft.fillRect(10, 120, tft.width() - 20, 44, ST77XX_RED);
+
+  tft.setCursor(10, 130);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.println(performances.first().performanceNo);
+  tft.setCursor(100, 130);
+  tft.setTextColor(ST7735_WHITE);
+  tft.println(performances.first().name);
+
+  tft.setCursor(10, 180);
+  tft.setTextColor(ST7735_YELLOW);
+  performances.size() > 1 ? tft.println(performances[1].performanceNo) : tft.println(performances.last().performanceNo);
+  tft.setCursor(100, 180);
+  tft.setTextColor(ST7735_WHITE);
+  performances.size() > 1 ? tft.println(performances[1].name) : tft.println(performances.last().name);
 }
 
 void renderCurrentParameterPage() {
@@ -352,29 +251,29 @@ void renderCurrentParameterPage() {
       if (upperSW) {
         tft.fillScreen(ST7735_BLACK);
         tft.setFont(&FreeSans12pt7b);
-        tft.setCursor(0, 29);
+        tft.setCursor(0, 97);
         tft.setTextColor(ST7735_YELLOW);
         tft.setTextSize(1);
         tft.println(currentParameter);
         tft.drawFastHLine(0, 63, tft.width(), ST7735_RED);
-        tft.setCursor(1, 55);
-        tft.setTextColor(ST7735_WHITE);
-        tft.println(currentValue);
-        // lower patch
-        tft.setFont(&FreeSansBold18pt7b);
-        tft.setCursor(5, 97);
-        tft.setTextColor(ST7735_YELLOW);
-        tft.setTextSize(1);
-        tft.println(currentPgmNumL);
-        tft.setCursor(80, 87);
-        tft.setFont(&FreeSans12pt7b);
-        tft.setTextSize(1);
-        tft.println("Lower");
-        tft.setFont(&FreeSans12pt7b);
-        tft.setTextColor(ST7735_YELLOW);
         tft.setCursor(1, 122);
         tft.setTextColor(ST7735_WHITE);
-        tft.println(currentPatchNameL);
+        tft.println(currentValue);
+        // upper patch
+        tft.setFont(&FreeSansBold18pt7b);
+        tft.setCursor(5, 29);
+        tft.setTextColor(ST7735_YELLOW);
+        tft.setTextSize(1);
+        tft.println(currentPgmNumU);
+        tft.setCursor(80, 19);
+        tft.setFont(&FreeSans12pt7b);
+        tft.setTextSize(1);
+        tft.println("Upper");
+        tft.setFont(&FreeSans12pt7b);
+        tft.setTextColor(ST7735_YELLOW);
+        tft.setCursor(1, 55);
+        tft.setTextColor(ST7735_WHITE);
+        tft.println(currentPatchNameU);
         switch (paramType) {
           case FILTER_ENV:
             renderEnv(upperData[P_filterAttack] * 0.0001, upperData[P_filterDecay] * 0.0001, upperData[P_filterSustain], upperData[P_filterRelease] * 0.0001);
@@ -422,29 +321,29 @@ void renderCurrentParameterPage() {
         } else {
           tft.fillScreen(ST7735_BLACK);
           tft.setFont(&FreeSans12pt7b);
-          tft.setCursor(0, 97);
+          tft.setCursor(0, 29);
           tft.setTextColor(ST7735_YELLOW);
           tft.setTextSize(1);
           tft.println(currentParameter);
           tft.drawFastHLine(0, 63, tft.width(), ST7735_RED);
-          tft.setCursor(1, 122);
+          tft.setCursor(1, 55);
           tft.setTextColor(ST7735_WHITE);
           tft.println(currentValue);
           // upper patch
           tft.setFont(&FreeSansBold18pt7b);
-          tft.setCursor(5, 29);
+          tft.setCursor(5, 97);
           tft.setTextColor(ST7735_YELLOW);
           tft.setTextSize(1);
-          tft.println(currentPgmNumU);
-          tft.setCursor(80, 19);
+          tft.println(currentPgmNumL);
+          tft.setCursor(80, 87);
           tft.setFont(&FreeSans12pt7b);
           tft.setTextSize(1);
-          tft.println("Upper");
+          tft.println("Lower");
           tft.setFont(&FreeSans12pt7b);
           tft.setTextColor(ST7735_YELLOW);
-          tft.setCursor(1, 55);
+          tft.setCursor(1, 122);
           tft.setTextColor(ST7735_WHITE);
-          tft.println(currentPatchNameU);
+          tft.println(currentPatchNameL);
           switch (paramType) {
             case FILTER_ENV:
               renderEnv(lowerData[P_filterAttack] * 0.0001, lowerData[P_filterDecay] * 0.0001, lowerData[P_filterSustain], lowerData[P_filterRelease] * 0.0001);
@@ -628,84 +527,58 @@ void showSettingsPage(const char *option, const char *value, int settingsPart) {
   currentSettingsPart = settingsPart;
 }
 
-void drawModeIndicator() {
-  tft.setTextSize(1);                            // Smallest text size
-  tft.setTextColor(ST7735_WHITE, ST7735_BLACK);  // White text on black background (overwrites cleanly)
-
-  tft.setCursor(128, 0);  // Near top-right, fits within 160 pixels wide
-  if (inPerformanceMode) {
-    tft.print("PERF");
-  } else {
-    tft.print("PATCH");
-  }
-}
-
 void displayThread() {
   threads.delay(2000);  //Give bootup page chance to display
   while (1) {
     switch (state) {
       case PARAMETER:
-        if (inPerformanceMode) {
-          renderCurrentPerformancePage();
+        if ((millis() - timer) > DISPLAYTIMEOUT) {
+          renderCurrentPatchPage();
         } else {
-          if ((millis() - timer) > DISPLAYTIMEOUT) {
-            renderCurrentPatchPage();
-          } else {
-            renderCurrentParameterPage();
-          }
+          renderCurrentParameterPage();
         }
         break;
-
       case RECALL:
-        if (inPerformanceMode) {
-          renderRecallPerformancePage();
-        } else {
-          renderRecallPage();
-        }
+        renderRecallPage();
         break;
-
       case SAVE:
         renderSavePage();
         break;
-
-      case SAVE_PERFORMANCE:
-        renderSavePerformancePage();
-        break;
-
-      case PERFORMANCE:
-        renderCurrentPerformancePage();
-        break;
-
       case REINITIALISE:
         renderReinitialisePage();
-        tft.updateScreen();
+        tft.updateScreen();  //update before delay
         threads.delay(1000);
         state = PARAMETER;
         break;
-
       case PATCHNAMING:
         renderPatchNamingPage();
         break;
-
       case PATCH:
         renderCurrentPatchPage();
         break;
-
       case DELETE:
         renderDeletePatchPage();
         break;
-
-      case DELETE_PERFORMANCE:
-        renderDeletePerformancePage();
-        break;
-
       case DELETEMSG:
         renderDeleteMessagePage();
         break;
-
       case SETTINGS:
       case SETTINGSVALUE:
         renderSettingsPage();
+        break;
+      case PERFORMANCE_RECALL:
+      case PERFORMANCE_EDIT:
+      case PERFORMANCE_SAVE:
+        renderPerformancePage();
+        break;
+      case PERFORMANCE_NAMING:
+        renderPerformanceNamingPage();  // see below
+        break;
+      case PERFORMANCE_DELETE:
+        renderPerformanceDeletePage();
+        break;
+      case PERFORMANCE_DELETEMSG:
+        // Handled inside checkSwitches() (already shows a message & delay)
         break;
     }
     tft.updateScreen();

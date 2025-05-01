@@ -1,5 +1,5 @@
 /*
-  PolyKit 16 MUX - Firmware Rev 1.8
+  PolyKit 16 MUX - Firmware Rev 1.9
 
   Includes code by:
     Dave Benn - Handling MUXs, a few other bits and original inspiration  https://www.notesandvolts.com/2019/01/teensy-synth-part-10-hardware.html
@@ -29,14 +29,11 @@
 #include "HWControls.h"
 #include "EepromMgr.h"
 #include "Settings.h"
-
+#include <cstring>
 #include <RoxMux.h>
-#include <AceButton.h>
-using namespace ace_button;
+#include <map>  // Include the map library
 
 String getPatchName(uint16_t patchNo);
-
-CircularBuffer<Performance, 128> performances;
 
 #define PARAMETER 0
 #define RECALL 1
@@ -48,10 +45,13 @@ CircularBuffer<Performance, 128> performances;
 #define DELETEMSG 7
 #define SETTINGS 8
 #define SETTINGSVALUE 9
-#define PERFORMANCE 10
-#define SAVE_PERFORMANCE 11
-#define DELETE_PERFORMANCE 12
-#define PERFORMANCENAMING 13
+#define PERFORMANCE_RECALL 10
+#define PERFORMANCE_SAVE 11
+#define PERFORMANCE_EDIT 12
+#define PERFORMANCE_NAMING 13
+#define PERFORMANCE_DELETE 14
+#define PERFORMANCE_DELETEMSG 15
+
 
 unsigned int state = PARAMETER;
 
@@ -68,6 +68,23 @@ uint32_t channel_f = 0b00000010010100000000000000000000;
 uint32_t channel_g = 0b00000010011000000000000000000000;
 uint32_t channel_h = 0b00000010011100000000000000000000;
 
+enum PlayMode {
+  WHOLE = 0,
+  DUAL = 1,
+  SPLIT = 2
+};
+
+struct Performance {
+  int performanceNo;
+  int upperPatchNo;
+  int lowerPatchNo;
+  String name;
+  PlayMode mode;  // ← Back to enum type!
+};
+
+CircularBuffer<Performance, PERFORMANCE_LIMIT> performances;
+Performance currentPerformance;
+
 #include "ST7735Display.h"
 
 boolean cardStatus = false;
@@ -77,7 +94,6 @@ struct VoiceAndNote {
   int velocity;
   long timeOn;
 };
-
 
 struct VoiceAndNote voices[NO_OF_VOICES] = {
   { -1, -1, 0 },
@@ -143,16 +159,13 @@ Rox74HC595<SR_TOTAL> sr;
 #define PIN_LOAD 49  // pin 1 on 74HC165 (LOAD)
 #define PIN_CLK 51   // pin 2 on 74HC165 (CLK))
 
-//RoxButton save_button;
-ButtonConfig saveButtonConfig;
-AceButton saveButton(&saveButtonConfig, SAVE_SW);  // SAVE_SW is your pin 24
-
 void setup() {
+
   SPI.begin();
   SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE0));
   octoswitch.begin(PIN_DATA, PIN_LOAD, PIN_CLK);
   octoswitch.setCallback(onButtonPress);
-  octoswitch.setIgnoreAfterHold(UPPER_SW, true);
+  //octoswitch.setIgnoreAfterHold(UPPER_SW, true);
 
   srp.begin(SRP_DATA, SRP_LATCH, SRP_CLK, SRP_PWM);
   sr.begin(SR_DATA, SR_LATCH, SR_CLK, SR_PWM);
@@ -163,22 +176,12 @@ void setup() {
   setUpSettings();
   setupHardware();
 
-  //save_button.begin();
-  //save_button.setDoublePressThreshold(450);  // Double press timing forgiving
-
-  saveButtonConfig.setEventHandler(handleSaveButtonEvent);
-  saveButtonConfig.setFeature(ButtonConfig::kFeatureDoubleClick);
-  saveButtonConfig.setFeature(ButtonConfig::kFeatureLongPress);
-  saveButtonConfig.setLongPressDelay(500);    // Optional: Faster long press
-  saveButtonConfig.setDoubleClickDelay(400);  // Optional: Tweak if needed
-
   SPI.beginTransaction(SPISettings(2000000, MSBFIRST, SPI_MODE1));
   digitalWrite(DAC_CS1, LOW);
   delayMicroseconds(1);
   SPI.transfer32(int_ref_on_flexible_mode);
   digitalWrite(DAC_CS1, HIGH);
   SPI.endTransaction();
-
 
   cardStatus = SD.begin(BUILTIN_SDCARD);
   if (cardStatus) {
@@ -262,144 +265,34 @@ void setup() {
   upperData[P_keyTrackSW] = getKeyTrackL();
   oldkeyTrackSWL = upperData[P_keyTrackSW];
 
-  //setupDisplay();
-  //delay(3000);
-
-  patchNoU = getLastPatchU();
-  patchNoL = getLastPatchL();
-  upperSW = 1;
-  recallPatch(patchNoU);
-  upperSW = 0;
-  recallPatch(patchNoL);  //Load first patch
-  updatewholemode();
-}
-
-// SaveButton Event Handler
-void handleSaveButtonEvent(AceButton* button, uint8_t eventType, uint8_t buttonState) {
-  switch (eventType) {
-
-    case AceButton::kEventClicked:
-      Serial.println("[DEBUG] Single Click Detected");
-
-      if (inPerformanceMode) {
-        // Save Performance
-        switch (state) {
-          case PARAMETER:
-            if (performances.size() < PERFORMANCE_LIMIT) {
-              resetPerformancesOrdering();
-              performances.push({ (uint16_t)(performances.size() + 1),
-                                  INITPERFORMANCENAME,
-                                  (uint16_t)patchNoU,
-                                  (uint16_t)patchNoL,
-                                  (uint8_t)(wholemode ? 0 : dualmode ? 1
-                                                                     : 2),
-                                  newsplitPoint });
-              state = SAVE_PERFORMANCE;
-            }
-            break;
-          case SAVE_PERFORMANCE:
-            savePerformance(String(performances.last().performanceNo).c_str(), performances.last());
-            loadPerformances();  // <<< reload performances after saving
-            setPerformancesOrdering(performanceNo);
-            renamedPerformance = "";
-            showPerformancePage(performances.last().performanceNo, performances.last().name,
-                                performances.last().upperPatchNo, performances.last().lowerPatchNo);
-            state = PARAMETER;
-            break;
-        }
-      } else {
-        // Save Patch
-        switch (state) {
-          case PARAMETER:
-            if (patches.size() < PATCHES_LIMIT) {
-              resetPatchesOrdering();
-              patches.push({ patches.size() + 1, INITPATCHNAME });
-              state = SAVE;
-            }
-            break;
-          case SAVE:
-            if (upperSW) {
-              patchNameU = patches.last().patchName;
-              savePatch(String(patches.last().patchNo).c_str(), getCurrentPatchData());
-              showPatchPage(patches.last().patchNo, patches.last().patchName, "", "");
-              patchNoU = patches.last().patchNo;
-              loadPatches();
-              setPatchesOrdering(patchNoU);
-              renamedPatch = "";
-              state = PARAMETER;
-            } else {
-              patchNameL = patches.last().patchName;
-              savePatch(String(patches.last().patchNo).c_str(), getCurrentPatchData());
-              showPatchPage(patches.last().patchNo, patches.last().patchName, "", "");
-              patchNoL = patches.last().patchNo;
-              loadPatches();
-              setPatchesOrdering(patchNoL);
-              renamedPatch = "";
-              state = PARAMETER;
-            }
-            break;
-        }
-      }
-      break;
-
-    case AceButton::kEventDoubleClicked:
-      Serial.println("[DEBUG] Double Click Detected");
-
-      if (!inPerformanceMode) {
-        // Save new Performance
-        if (performances.size() < PERFORMANCE_LIMIT) {
-          resetPerformancesOrdering();
-
-          Performance newPerf;
-          newPerf.performanceNo = performances.size() + 1;
-          strcpy(newPerf.name, INITPERFORMANCENAME);
-          newPerf.upperPatchNo = patchNoU;
-          newPerf.lowerPatchNo = patchNoL;
-          newPerf.keyboardMode = wholemode ? 0 : dualmode ? 1
-                                                          : 2;
-          newPerf.newsplitPoint = newsplitPoint;
-
-          performances.push(newPerf);
-
-          savePerformance(String(newPerf.performanceNo).c_str(), newPerf);
-          loadPerformances();  // <<< reload after saving
-          setPerformancesOrdering(newPerf.performanceNo);
-
-          performanceNo = newPerf.performanceNo;
-          renamedPerformance = "";
-
-          showPerformancePage(newPerf.performanceNo, newPerf.name,
-                              newPerf.upperPatchNo, newPerf.lowerPatchNo);
-
-          timer = millis();
-          state = PARAMETER;
-        }
-      }
-      break;
-
-    case AceButton::kEventLongPressed:
-      Serial.println("[DEBUG] Long Press Detected");
-
-      if (inPerformanceMode) {
-        switch (state) {
-          case PARAMETER:
-            state = DELETE_PERFORMANCE;
-            break;
-        }
-      } else {
-        switch (state) {
-          case PARAMETER:
-          case PATCH:
-            state = DELETE;
-            break;
-        }
-      }
-      break;
+  for (int i = 0; i < 4; i++) {
+    int noteon = 60;
+    MIDI5.sendNoteOn(noteon, 64, 1);
+    delayMicroseconds(DelayForSH3);
+    MIDI2.sendNoteOn(noteon, 64, 1);
+    delay(1);
+    MIDI5.sendNoteOff(noteon, 64, 1);
+    delayMicroseconds(DelayForSH3);
+    MIDI2.sendNoteOff(noteon, 64, 1);
+    noteon++;
   }
+
+  upperSW = 0;
+  wholemode = true;
+  recallPatch(patchNoL);  //Load first patch
+  updateplayMode(0);
 }
 
-void savePerformance(const char* fileName, const Performance& perf) {
-  String path = "/perf/" + String(fileName) + ".perf";
+void refreshPatchDisplayFromState() {
+  showPatchPage(
+    currentPgmNumU,
+    currentPatchNameU,
+    currentPgmNumL,
+    currentPatchNameL);
+}
+
+void savePerformance(const char *fileName, const Performance &perf) {
+  String path = "/perf/" + String(fileName);
 
   if (SD.exists(path.c_str())) {
     SD.remove(path.c_str());
@@ -413,107 +306,65 @@ void savePerformance(const char* fileName, const Performance& perf) {
     file.print(",");
     file.print(perf.name);
     file.print(",");
-    file.print(perf.keyboardMode);
-    file.print(",");
-    file.println(perf.newsplitPoint);
+    file.println((int)perf.mode);  // Save playMode as an integer (0, 1, 2)
     file.close();
-    Serial.println("[DEBUG] Performance saved as CSV to SD card.");
   } else {
-    Serial.print("[ERROR] Failed to open file for saving: ");
+    Serial.print("Failed to save performance: ");
     Serial.println(path);
   }
 }
 
-void applyPerformance(const Performance& perf) {
-  // update global state
-  performanceNo = perf.performanceNo;
-  patchNoU = perf.upperPatchNo;
-  patchNoL = perf.lowerPatchNo;
-  wholemode = (perf.keyboardMode == 0);
-  dualmode = (perf.keyboardMode == 1);
-  splitmode = (perf.keyboardMode == 2);
-  newsplitPoint = perf.newsplitPoint;
+void recallPerformance(const Performance &perf) {
+  currentPerformance = perf;
+  playMode = perf.mode;
 
-  // actually load the patches, modes and update the display
-  recallPatch(patchNoU);
-  recallPatch(patchNoL);
-  setKeyboardMode(perf.keyboardMode);
-  setSplitPoint(newsplitPoint);
-  showPerformancePage(perf.performanceNo,
-                      perf.name,
-                      perf.upperPatchNo,
-                      perf.lowerPatchNo);
+  switch (playMode) {
+    case WHOLE:
+      recallPatch(perf.lowerPatchNo);
+      patchNo = perf.lowerPatchNo;
+      refreshPatchDisplayFromState();
+      break;
+    case DUAL:
+    case SPLIT:
+      recallPatch(perf.upperPatchNo);
+      recallPatch(perf.lowerPatchNo);
+      patchNo = perf.lowerPatchNo;
+      refreshPatchDisplayFromState();
+      break;
+  }
 }
 
-void recallPerformance(uint16_t performanceNo) {
+void deletePerformance(int perfNo) {
   char filename[32];
-  sprintf(filename, "/perf/%d.perf", performanceNo);
-
-  File file = SD.open(filename, FILE_READ);
-  if (!file) {
-    Serial.print("[ERROR] Cannot open performance file: ");
+  snprintf(filename, sizeof(filename), "/performances/perf%03d", perfNo);
+  if (SD.exists(filename)) {
+    SD.remove(filename);
+    Serial.print("[DELETE] Removed performance: ");
     Serial.println(filename);
-    return;
-  }
-
-  String dataLine = file.readStringUntil('\n');
-  file.close();
-
-  if (dataLine.length() > 0) {
-    int comma1 = dataLine.indexOf(',');
-    int comma2 = dataLine.indexOf(',', comma1 + 1);
-    int comma3 = dataLine.indexOf(',', comma2 + 1);
-    int comma4 = dataLine.indexOf(',', comma3 + 1);
-
-    if (comma1 == -1 || comma2 == -1 || comma3 == -1 || comma4 == -1) {
-      Serial.println("[ERROR] Invalid performance file format");
-      return;
-    }
-
-    Performance perf;
-    perf.performanceNo = performanceNo;
-    perf.upperPatchNo = dataLine.substring(0, comma1).toInt();
-    perf.lowerPatchNo = dataLine.substring(comma1 + 1, comma2).toInt();
-    dataLine.substring(comma2 + 1, comma3).toCharArray(perf.name, sizeof(perf.name));
-    perf.keyboardMode = dataLine.substring(comma3 + 1, comma4).toInt();
-    perf.newsplitPoint = dataLine.substring(comma4 + 1).toInt();
-
-    // Apply performance
-    patchNoU = perf.upperPatchNo;
-    patchNoL = perf.lowerPatchNo;
-    wholemode = (perf.keyboardMode == 0);
-    dualmode = (perf.keyboardMode == 1);
-    splitmode = (perf.keyboardMode == 2);
-    newsplitPoint = perf.newsplitPoint;
-
-    recallPatch(patchNoU);
-    recallPatch(patchNoL);
-
-    setKeyboardMode(perf.keyboardMode);
-    setSplitPoint(perf.newsplitPoint);
-
-    showPerformancePage(perf.performanceNo, perf.name, perf.upperPatchNo, perf.lowerPatchNo);
   }
 }
 
-void deletePerformance(const char* filename) {
-  SD.remove((String("/perf/") + filename + ".perf").c_str());
+String getModeName(PlayMode mode) {
+  switch (mode) {
+    case WHOLE: return "Whole";
+    case DUAL: return "Dual";
+    case SPLIT: return "Split";
+    default: return "-";
+  }
 }
 
 void loadPerformances() {
-  performances.clear();  // Clear old performances first
-
+  performances.clear();
   File dir = SD.open("/perf");
+
   if (!dir || !dir.isDirectory()) {
-    Serial.println("[ERROR] /perf directory not found or not a directory");
+    Serial.println("/perf not found or is not a directory");
     return;
   }
 
   while (true) {
     File file = dir.openNextFile();
-    if (!file) {
-      break;  // No more files
-    }
+    if (!file) break;
 
     if (file.isDirectory()) {
       file.close();
@@ -523,45 +374,29 @@ void loadPerformances() {
     String dataLine = file.readStringUntil('\n');
     file.close();
 
-    dataLine.trim();  // <-- strip any \r or whitespace
-
     if (dataLine.length() > 0) {
       int comma1 = dataLine.indexOf(',');
       int comma2 = dataLine.indexOf(',', comma1 + 1);
       int comma3 = dataLine.indexOf(',', comma2 + 1);
-      int comma4 = dataLine.indexOf(',', comma3 + 1);
 
-      if (comma1 == -1 || comma2 == -1 || comma3 == -1 || comma4 == -1) {
-        Serial.println("[WARNING] Invalid performance line, skipping...");
-        continue;
-      }
+      if (comma1 == -1 || comma2 == -1 || comma3 == -1) continue;
 
-      Performance perf;
-      perf.performanceNo = performances.size() + 1;  // Auto assign
+      int upper = dataLine.substring(0, comma1).toInt();
+      int lower = dataLine.substring(comma1 + 1, comma2).toInt();
+      String name = dataLine.substring(comma2 + 1, comma3);
+      int mode = dataLine.substring(comma3 + 1).toInt();
 
-      perf.upperPatchNo = dataLine.substring(0, comma1).toInt();
-      perf.lowerPatchNo = dataLine.substring(comma1 + 1, comma2).toInt();
-
-      String nameStr = dataLine.substring(comma2 + 1, comma3);
-      nameStr.trim();  // <- extra safe
-      nameStr.toCharArray(perf.name, sizeof(perf.name));
-
-      perf.keyboardMode = dataLine.substring(comma3 + 1, comma4).toInt();
-      perf.newsplitPoint = dataLine.substring(comma4 + 1).toInt();
-
-      performances.push(perf);
+      int perfNo = performances.size() + 1;
+      performances.push({ perfNo, upper, lower, name, (PlayMode)mode });
     }
   }
 
   if (performances.size() == 0) {
-    Serial.println("[INFO] No performances found, creating default");
-
-    Performance defaultPerf = { 1, INITPERFORMANCENAME, 1, 1, 0, 60 };
-    savePerformance("1", defaultPerf);
-    loadPerformances();  // Reload after creating default
+    Performance defaultPerf = { 1, 1, 1, "Default", WHOLE };
+    savePerformance("perf001", defaultPerf);
+    loadPerformances();  // try again
   }
 }
-
 String getPatchName(uint16_t patchNo) {
   for (uint8_t i = 0; i < patches.size(); i++) {
     auto p = patches[i];  // p is your Patch struct
@@ -2381,42 +2216,67 @@ void updateupperLower() {
   }
 }
 
-void updatewholemode() {
+void updateplayMode(boolean announce) {
+  if (playMode == 0) {
+    updatewholemode(0);
+  } else if (playMode == 1) {
+    updatedualmode(0);
+  } else if (playMode == 2) {
+    updatesplitmode(0);
+  }
+}
+
+void updatewholemode(boolean announce) {
   allNotesOff();
-  showCurrentParameterPage("Mode", String("Whole"));
+  if (announce) {
+    showCurrentParameterPage("Mode", String("Whole"));
+  }
   sr.writePin(WHOLE_LED, HIGH);  // LED off
   sr.writePin(DUAL_LED, LOW);    // LED off
   sr.writePin(SPLIT_LED, LOW);   // LED off
   sr.writePin(UPPER_LED, LOW);   // LED off
   sr.writePin(LOWER_LED, HIGH);  // LED on
   srp.writePin(UPPER2, HIGH);
-  srp.writePin(UPPER1, HIGH);
   upperSW = 0;
+  wholemode = true;
+
+  patchNoU = patchNoL;
+  patchNameU = patchNameL;
+  currentPatchNameU = currentPatchNameL;
+  currentPgmNumU = currentPgmNumL;
+  memcpy(upperData, lowerData, sizeof(upperData));
+
+  lowerParamsToDisplay();
   setAllButtons();
   dualmode = false;
   splitmode = false;
 }
 
-void updatedualmode() {
+void updatedualmode(boolean announce) {
   allNotesOff();
-  showCurrentParameterPage("Mode", String("Dual"));
-  sr.writePin(DUAL_LED, HIGH);  // LED off
+  if (announce) {
+    showCurrentParameterPage("Mode", String("Dual"));
+  }
+  sr.writePin(DUAL_LED, HIGH);  // LED on
   sr.writePin(WHOLE_LED, LOW);  // LED off
   sr.writePin(SPLIT_LED, LOW);  // LED off
   srp.writePin(UPPER2, LOW);
-  srp.writePin(UPPER1, LOW);
+  dualmode = true;
   wholemode = false;
   splitmode = false;
 }
 
-void updatesplitmode() {
+void updatesplitmode(boolean announce) {
   allNotesOff();
-  showCurrentParameterPage("Mode", String("Split"));
-  sr.writePin(SPLIT_LED, HIGH);  // LED off
+  if (announce) {
+    showCurrentParameterPage("Mode", String("Split"));
+  }
+  sr.writePin(SPLIT_LED, HIGH);  // LED on
   sr.writePin(WHOLE_LED, LOW);   // LED off
   sr.writePin(DUAL_LED, LOW);    // LED off
   srp.writePin(UPPER2, LOW);
   srp.writePin(UPPER1, LOW);
+  splitmode = true;
   wholemode = false;
   dualmode = false;
 }
@@ -2582,7 +2442,7 @@ void updatemodWheel() {
 }
 
 void updatePatchname() {
-  showPatchPage(String(patchNoU), patchNameU, String(patchNoL), patchNameL);
+  refreshPatchDisplayFromState();
 }
 
 void myConvertControlChange(byte channel, byte number, byte value) {
@@ -3181,17 +3041,17 @@ void myControlChange(byte channel, byte control, int value) {
 
     case CCwholemode:
       wholemode = true;
-      updatewholemode();
+      updatewholemode(1);
       break;
 
     case CCdualmode:
       dualmode = true;
-      updatedualmode();
+      updatedualmode(1);
       break;
 
     case CCsplitmode:
       splitmode = true;
-      updatesplitmode();
+      updatesplitmode(1);
       break;
 
 
@@ -3292,10 +3152,37 @@ void myControlChange(byte channel, byte control, int value) {
 }
 
 void myProgramChange(byte channel, byte program) {
-  state = PATCH;
-  patchNo = program + 1;
-  recallPatch(patchNo);
-  state = PARAMETER;
+  if (inPerformanceMode) {
+    if (program < performances.size()) {
+      performanceIndex = program;
+      currentPerformance = performances[performanceIndex];
+
+      // Update playmode and patch indices
+      playMode = currentPerformance.mode;
+      wholemode = (playMode == WHOLE);
+      updateplayMode(0);
+
+      // Set patch indices
+      for (int i = 0; i < patches.size(); i++) {
+        if (patches[i].patchNo == currentPerformance.upperPatchNo) upperPatchIndex = i;
+        if (patches[i].patchNo == currentPerformance.lowerPatchNo) lowerPatchIndex = i;
+      }
+
+      // Recall both patches
+      upperSW = true;
+      recallPatch(currentPerformance.upperPatchNo);
+      upperSW = false;
+      recallPatch(currentPerformance.lowerPatchNo);
+
+      refreshPatchDisplayFromState();
+    }
+  } else {
+    // Normal patch recall
+    state = PATCH;
+    patchNo = program + 1;
+    recallPatch(patchNo);
+    state = PARAMETER;
+  }
 }
 
 void myAfterTouch(byte channel, byte value) {
@@ -3358,15 +3245,13 @@ void recallPatch(int patchNo) {
 
       if (patches[i].patchNo == patchNo) {
         if (upperSW) {
-          //upperPatchIndex = i;
+          upperPatchIndex = i;
           currentPgmNumU = String(patches[i].patchNo);
           currentPatchNameU = patches[i].patchName;
-          //storeLastPatchU(currentPgmNumU)
         } else {
-          //lowerPatchIndex = i;
+          lowerPatchIndex = i;
           currentPgmNumL = String(patches[i].patchNo);
           currentPatchNameL = patches[i].patchName;
-          //storeLastPatchL(currentPgmNumL)
         }
 
         break;
@@ -3464,6 +3349,9 @@ void upperParamsToDisplay() {
   updatenoiseLevel(0);
   updatevolumeControl(0);
   updateamDepth(0);
+  updateOsc1Range(0);
+  updateOsc2Range(0);
+
   //updateStratusLFOWaveform(0);
 }
 
@@ -3500,6 +3388,9 @@ void lowerParamsToDisplay() {
   updatenoiseLevel(0);
   updatevolumeControl(0);
   updateamDepth(0);
+  updateOsc1Range(0);
+  updateOsc2Range(0);
+
   //updateStratusLFOWaveform(0);
 }
 
@@ -4097,42 +3988,7 @@ void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
     myControlChange(midiChannel, CCfilterVel, filterVel);
   }
 
-  if (btnIndex == UPPER_SW && btnType == ROX_HELD) {
-
-    if (!inPerformanceMode) {
-      if (performances.size() == 0) {
-        Serial.println("[ERROR] No performances available, staying in Patch Mode");
-        showCurrentPage("No Performances!");
-        timer = millis();
-        state = PARAMETER;
-        return;
-      }
-    }
-
-    inPerformanceMode = !inPerformanceMode;
-    Serial.print("[DEBUG] Performance Mode switched to: ");
-    Serial.println(inPerformanceMode ? "ON" : "OFF");
-
-    if (inPerformanceMode) {
-      srp.writePin(UPPER_LED, LOW);
-      srp.writePin(LOWER_LED, LOW);
-      srp.update();
-      showCurrentPage("Performance Mode");
-    } else {
-      showCurrentPage("Patch Mode");
-
-      // <<< Fix: Recall patch after exiting performance mode
-      Serial.println("[DEBUG] Recalling patch after leaving performance mode...");
-      if (wholemode || upperSW) {
-        recallPatch(patchNoU);
-      } else {
-        recallPatch(patchNoL);
-      }
-
-      timer = millis();
-      state = PARAMETER;
-    }
-  } else if (btnIndex == UPPER_SW && btnType == ROX_RELEASED) {
+  if (btnIndex == UPPER_SW && btnType == ROX_PRESSED) {
     upperSW = !upperSW;
     myControlChange(midiChannel, CCupperSW, upperSW);
   }
@@ -4157,11 +4013,208 @@ void showSettingsPage() {
   showSettingsPage(settings::current_setting(), settings::current_setting_value(), state);
 }
 
+void showPerformancePage(String perfNum, String name, int upperNo, String upperName, int lowerNo, String lowerName) {
+  currentPerfNum = perfNum;
+  currentPerfName = name;
+  currentUpperPatchNo = upperNo;
+  currentUpperPatchName = upperName;
+  currentLowerPatchNo = lowerNo;
+  currentLowerPatchName = lowerName;
+}
+
 void checkSwitches() {
 
-  // Update save button
+  saveButton.update();
+  if (saveButton.held()) {
+    if (inPerformanceMode && (state == PARAMETER || state == PATCH)) {
+      state = PERFORMANCE_DELETE;
+    } else if (state == PARAMETER || state == PATCH) {
+      state = DELETE;
+    }
+  } else if (saveButton.numClicks() == 1) {
+    switch (state) {
+      case SAVE:
+        {
+          if (renamedPatch.length() == 0) {
+            renamedPatch = INITPATCHNAME;  // fallback if no rename occurred
+          }
 
-  saveButton.check();
+          // Update patch name depending on upper or lower
+          if (upperSW) {
+            patchNameU = renamedPatch;
+            currentPatchNameU = renamedPatch;
+            currentPgmNumU = String(patches.last().patchNo);
+          } else {
+            patchNameL = renamedPatch;
+            currentPatchNameL = renamedPatch;
+            currentPgmNumL = String(patches.last().patchNo);
+          }
+
+          // ✅ Update last patch in the buffer before saving
+          patches.last().patchName = renamedPatch;
+
+          // ✅ Save updated patch data
+          String patchData = getCurrentPatchData();
+          savePatch(String(patches.last().patchNo).c_str(), patchData);
+
+          // ✅ Reload and reorder patches explicitly
+          loadPatches();
+          setPatchesOrdering(patches.last().patchNo);
+
+          // ✅ Correctly update patch index for immediate display
+          for (int i = 0; i < patches.size(); i++) {
+            if (patches[i].patchNo == patches.last().patchNo) {
+              if (upperSW) upperPatchIndex = i;
+              else lowerPatchIndex = i;
+              break;
+            }
+          }
+
+          // ✅ Immediately refresh display with updated data
+          refreshPatchDisplayFromState();
+
+          renamedPatch = "";
+          state = PARAMETER;
+        }
+        break;
+
+
+      case PATCHNAMING:
+        {
+          //Serial.println("renamedPatch BEFORE SAVING: " + renamedPatch);
+
+          if (renamedPatch.length() == 0) {
+            renamedPatch = patches.last().patchName;  // fallback to existing name
+          }
+
+          // Update correct upper/lower patch name based on current layer
+          if (upperSW) {
+            patchNameU = renamedPatch;
+            currentPatchNameU = renamedPatch;  // Update immediately
+            currentPgmNumU = String(patches.last().patchNo);
+          } else {
+            patchNameL = renamedPatch;
+            currentPatchNameL = renamedPatch;  // Update immediately
+            currentPgmNumL = String(patches.last().patchNo);
+          }
+
+          // Update last patch in the patches buffer
+          patches.last().patchName = renamedPatch;
+
+          // Save patch data (with the correct name included)
+          String patchData = getCurrentPatchData();
+          savePatch(String(patches.last().patchNo).c_str(), patchData);
+
+          loadPatches();                   // Refresh patches list from SD card
+          refreshPatchDisplayFromState();  // immediately update the display
+          setPatchesOrdering(patches.last().patchNo);
+
+          renamedPatch = "";
+          state = PARAMETER;
+        }
+        break;
+
+      case PARAMETER:
+        if (inPerformanceMode) {
+          if (performances.size() < PERFORMANCE_LIMIT) {
+            int newPerfNo = performances.size() + 1;
+            Performance newPerf = {
+              newPerfNo,
+              patches[upperPatchIndex].patchNo,
+              patches[lowerPatchIndex].patchNo,
+              INITPATCHNAME,
+              (PlayMode)playMode
+            };
+            currentPerformance = newPerf;
+            performances.push(newPerf);
+            performanceIndex = performances.size() - 1;
+
+            showPerformancePage(
+              String(newPerf.performanceNo),
+              newPerf.name,
+              newPerf.upperPatchNo,
+              getPatchName(newPerf.upperPatchNo),
+              newPerf.lowerPatchNo,
+              getPatchName(newPerf.lowerPatchNo));
+
+            state = PERFORMANCE_SAVE;
+          }
+        } else {
+          // 🛠 PATCH SAVE FLOW
+          if (patches.size() < PATCHES_LIMIT) {
+            resetPatchesOrdering();  // start from patch 1
+            patches.push({ patches.size() + 1, INITPATCHNAME });
+            state = SAVE;
+          }
+        }
+        break;
+
+      case PERFORMANCE_SAVE:
+        currentPerformance = performances[performanceIndex];
+        state = PERFORMANCE_NAMING;
+        renamedPatch = currentPerformance.name;
+        charIndex = 0;
+        currentCharacter = CHARACTERS[charIndex];
+        startedRenaming = false;
+        showRenamingPage(renamedPatch);
+        break;
+
+      case PERFORMANCE_NAMING:
+        if (saveButton.numClicks() == 1) {
+          if (renamedPatch.length() > 0) {
+            currentPerformance.name = renamedPatch;
+          }
+
+          upperSW = true;
+          savePatch(String(currentPerformance.upperPatchNo).c_str(), getCurrentPatchData());
+
+          upperSW = false;
+          savePatch(String(currentPerformance.lowerPatchNo).c_str(), getCurrentPatchData());
+
+          upperSW = true;
+
+          // Update full performance data
+          currentPerformance.upperPatchNo = patches[upperPatchIndex].patchNo;
+          currentPerformance.lowerPatchNo = patches[lowerPatchIndex].patchNo;
+          currentPerformance.mode = (PlayMode)playMode;
+
+          for (int i = 0; i < performances.size(); i++) {
+            if (performances[i].performanceNo == currentPerformance.performanceNo) {
+              performances[i] = currentPerformance;
+              break;
+            }
+          }
+
+          char filename[16];
+          snprintf(filename, sizeof(filename), "perf%03d", currentPerformance.performanceNo);
+
+          savePerformance(filename, currentPerformance);
+          loadPerformances();
+
+          renamedPatch = "";
+          charIndex = 0;
+          currentCharacter = CHARACTERS[0];
+          startedRenaming = false;
+          state = PARAMETER;
+        } else if (recallButton.numClicks() == 1) {
+          if (renamedPatch.length() < 12) {
+            renamedPatch.concat(String(currentCharacter));
+            charIndex = 0;
+            currentCharacter = CHARACTERS[charIndex];
+            showRenamingPage(renamedPatch);
+          }
+        } else if (backButton.numClicks() == 1) {
+          renamedPatch = "";
+          charIndex = 0;
+          startedRenaming = false;
+          state = PARAMETER;
+          if (performances.size() > 0 && performances.last().name == INITPATCHNAME) {
+            performances.pop();
+          }
+        }
+        break;
+    }
+  }
 
   settingsButton.update();
   if (settingsButton.held()) {
@@ -4185,29 +4238,90 @@ void checkSwitches() {
     }
   }
 
+  backButton.update();
+  if (backButton.held()) {
+    //If Back button held, Panic - all notes off
+  } else if (backButton.numClicks() == 1) {
+    switch (state) {
+      case RECALL:
+        setPatchesOrdering(patchNo);
+        state = PARAMETER;
+        break;
+      case SAVE:
+        renamedPatch = "";
+        state = PARAMETER;
+        loadPatches();  //Remove patch that was to be saved
+        setPatchesOrdering(patchNo);
+        break;
+      case PATCHNAMING:
+        charIndex = 0;
+        renamedPatch = "";
+        state = SAVE;
+        break;
+      case DELETE:
+        setPatchesOrdering(patchNo);
+        state = PARAMETER;
+        break;
+      case SETTINGS:
+        state = PARAMETER;
+        break;
+      case SETTINGSVALUE:
+        state = SETTINGS;
+        showSettingsPage();
+        break;
+      case PERFORMANCE_NAMING:
+        renamedPatch = "";
+        charIndex = 0;
+        state = PARAMETER;
+        // Optionally remove the unsaved performance from the buffer:
+        if (performances.size() > 0 && performances.last().name == INITPATCHNAME) {
+          performances.pop();
+        }
+        break;
+      case PERFORMANCE_DELETE:
+        setPerformancesOrdering(currentPerformance.performanceNo);
+        state = PARAMETER;
+        break;
+    }
+  }
+
+  // Encoder switch
   recallButton.update();
   if (recallButton.held()) {
-    if (inPerformanceMode) {
-      performanceNo = performances.first().performanceNo;
-      recallPerformance(performanceNo);
-    } else {
-      patchNo = patches.first().patchNo;
-      recallPatch(patchNo);
+    if (!recallHeldToggleLatch) {
+      inPerformanceMode = !inPerformanceMode;
+      recallHeldToggleLatch = true;
+
+      //Serial.print("[MODE] Switched to ");
+      //Serial.println(inPerformanceMode ? "Performance Mode" : "Patch Mode");
+
+      showCurrentParameterPage("Mode", inPerformanceMode ? "Performance" : "Patch");
+
+      if (inPerformanceMode && performances.size() > 0) {
+        // Entering Performance Mode
+        performanceIndex = 0;
+        currentPerformance = performances[performanceIndex];
+
+        showPerformancePage(
+          String(currentPerformance.performanceNo),
+          currentPerformance.name,
+          currentPerformance.upperPatchNo,
+          getPatchName(currentPerformance.upperPatchNo),
+          currentPerformance.lowerPatchNo,
+          getPatchName(currentPerformance.lowerPatchNo));
+
+      } else {
+        // Returning to Patch Mode
+        refreshPatchDisplayFromState();
+      }
     }
-    state = PARAMETER;
-  } else if (recallButton.numClicks() == 1) {
+  } else {
+    recallHeldToggleLatch = false;
+  }
+  if (recallButton.numClicks() == 1) {
     switch (state) {
-      case PARAMETER:
-        state = RECALL;
-        break;
       case RECALL:
-        if (inPerformanceMode) {
-          performanceNo = performances.first().performanceNo;
-          recallPerformance(performanceNo);
-        } else {
-          patchNo = patches.first().patchNo;
-          recallPatch(patchNo);
-        }
+        //Serial.println("[INFO] Ignored default RECALL to avoid overwriting performance recall.");
         state = PARAMETER;
         break;
       case SAVE:
@@ -4248,62 +4362,326 @@ void checkSwitches() {
         state = SETTINGS;
         showSettingsPage();
         break;
+
+      case PARAMETER:
+        // Enter performance recall
+        if (performances.size() > 0) {
+          currentPerformance = performances.first();
+          showPerformancePage(
+            String(currentPerformance.performanceNo),
+            currentPerformance.name,
+            currentPerformance.upperPatchNo,
+            getPatchName(currentPerformance.upperPatchNo),
+            currentPerformance.lowerPatchNo,
+            getPatchName(currentPerformance.lowerPatchNo));
+          state = PERFORMANCE_RECALL;
+        }
+        break;
+
+      case PERFORMANCE_RECALL:
+        for (int i = 0; i < patches.size(); i++) {
+          if (patches[i].patchNo == currentPerformance.upperPatchNo) {
+            upperPatchIndex = i;
+          }
+          if (patches[i].patchNo == currentPerformance.lowerPatchNo) {
+            lowerPatchIndex = i;
+          }
+        }
+
+        playMode = currentPerformance.mode;
+        wholemode = (playMode == WHOLE);
+        updateplayMode(0);
+
+        if (wholemode) {
+          patchNoU = patchNoL;
+          patchNameU = patchNameL;
+          currentPatchNameU = currentPatchNameL;
+          currentPgmNumU = currentPgmNumL;
+          memcpy(upperData, lowerData, sizeof(upperData));
+        }
+
+        upperSW = true;
+        recallPatch(currentPerformance.upperPatchNo);
+
+        upperSW = false;
+        recallPatch(currentPerformance.lowerPatchNo);
+
+        refreshPatchDisplayFromState();
+
+        state = PARAMETER;
+        patchNo = 0;  // ✅ Clear global patchNo to avoid accidental reuse
+        return;
+
+      case PERFORMANCE_NAMING:
+        if (renamedPatch.length() < 12) {
+          renamedPatch.concat(String(currentCharacter));
+          charIndex = 0;
+          currentCharacter = CHARACTERS[charIndex];
+          showRenamingPage(renamedPatch);
+        }
+        break;
+
+      case PERFORMANCE_DELETE:
+        if (performances.size() > 0) {
+          state = PERFORMANCE_DELETEMSG;
+
+          int deletedNo = performances.first().performanceNo;
+          performances.shift();          // Remove from buffer
+          deletePerformance(deletedNo);  // Delete file
+          loadPerformances();            // Refresh buffer
+          renumberPerformancesOnSD();    // Reorder files
+          loadPerformances();            // Reload to apply new order
+
+          currentPerformance = performances.first();
+          recallPerformance(currentPerformance);
+        }
+        state = PARAMETER;
+        return;
+
+
+      case PERFORMANCE_DELETEMSG:
+        // Show deletion complete screen briefly
+        tft.fillScreen(ST7735_BLACK);
+        tft.setFont(&FreeSans12pt7b);
+        tft.setTextColor(ST7735_YELLOW);
+        tft.setCursor(10, 60);
+        tft.println("Renumbering");
+        tft.setCursor(10, 100);
+        tft.println("Performances...");
+        tft.updateScreen();
+        delay(1000);
+        state = PARAMETER;
+        break;
+    }
+  }
+}
+
+// Updated checkEncoder() with upperPatchIndex and lowerPatchIndex
+void checkEncoder() {
+  long encRead = encoder.read();
+  bool moved = false;
+
+  if ((encCW && encRead > encPrevious + 3) || (!encCW && encRead < encPrevious - 3)) {
+    moved = true;
+
+    switch (state) {
+
+      case PERFORMANCE_DELETE:
+        if (encCW) {
+          performances.push(performances.shift());
+        } else {
+          performances.unshift(performances.pop());
+        }
+        break;
+
+      case PERFORMANCE_SAVE:
+        performanceIndex++;
+        if (performanceIndex >= performances.size()) performanceIndex = 0;
+        currentPerformance = performances[performanceIndex];
+        showPerformancePage(
+          String(currentPerformance.performanceNo),
+          currentPerformance.name,
+          currentPerformance.upperPatchNo,
+          getPatchName(currentPerformance.upperPatchNo),
+          currentPerformance.lowerPatchNo,
+          getPatchName(currentPerformance.lowerPatchNo));
+        break;
+
+      case PERFORMANCE_RECALL:
+        performanceIndex++;
+        if (performanceIndex >= performances.size()) performanceIndex = 0;
+        currentPerformance = performances[performanceIndex];
+        showPerformancePage(
+          String(currentPerformance.performanceNo),
+          currentPerformance.name,
+          currentPerformance.upperPatchNo,
+          getPatchName(currentPerformance.upperPatchNo),
+          currentPerformance.lowerPatchNo,
+          getPatchName(currentPerformance.lowerPatchNo));
+        break;
+
+      case PERFORMANCE_NAMING:
+        if (!startedRenaming) {
+          renamedPatch = "";
+          startedRenaming = true;
+        }
+
+        charIndex++;
+        if (charIndex >= TOTALCHARS) charIndex = 0;
+        currentCharacter = CHARACTERS[charIndex];
+        showRenamingPage(renamedPatch + currentCharacter);
+        break;
+
+      case PARAMETER:
+        if (inPerformanceMode) {
+          performanceIndex++;
+          if (performanceIndex >= performances.size()) performanceIndex = 0;
+          currentPerformance = performances[performanceIndex];
+
+          for (int i = 0; i < patches.size(); i++) {
+            if (patches[i].patchNo == currentPerformance.upperPatchNo) upperPatchIndex = i;
+            if (patches[i].patchNo == currentPerformance.lowerPatchNo) lowerPatchIndex = i;
+          }
+
+          playMode = currentPerformance.mode;
+          wholemode = (playMode == WHOLE);
+          updateplayMode(0);
+
+          upperSW = true;
+          recallPatch(currentPerformance.upperPatchNo);
+          upperSW = false;
+          recallPatch(currentPerformance.lowerPatchNo);
+        } else {
+          if (upperSW) {
+            upperPatchIndex++;
+            if (upperPatchIndex >= patches.size()) upperPatchIndex = 0;
+            patchNo = patches[upperPatchIndex].patchNo;
+            recallPatch(patchNo);
+          } else {
+            lowerPatchIndex++;
+            if (lowerPatchIndex >= patches.size()) lowerPatchIndex = 0;
+            patchNo = patches[lowerPatchIndex].patchNo;
+            recallPatch(patchNo);
+          }
+        }
+        refreshPatchDisplayFromState();
+        break;
+
+      case RECALL:
+      case SAVE:
+      case DELETE:
+        patches.push(patches.shift());
+        break;
+
+      case PATCHNAMING:
+        if (charIndex == TOTALCHARS) charIndex = 0;
+        currentCharacter = CHARACTERS[charIndex++];
+        showRenamingPage(renamedPatch + currentCharacter);
+        break;
+
+      case SETTINGS:
+        settings::increment_setting();
+        showSettingsPage();
+        break;
+
+      case SETTINGSVALUE:
+        settings::increment_setting_value();
+        showSettingsPage();
+        break;
+    }
+  } else if ((encCW && encRead < encPrevious - 3) || (!encCW && encRead > encPrevious + 3)) {
+    moved = true;
+
+    switch (state) {
+
+      case PERFORMANCE_DELETE:
+        if (encCW) {
+          performances.push(performances.shift());
+        } else {
+          performances.unshift(performances.pop());
+        }
+        break;
+
+      case PERFORMANCE_SAVE:
+        performanceIndex--;
+        if (performanceIndex < 0) performanceIndex = performances.size() - 1;
+        currentPerformance = performances[performanceIndex];
+        showPerformancePage(
+          String(currentPerformance.performanceNo),
+          currentPerformance.name,
+          currentPerformance.upperPatchNo,
+          getPatchName(currentPerformance.upperPatchNo),
+          currentPerformance.lowerPatchNo,
+          getPatchName(currentPerformance.lowerPatchNo));
+        break;
+
+      case PERFORMANCE_RECALL:
+        performanceIndex--;
+        if (performanceIndex < 0) performanceIndex = performances.size() - 1;
+        currentPerformance = performances[performanceIndex];
+        showPerformancePage(
+          String(currentPerformance.performanceNo),
+          currentPerformance.name,
+          currentPerformance.upperPatchNo,
+          getPatchName(currentPerformance.upperPatchNo),
+          currentPerformance.lowerPatchNo,
+          getPatchName(currentPerformance.lowerPatchNo));
+        break;
+
+      case PERFORMANCE_NAMING:
+        if (!startedRenaming) {
+          renamedPatch = "";
+          startedRenaming = true;
+        }
+
+        charIndex--;
+        if (charIndex < 0) charIndex = TOTALCHARS - 1;
+        currentCharacter = CHARACTERS[charIndex];
+        showRenamingPage(renamedPatch + currentCharacter);
+        break;
+
+      case PARAMETER:
+        if (inPerformanceMode) {
+          performanceIndex--;
+          if (performanceIndex < 0) performanceIndex = performances.size() - 1;
+          currentPerformance = performances[performanceIndex];
+
+          for (int i = 0; i < patches.size(); i++) {
+            if (patches[i].patchNo == currentPerformance.upperPatchNo) upperPatchIndex = i;
+            if (patches[i].patchNo == currentPerformance.lowerPatchNo) lowerPatchIndex = i;
+          }
+
+          playMode = currentPerformance.mode;
+          wholemode = (playMode == WHOLE);
+          updateplayMode(0);
+
+          upperSW = true;
+          recallPatch(currentPerformance.upperPatchNo);
+          upperSW = false;
+          recallPatch(currentPerformance.lowerPatchNo);
+        } else {
+          if (upperSW) {
+            upperPatchIndex--;
+            if (upperPatchIndex < 0) upperPatchIndex = patches.size() - 1;
+            patchNo = patches[upperPatchIndex].patchNo;
+            recallPatch(patchNo);
+          } else {
+            lowerPatchIndex--;
+            if (lowerPatchIndex < 0) lowerPatchIndex = patches.size() - 1;
+            patchNo = patches[lowerPatchIndex].patchNo;
+            recallPatch(patchNo);
+          }
+        }
+        refreshPatchDisplayFromState();
+        break;
+
+
+      case RECALL:
+      case SAVE:
+      case DELETE:
+        patches.unshift(patches.pop());
+        break;
+
+      case PATCHNAMING:
+        if (charIndex == -1) charIndex = TOTALCHARS - 1;
+        currentCharacter = CHARACTERS[charIndex--];
+        showRenamingPage(renamedPatch + currentCharacter);
+        break;
+
+      case SETTINGS:
+        settings::decrement_setting();
+        showSettingsPage();
+        break;
+
+      case SETTINGSVALUE:
+        settings::decrement_setting_value();
+        showSettingsPage();
+        break;
     }
   }
 
-  backButton.update();
-  if (backButton.held()) {
-    allNotesOff();
-  } else if (backButton.numClicks() == 1) {
-    switch (state) {
-      case DELETE:
-        if (patches.size() > 1) {
-          patchNo = patches.first().patchNo;
-          patches.shift();
-          deletePatch(String(patchNo).c_str());
-          loadPatches();
-          renumberPatchesOnSD();
-          loadPatches();
-          patchNo = patches.first().patchNo;
-          recallPatch(patchNo);
-        }
-        state = PARAMETER;
-        break;
-      case DELETE_PERFORMANCE:
-        if (performances.size() > 1) {
-          performanceNo = performances.first().performanceNo;
-          performances.shift();
-          deletePerformance(String(performanceNo).c_str());
-          loadPerformances();
-          renumberPerformancesOnSD();
-          loadPerformances();
-          performanceNo = performances.first().performanceNo;
-          recallPerformance(performanceNo);
-        }
-        state = PARAMETER;
-        break;
-      case RECALL:
-        state = PARAMETER;
-        break;
-      case SAVE:
-      case SAVE_PERFORMANCE:
-        renamedPatch = "";
-        renamedPerformance = "";
-        state = PARAMETER;
-        break;
-      case SETTINGS:
-        state = PARAMETER;
-        break;
-      case SETTINGSVALUE:
-        state = SETTINGS;
-        showSettingsPage();
-        break;
-      case PATCHNAMING:
-        charIndex = 0;
-        renamedPatch = "";
-        state = SAVE;
-        break;
-    }
+  if (moved) {
+    encPrevious = encRead;
   }
 }
 
@@ -4321,115 +4699,6 @@ void reinitialiseToPanel() {
   showPatchPage("Initial", "Panel Settings", "", "");
 }
 
-void checkEncoder() {
-  long encRead = encoder.read();
-
-  bool movedCW = (encCW && encRead > encPrevious + 3)
-                 || (!encCW && encRead < encPrevious - 3);
-  bool movedCCW = (encCW && encRead < encPrevious - 3)
-                  || (!encCW && encRead > encPrevious + 3);
-
-  // Detect clockwise rotation
-  if (movedCW) {
-    if (inPerformanceMode && performances.size() > 0) {
-      performanceIndex = (performanceIndex + 1) % performances.size();
-      state = PERFORMANCE;  // trigger the thread to redraw
-      timer = millis();     // reset any timeout you use
-    } else {
-      // Normal Patch Mode CW
-      switch (state) {
-        case PARAMETER:
-          state = PATCH;
-          if (upperSW) {
-            patches.push(patches.shift());
-            patchNoU = patches.first().patchNo;
-            recallPatch(patchNoU);
-          } else {
-            patches.push(patches.shift());
-            patchNoL = patches.first().patchNo;
-            recallPatch(patchNoL);
-          }
-          state = PARAMETER;
-          break;
-        case RECALL:
-          patches.push(patches.shift());
-          break;
-        case SAVE:
-          patches.push(patches.shift());
-          break;
-        case PATCHNAMING:
-          if (charIndex == TOTALCHARS) charIndex = 0;
-          currentCharacter = CHARACTERS[charIndex++];
-          showRenamingPage(renamedPatch + currentCharacter);
-          break;
-        case DELETE:
-          patches.push(patches.shift());
-          break;
-        case SETTINGS:
-          settings::increment_setting();
-          showSettingsPage();
-          break;
-        case SETTINGSVALUE:
-          settings::increment_setting_value();
-          showSettingsPage();
-          break;
-      }
-    }
-    encPrevious = encRead;
-  }
-
-  else if (movedCCW) {
-    if (inPerformanceMode && performances.size() > 0) {
-      performanceIndex = performanceIndex == 0
-                           ? performances.size() - 1
-                           : performanceIndex - 1;
-      state = PERFORMANCE;  // trigger redraw
-      timer = millis();
-    } else {
-      // Normal Patch Mode CCW
-      switch (state) {
-        case PARAMETER:
-          state = PATCH;
-          if (upperSW) {
-            patches.unshift(patches.pop());
-            patchNoU = patches.first().patchNo;
-            recallPatch(patchNoU);
-          } else {
-            patches.unshift(patches.pop());
-            patchNoL = patches.first().patchNo;
-            recallPatch(patchNoL);
-          }
-          state = PARAMETER;
-          break;
-        case RECALL:
-          patches.unshift(patches.pop());
-          break;
-        case SAVE:
-          patches.unshift(patches.pop());
-          break;
-        case PATCHNAMING:
-          if (charIndex == -1) {
-            charIndex = TOTALCHARS - 1;
-          }
-          currentCharacter = CHARACTERS[charIndex--];
-          showRenamingPage(renamedPatch + currentCharacter);
-          break;
-        case DELETE:
-          patches.unshift(patches.pop());
-          break;
-        case SETTINGS:
-          settings::decrement_setting();
-          showSettingsPage();
-          break;
-        case SETTINGSVALUE:
-          settings::decrement_setting_value();
-          showSettingsPage();
-          break;
-      }
-    }
-    encPrevious = encRead;
-  }
-}
 
 void loop() {
   octoswitch.update();
@@ -4443,15 +4712,4 @@ void loop() {
   MIDI.read(midiChannel);
   usbMIDI.read(midiChannel);
   LFODelayHandle();
-
-
-  // Only one delayed‐recall block
-  if (pendingPerformanceRecall && (millis() - performanceScrollTimer > 100)) {
-    pendingPerformanceRecall = false;
-    // Apply the performance entirely in memory (no SD I/O here)
-    applyPerformance(performances[performanceIndex]);
-    // If you still want the thread to redraw, you can also:
-    // state = PERFORMANCE;
-    // timer = millis();
-  }
 }

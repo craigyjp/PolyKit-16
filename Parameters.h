@@ -14,15 +14,19 @@ int lowerTranspose = 0;
 int newvalue = 0;
 
 // Performance
-unsigned long performanceScrollTimer = 0;
-bool pendingPerformanceRecall = false;
-uint16_t performanceIndex = 0;
+int playMode = 0;
+int lowerSplitVoicePointer = 0;
+int upperSplitVoicePointer = 0;
+int performanceIndex = 0;
 bool inPerformanceMode = false;
 uint16_t performanceNo = 1;
+bool startedRenaming = false;
 String renamedPerformance = "";
 int patchNo = 0;
-int patchNoU = 0;
-int patchNoL = 0;
+int patchNoU = 1;
+int patchNoL = 1;
+bool recallHeldToggleLatch = false;
+
 
 //Delayed LFO
 int numberOfNotesU = 0;
