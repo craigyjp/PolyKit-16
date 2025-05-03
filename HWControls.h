@@ -37,12 +37,13 @@ ADC *adc = new ADC();
 //Mux 1 Connections
 #define MUX1_spare0 0 			// 2V
 #define MUX1_pwLFO 1   			// 5V
-#define MUX1_osc2PW 2			// 12V
-#define MUX1_osc1PW 3			// 12V
+#define MUX1_osc1PW 2			// 12V
+#define MUX1_osc2PW 3			// 12V
 #define MUX1_spare4 4			// 2V
 #define MUX1_fmDepth 5			// 2V
-#define MUX1_osc2PWM 6			// 2V
-#define MUX1_osc1PWM 7  		// 2V
+#define MUX1_osc1PWM 6  		// 2V
+#define MUX1_osc2PWM 7			// 2V
+
 
 #define MUX1_osc1Range 8  		// 3.3V switches
 #define MUX1_noiseLevel 9 		// 2V

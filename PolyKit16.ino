@@ -59,6 +59,9 @@ uint32_t int_ref_on_flexible_mode = 0b00001001000010100000000000000000;  // { 00
 
 uint32_t sample_data1 = 0b00000000000000000000000000000000;
 uint32_t sample_data2 = 0b00000000000000000000000000000000;
+uint32_t sample_data3 = 0b00000000000000000000000000000000;
+uint32_t sample_data4 = 0b00000000000000000000000000000000;
+
 uint32_t channel_a = 0b00000010000000000000000000000000;
 uint32_t channel_b = 0b00000010000100000000000000000000;
 uint32_t channel_c = 0b00000010001000000000000000000000;
@@ -79,7 +82,9 @@ struct Performance {
   int upperPatchNo;
   int lowerPatchNo;
   String name;
-  PlayMode mode;  // ← Back to enum type!
+  PlayMode mode;       // ← Back to enum type!
+  byte newsplitPoint;  // 👈 add this line
+  byte splitTrans;     // 👈 add this line
 };
 
 CircularBuffer<Performance, PERFORMANCE_LIMIT> performances;
@@ -165,7 +170,7 @@ void setup() {
   SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE0));
   octoswitch.begin(PIN_DATA, PIN_LOAD, PIN_CLK);
   octoswitch.setCallback(onButtonPress);
-  //octoswitch.setIgnoreAfterHold(UPPER_SW, true);
+  octoswitch.setIgnoreAfterHold(UPPER_SW, true);
 
   srp.begin(SRP_DATA, SRP_LATCH, SRP_CLK, SRP_PWM);
   sr.begin(SR_DATA, SR_LATCH, SR_CLK, SR_PWM);
@@ -300,13 +305,19 @@ void savePerformance(const char *fileName, const Performance &perf) {
 
   File file = SD.open(path.c_str(), FILE_WRITE);
   if (file) {
+    file.print(perf.performanceNo);  // 👈 Save perf number first
+    file.print(",");
     file.print(perf.upperPatchNo);
     file.print(",");
     file.print(perf.lowerPatchNo);
     file.print(",");
     file.print(perf.name);
     file.print(",");
-    file.println((int)perf.mode);  // Save playMode as an integer (0, 1, 2)
+    file.print((int)perf.mode);  // Save playMode as an integer (0, 1, 2)
+    file.print(",");
+    file.print(perf.newsplitPoint);
+    file.print(",");
+    file.println(perf.splitTrans);
     file.close();
   } else {
     Serial.print("Failed to save performance: ");
@@ -375,33 +386,44 @@ void loadPerformances() {
     file.close();
 
     if (dataLine.length() > 0) {
-      int comma1 = dataLine.indexOf(',');
+      int comma0 = dataLine.indexOf(',');
+      int comma1 = dataLine.indexOf(',', comma0 + 1);
       int comma2 = dataLine.indexOf(',', comma1 + 1);
       int comma3 = dataLine.indexOf(',', comma2 + 1);
+      int comma4 = dataLine.indexOf(',', comma3 + 1);
+      int comma5 = dataLine.indexOf(',', comma4 + 1);
 
-      if (comma1 == -1 || comma2 == -1 || comma3 == -1) continue;
+      if (comma0 == -1 || comma1 == -1 || comma2 == -1 || comma3 == -1 || comma4 == -1 || comma5 == -1) continue;
 
-      int upper = dataLine.substring(0, comma1).toInt();
+      int perfNo = dataLine.substring(0, comma0).toInt();
+      int upper = dataLine.substring(comma0 + 1, comma1).toInt();
       int lower = dataLine.substring(comma1 + 1, comma2).toInt();
       String name = dataLine.substring(comma2 + 1, comma3);
-      int mode = dataLine.substring(comma3 + 1).toInt();
+      int mode = dataLine.substring(comma3 + 1, comma4).toInt();
+      int newsplitPoint = dataLine.substring(comma4 + 1, comma5).toInt();
+      int splitTrans = dataLine.substring(comma5 + 1).toInt();
 
-      int perfNo = performances.size() + 1;
-      performances.push({ perfNo, upper, lower, name, (PlayMode)mode });
+      performances.push({ perfNo, upper, lower, name, (PlayMode)mode, (byte)newsplitPoint, (byte)splitTrans });
+
     }
   }
 
+
+
+  // ✅ Only run once after loop
   if (performances.size() == 0) {
-    Performance defaultPerf = { 1, 1, 1, "Default", WHOLE };
+    Performance defaultPerf = { 1, 1, 1, "Default", WHOLE, 60, 2 };
     savePerformance("perf001", defaultPerf);
     loadPerformances();  // try again
   }
 }
+
+// ✅ This must be outside `loadPerformances()`
 String getPatchName(uint16_t patchNo) {
   for (uint8_t i = 0; i < patches.size(); i++) {
-    auto p = patches[i];  // p is your Patch struct
+    auto p = patches[i];
     if (p.patchNo == patchNo) {
-      return p.patchName;  // p.patchName is a String
+      return p.patchName;
     }
   }
   return String("Unknown");
@@ -2227,7 +2249,7 @@ void updateplayMode(boolean announce) {
 }
 
 void updatewholemode(boolean announce) {
-  allNotesOff();
+  //allNotesOff();
   if (announce) {
     showCurrentParameterPage("Mode", String("Whole"));
   }
@@ -2253,7 +2275,7 @@ void updatewholemode(boolean announce) {
 }
 
 void updatedualmode(boolean announce) {
-  allNotesOff();
+  //allNotesOff();
   if (announce) {
     showCurrentParameterPage("Mode", String("Dual"));
   }
@@ -2267,7 +2289,7 @@ void updatedualmode(boolean announce) {
 }
 
 void updatesplitmode(boolean announce) {
-  allNotesOff();
+  //allNotesOff();
   if (announce) {
     showCurrentParameterPage("Mode", String("Split"));
   }
@@ -3230,7 +3252,7 @@ void myAfterTouch(byte channel, byte value) {
 }
 
 void recallPatch(int patchNo) {
-  allNotesOff();
+  //allNotesOff();
 
   File patchFile = SD.open(String(patchNo).c_str());
   if (!patchFile) {
@@ -3597,15 +3619,19 @@ void midiCCOutCPU5(byte cc, byte value, byte channel) {
 }
 
 
-void outputDAC(int CHIP_SELECT, uint32_t sample_data1, uint32_t sample_data2) {
-  SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE1));
+void outputDAC(int CHIP_SELECT, uint32_t sample_data1, uint32_t sample_data2, uint32_t sample_data3, uint32_t sample_data4) {
+  SPI.beginTransaction(SPISettings(40000000, MSBFIRST, SPI_MODE1));
   digitalWriteFast(CHIP_SELECT, LOW);
   SPI.transfer32(sample_data1);
-  //delayMicroseconds(5);
   digitalWriteFast(CHIP_SELECT, HIGH);
   digitalWriteFast(CHIP_SELECT, LOW);
   SPI.transfer32(sample_data2);
-  //delayMicroseconds(5);
+  digitalWriteFast(CHIP_SELECT, HIGH);
+  digitalWriteFast(CHIP_SELECT, LOW);
+  SPI.transfer32(sample_data3);
+  digitalWriteFast(CHIP_SELECT, HIGH);
+  digitalWriteFast(CHIP_SELECT, LOW);
+  SPI.transfer32(sample_data4);
   digitalWriteFast(CHIP_SELECT, HIGH);
   SPI.endTransaction();
 }
@@ -3632,73 +3658,61 @@ void writeDemux() {
           sample_data2 = (channel_b & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
           break;
       }
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterAttack] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterAttack] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterAttack] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterAttack] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 1:
       sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc2PWM] * DACMULT)) & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc2PWM] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterDecay] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterDecay] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterDecay] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterDecay] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 2:
       sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc1PWM] * DACMULT)) & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc1PWM] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterSustain] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterSustain] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterSustain] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterSustain] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 3:
       sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_stack] * DACMULT)) & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_stack] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterRelease] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterRelease] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterRelease] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterRelease] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 4:
       sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc2Detune] * DACMULT)) & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc2Detune] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_ampAttack] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_ampAttack] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_ampAttack] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_ampAttack] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 5:
       sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_noiseLevel] * DACMULT)) & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_noiseLevel] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_ampDecay] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_ampDecay] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_ampDecay] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_ampDecay] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 6:
@@ -3720,109 +3734,91 @@ void writeDemux() {
           sample_data2 = (channel_b & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
           break;
       }
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_ampSustain] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_ampSustain] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_ampSustain] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_ampSustain] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 7:
       sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_volumeControl] * DACMULT)) & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_volumeControl] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_ampRelease] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_ampRelease] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_ampRelease] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_ampRelease] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 8:
       sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc1SawLevel] * DACMULT)) & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc1SawLevel] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_pwLFO] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_pwLFO] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_pwLFO] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_pwLFO] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 9:
       sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc1PulseLevel] * DACMULT)) & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc1PulseLevel] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_LFORate] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_LFORate] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_LFORate] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_LFORate] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 10:
       sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc2SawLevel] * DACMULT)) & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc2SawLevel] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(LFOWaveCVupper * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(LFOWaveCVlower * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(LFOWaveCVupper * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(LFOWaveCVlower * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 11:
       sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc2PulseLevel] * DACMULT)) & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc2PulseLevel] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterEGlevel] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterEGlevel] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterEGlevel] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterEGlevel] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 12:  // was keytrack, but now moved to MIDI
       sample_data1 = (channel_a & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterCutoff] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterCutoff] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterCutoff] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterCutoff] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 13:
       sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc1PW] * DACMULT)) & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc1PW] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterRes] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterRes] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_filterRes] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_filterRes] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 14:
       sample_data1 = (channel_a & 0xFFF0000F) | (((int(upperData[P_osc2PW] * DACMULT)) & 0xFFFF) << 4);
       sample_data2 = (channel_b & 0xFFF0000F) | (((int(lowerData[P_osc2PW] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_osc1SubLevel] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_osc1SubLevel] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_osc1SubLevel] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_osc1SubLevel] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
 
     case 15:
@@ -3844,19 +3840,15 @@ void writeDemux() {
           sample_data2 = (channel_b & 0xFFF0000F) | ((0 & 0xFFFF) << 4);
           break;
       }
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_1, LOW);
 
-      sample_data1 = (channel_c & 0xFFF0000F) | (((int(upperData[P_osc2TriangleLevel] * DACMULT)) & 0xFFFF) << 4);
-      sample_data2 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_osc2TriangleLevel] * DACMULT)) & 0xFFFF) << 4);
-      outputDAC(DAC_CS1, sample_data1, sample_data2);
-      digitalWriteFast(DEMUX_EN_2, LOW);
+      sample_data3 = (channel_c & 0xFFF0000F) | (((int(upperData[P_osc2TriangleLevel] * DACMULT)) & 0xFFFF) << 4);
+      sample_data4 = (channel_d & 0xFFF0000F) | (((int(lowerData[P_osc2TriangleLevel] * DACMULT)) & 0xFFFF) << 4);
+      outputDAC(DAC_CS1, sample_data1, sample_data2, sample_data3, sample_data4);
+      digitalWriteFast(DEMUX_EN_1, LOW);
       break;
   }
-  delayMicroseconds(100);
+  delayMicroseconds(10);
   digitalWriteFast(DEMUX_EN_1, HIGH);
-  delayMicroseconds(100);
-  digitalWriteFast(DEMUX_EN_2, HIGH);
 
   muxOutput++;
   if (muxOutput >= DEMUXCHANNELS)
@@ -3988,7 +3980,51 @@ void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
     myControlChange(midiChannel, CCfilterVel, filterVel);
   }
 
-  if (btnIndex == UPPER_SW && btnType == ROX_PRESSED) {
+  if (btnIndex == UPPER_SW && btnType == ROX_HELD) {
+    if (!inPerformanceMode && state == PARAMETER) {
+      // Switch to performance mode temporarily to select a slot
+      inPerformanceMode = true;
+      state = PERFORMANCE_SAVE;
+
+      performanceIndex = performances.size();  // start on a new slot
+      int newPerfNo = performanceIndex + 1;
+
+      PlayMode currentMode;
+      if (dualmode)
+        currentMode = DUAL;
+      else if (splitmode)
+        currentMode = SPLIT;
+      else
+        currentMode = WHOLE;
+
+      Performance newPerf = {
+        newPerfNo,
+        patches[upperPatchIndex].patchNo,
+        patches[lowerPatchIndex].patchNo,
+        INITPATCHNAME,
+        currentMode,
+        newsplitPoint,
+        splitTrans
+      };
+
+      currentPerformance = newPerf;
+
+      if (performanceIndex >= performances.size()) {
+        performances.push(currentPerformance);  // temp slot
+      }
+
+      showPerformancePage(
+        String(newPerf.performanceNo),
+        newPerf.name,
+        newPerf.upperPatchNo,
+        getPatchName(newPerf.upperPatchNo),
+        newPerf.lowerPatchNo,
+        getPatchName(newPerf.lowerPatchNo));
+
+      // Wait for encoder click to continue to PERFORMANCE_NAMING
+      // Don't push() yet — defer until naming is complete
+    }
+  } else if (btnIndex == UPPER_SW && btnType == ROX_RELEASED) {
     upperSW = !upperSW;
     myControlChange(midiChannel, CCupperSW, upperSW);
   }
@@ -4036,7 +4072,7 @@ void checkSwitches() {
       case SAVE:
         {
           if (renamedPatch.length() == 0) {
-            renamedPatch = INITPATCHNAME;  // fallback if no rename occurred
+            renamedPatch = patches.last().patchName;
           }
 
           // Update patch name depending on upper or lower
@@ -4062,8 +4098,10 @@ void checkSwitches() {
           setPatchesOrdering(patches.last().patchNo);
 
           // ✅ Correctly update patch index for immediate display
+          int targetPatchNo = upperSW ? patchNoU : patchNoL;
+
           for (int i = 0; i < patches.size(); i++) {
-            if (patches[i].patchNo == patches.last().patchNo) {
+            if (patches[i].patchNo == targetPatchNo) {
               if (upperSW) upperPatchIndex = i;
               else lowerPatchIndex = i;
               break;
@@ -4123,7 +4161,9 @@ void checkSwitches() {
               patches[upperPatchIndex].patchNo,
               patches[lowerPatchIndex].patchNo,
               INITPATCHNAME,
-              (PlayMode)playMode
+              (PlayMode)playMode,
+              newsplitPoint,
+              splitTrans
             };
             currentPerformance = newPerf;
             performances.push(newPerf);
@@ -4161,41 +4201,38 @@ void checkSwitches() {
 
       case PERFORMANCE_NAMING:
         if (saveButton.numClicks() == 1) {
+          // ✅ Apply renamed name
           if (renamedPatch.length() > 0) {
             currentPerformance.name = renamedPatch;
           }
 
-          upperSW = true;
-          savePatch(String(currentPerformance.upperPatchNo).c_str(), getCurrentPatchData());
-
-          upperSW = false;
-          savePatch(String(currentPerformance.lowerPatchNo).c_str(), getCurrentPatchData());
-
-          upperSW = true;
-
-          // Update full performance data
+          // ✅ Finalize patch numbers
           currentPerformance.upperPatchNo = patches[upperPatchIndex].patchNo;
           currentPerformance.lowerPatchNo = patches[lowerPatchIndex].patchNo;
-          currentPerformance.mode = (PlayMode)playMode;
+          //currentPerformance.mode = (PlayMode)playMode;
+          currentPerformance.newsplitPoint = newsplitPoint;
+          currentPerformance.splitTrans = splitTrans;
 
-          for (int i = 0; i < performances.size(); i++) {
-            if (performances[i].performanceNo == currentPerformance.performanceNo) {
-              performances[i] = currentPerformance;
-              break;
-            }
+          // ✅ Insert or overwrite into buffer
+          if (performanceIndex < performances.size()) {
+            performances[performanceIndex] = currentPerformance;
+          } else {
+            performances.push(currentPerformance);
           }
 
+          // ✅ Save to file
           char filename[16];
           snprintf(filename, sizeof(filename), "perf%03d", currentPerformance.performanceNo);
-
           savePerformance(filename, currentPerformance);
-          loadPerformances();
+          loadPerformances();  // refresh in case of renumbering
 
+          // ✅ Cleanup
           renamedPatch = "";
           charIndex = 0;
           currentCharacter = CHARACTERS[0];
           startedRenaming = false;
-          state = PARAMETER;
+          state = PERFORMANCE_RECALL;
+          inPerformanceMode = true;  // ✅ stay in performance mode after saving
         } else if (recallButton.numClicks() == 1) {
           if (renamedPatch.length() < 12) {
             renamedPatch.concat(String(currentCharacter));
@@ -4292,9 +4329,6 @@ void checkSwitches() {
       inPerformanceMode = !inPerformanceMode;
       recallHeldToggleLatch = true;
 
-      //Serial.print("[MODE] Switched to ");
-      //Serial.println(inPerformanceMode ? "Performance Mode" : "Patch Mode");
-
       showCurrentParameterPage("Mode", inPerformanceMode ? "Performance" : "Patch");
 
       if (inPerformanceMode && performances.size() > 0) {
@@ -4310,8 +4344,14 @@ void checkSwitches() {
           currentPerformance.lowerPatchNo,
           getPatchName(currentPerformance.lowerPatchNo));
 
+        state = PERFORMANCE_RECALL;
+
       } else {
-        // Returning to Patch Mode
+        state = PARAMETER;
+        upperSW = true;
+        recallPatch(patches[upperPatchIndex].patchNo);
+        upperSW = false;
+        recallPatch(patches[lowerPatchIndex].patchNo);
         refreshPatchDisplayFromState();
       }
     }
@@ -4701,9 +4741,7 @@ void reinitialiseToPanel() {
 
 
 void loop() {
-  octoswitch.update();
-  srp.update();
-  sr.update();
+
   checkSwitches();
   checkEeprom();
   writeDemux();
@@ -4711,5 +4749,8 @@ void loop() {
   checkEncoder();
   MIDI.read(midiChannel);
   usbMIDI.read(midiChannel);
+  octoswitch.update();
+  srp.update();
+  sr.update();
   LFODelayHandle();
 }

@@ -87,53 +87,70 @@ void renderBootUpPage() {
 
 void renderCurrentPatchPage() {
   tft.fillScreen(ST7735_BLACK);
+  label = "Patch Mode";
+  tft.setFont(&FreeSans9pt7b);
+  int16_t x1, y1;
+  uint16_t w, h;
+
+  // Measure text width/height
+  tft.getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
+
+  // Calculate centered position
+  int textX = (160 - w) / 2;
+  int textY = 15;  // vertical alignment baseline
+  int boxHeight = 20;
+  int boxY = textY - boxHeight + 5;  // adjust upward so text baseline fits well
+
+  // Draw yellow rectangle
+  tft.fillRect(0, boxY, 160, boxHeight, ST7735_YELLOW);
+
+  // Draw text in black, centered
+  tft.setCursor(textX, textY);
+  tft.setTextColor(ST7735_BLACK);
+  tft.setTextSize(1);
+  tft.println(label);
 
   // ─── Patch Display ─────────────────────────
   if (!wholemode) {
     // Upper patch block
-    tft.setFont(&FreeSansBold18pt7b);
-    tft.setCursor(5, 29);
+    tft.setFont(&FreeSansBold12pt7b);
+    tft.setCursor(5, 45);
     tft.setTextColor(ST7735_YELLOW);
     tft.setTextSize(1);
     tft.println(currentPgmNumU);
-    tft.setCursor(80, 19);
-    tft.setFont(&FreeSans12pt7b);
+    tft.setCursor(80, 43);
+    tft.setFont(&FreeSans9pt7b);
     tft.setTextSize(1);
     tft.println("Upper");
-    tft.setFont(&FreeSans12pt7b);
-    tft.setTextColor(ST7735_YELLOW);
-    tft.setCursor(1, 55);
+    tft.setCursor(1, 65);
     tft.setTextColor(ST7735_WHITE);
     tft.println(currentPatchNameU);
   }
 
   // Lower patch block (always shown)
   //lower whole mode patch lower ection
-  tft.setFont(&FreeSansBold18pt7b);
-  tft.setCursor(5, 97);
+  tft.setFont(&FreeSansBold12pt7b);
+  tft.setCursor(5, 99);
   tft.setTextColor(ST7735_YELLOW);
   tft.setTextSize(1);
   tft.println(currentPgmNumL);
 
   if (wholemode) {
-  tft.setCursor(80, 87);
-  tft.setFont(&FreeSans12pt7b);
-  tft.setTextSize(1);
-  tft.println("Whole");
+    tft.setCursor(80, 97);
+    tft.setFont(&FreeSans9pt7b);
+    tft.setTextSize(1);
+    tft.println("Whole");
   } else {
-  tft.setCursor(80, 87);
-  tft.setFont(&FreeSans12pt7b);
-  tft.setTextSize(1);
-  tft.println("Lower");
+    tft.setCursor(80, 97);
+    tft.setFont(&FreeSans9pt7b);
+    tft.setTextSize(1);
+    tft.println("Lower");
   }
 
-  tft.setTextColor(ST7735_BLACK);
-  tft.setFont(&Org_01);
-  tft.drawFastHLine(0, 63, tft.width(), ST7735_RED);
+  tft.drawFastHLine(0, 76, tft.width(), ST7735_RED);
 
-  tft.setFont(&FreeSans12pt7b);
-  tft.setTextColor(ST7735_YELLOW);
-  tft.setCursor(1, 122);
+  tft.setFont(&FreeSans9pt7b);
+  tft.setCursor(1, 118);
   tft.setTextColor(ST7735_WHITE);
   tft.println(currentPatchNameL);
 }
@@ -154,44 +171,90 @@ void renderEnv(float att, float dec, float sus, float rel) {
 
 void renderPerformancePage() {
   tft.fillScreen(ST7735_BLACK);
-  tft.drawFastHLine(0, 40, tft.width(), ST7735_RED);
-  tft.drawFastHLine(0, 140, tft.width(), ST7735_RED);
+  label = "Perf Mode";
+  tft.setFont(&FreeSans9pt7b);
+  int16_t x1, y1;
+  uint16_t w, h;
+
+  // Measure text width/height
+  tft.getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
+
+  // Calculate centered position
+  int textX = (160 - w) / 2;
+  int textY = 15;  // vertical alignment baseline
+  int boxHeight = 20;
+  int boxY = textY - boxHeight + 5;  // adjust upward so text baseline fits well
+
+  // Draw yellow rectangle
+  tft.fillRect(0, boxY, 160, boxHeight, ST7735_RED);
+
+  // Draw text in black, centered
+  tft.setCursor(textX, textY);
+  tft.setTextColor(ST7735_BLACK);
+  tft.setTextSize(1);
+  tft.println(label);
 
   tft.setTextColor(ST7735_YELLOW);
   tft.setFont(&FreeSans12pt7b);
   tft.setTextSize(1);
-  tft.setCursor(5, 10);
-  tft.println("Perf No");
+  tft.setCursor(1, 42);
+  tft.println("P:");
 
-  tft.setCursor(100, 10);
-  tft.println("Name");
-
-  tft.setCursor(5, 70);
-  tft.setTextSize(3);
+  tft.setCursor(25, 42);
+  tft.setTextSize(1);
   tft.println(currentPerfNum);
 
-  tft.setCursor(100, 75);
+  tft.setCursor(60, 40);
   tft.setFont(&FreeSans9pt7b);
-  tft.setTextSize(2);
+  tft.setTextSize(1);
   tft.setTextColor(ST7735_WHITE);
   tft.println(currentPerfName);
 
-  tft.setCursor(5, 160);
-  tft.setTextSize(2);
+  if (currentPerformance.mode != WHOLE) {
+    tft.setCursor(1, 98);
+    tft.setTextSize(1);
+    tft.setTextColor(ST7735_YELLOW);
+    tft.println("U:");
+
+    tft.setCursor(25, 98);
+    tft.setTextColor(ST7735_WHITE);
+    tft.println(String(currentUpperPatchNo) + " " + currentUpperPatchName);
+  }
+
+  tft.setCursor(1, 118);
   tft.setTextColor(ST7735_YELLOW);
-  tft.println("Upp:");
+  tft.println("L:");
 
-  tft.setCursor(100, 160);
-  tft.setTextColor(ST7735_WHITE);
-  tft.println(String(currentUpperPatchNo) + " " + currentUpperPatchName);
-
-  tft.setCursor(5, 200);
-  tft.setTextColor(ST7735_YELLOW);
-  tft.println("Low:");
-
-  tft.setCursor(100, 200);
+  tft.setCursor(25, 118);
   tft.setTextColor(ST7735_WHITE);
   tft.println(String(currentLowerPatchNo) + " " + currentLowerPatchName);
+
+  tft.setCursor(1, 62);
+  tft.setFont(&FreeSans9pt7b);
+  tft.setTextColor(ST7735_YELLOW);
+
+  String modeLabel;
+  switch (currentPerformance.mode) {
+    case WHOLE:
+      modeLabel = "Mode Whole";
+      tft.println(modeLabel);
+      break;
+    case DUAL:
+      modeLabel = "Mode Dual";
+      tft.println(modeLabel);
+      break;
+    case SPLIT:
+      modeLabel = "Split Mode - " + String(currentPerformance.newsplitPoint);
+      tft.print(modeLabel);
+      tft.setCursor(1, 80);
+      modeLabel = "Low Xpose - " + String(currentPerformance.splitTrans);
+      tft.print(modeLabel);
+      break;
+    default:
+      modeLabel = "Mode ?";
+      break;
+  }
+
 }
 
 void renderPerformanceNamingPage() {
@@ -246,32 +309,55 @@ void renderPerformanceDeletePage() {
 }
 
 void renderCurrentParameterPage() {
+  tft.fillScreen(ST7735_BLACK);
+  label = "Patch Mode";
+  tft.setFont(&FreeSans9pt7b);
+  int16_t x1, y1;
+  uint16_t w, h;
+
+  // Measure text width/height
+  tft.getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
+
+  // Calculate centered position
+  int textX = (160 - w) / 2;
+  int textY = 15;  // vertical alignment baseline
+  int boxHeight = 20;
+  int boxY = textY - boxHeight + 5;  // adjust upward so text baseline fits well
+
+  // Draw yellow rectangle
+  tft.fillRect(0, boxY, 160, boxHeight, ST7735_YELLOW);
+
+  // Draw text in black, centered
+  tft.setCursor(textX, textY);
+  tft.setTextColor(ST7735_BLACK);
+  tft.setTextSize(1);
+  tft.println(label);
+
   switch (state) {
     case PARAMETER:
       if (upperSW) {
-        tft.fillScreen(ST7735_BLACK);
+
         tft.setFont(&FreeSans12pt7b);
-        tft.setCursor(0, 97);
+        tft.setCursor(0, 99);
         tft.setTextColor(ST7735_YELLOW);
         tft.setTextSize(1);
         tft.println(currentParameter);
-        tft.drawFastHLine(0, 63, tft.width(), ST7735_RED);
+        tft.drawFastHLine(0, 76, tft.width(), ST7735_RED);
+        tft.setFont(&FreeSans9pt7b);
         tft.setCursor(1, 122);
         tft.setTextColor(ST7735_WHITE);
         tft.println(currentValue);
         // upper patch
-        tft.setFont(&FreeSansBold18pt7b);
-        tft.setCursor(5, 29);
+        tft.setFont(&FreeSansBold12pt7b);
+        tft.setCursor(5, 45);
         tft.setTextColor(ST7735_YELLOW);
         tft.setTextSize(1);
         tft.println(currentPgmNumU);
-        tft.setCursor(80, 19);
-        tft.setFont(&FreeSans12pt7b);
+        tft.setCursor(80, 43);
+        tft.setFont(&FreeSans9pt7b);
         tft.setTextSize(1);
         tft.println("Upper");
-        tft.setFont(&FreeSans12pt7b);
-        tft.setTextColor(ST7735_YELLOW);
-        tft.setCursor(1, 55);
+        tft.setCursor(1, 65);
         tft.setTextColor(ST7735_WHITE);
         tft.println(currentPatchNameU);
         switch (paramType) {
@@ -286,62 +372,76 @@ void renderCurrentParameterPage() {
         if (wholemode) {
           //lower whole mode patch lower ection
           tft.fillScreen(ST7735_BLACK);
-          tft.setFont(&FreeSansBold18pt7b);
-          tft.setCursor(5, 97);
+          tft.fillRect(0, boxY, 160, boxHeight, ST7735_YELLOW);
+          // Draw text in black, centered
+          tft.setCursor(textX, textY);
+          tft.setTextColor(ST7735_BLACK);
+          tft.setTextSize(1);
+          tft.println(label);
+
+          tft.setFont(&FreeSansBold12pt7b);
+          tft.setCursor(5, 99);
           tft.setTextColor(ST7735_YELLOW);
           tft.setTextSize(1);
           tft.println(currentPgmNumL);
 
-          tft.setCursor(80, 87);
-          tft.setFont(&FreeSans12pt7b);
+          tft.setCursor(80, 97);
+          tft.setFont(&FreeSans9pt7b);
           tft.setTextSize(1);
           tft.println("Whole");
 
           tft.setTextColor(ST7735_BLACK);
           tft.setFont(&Org_01);
-          tft.drawFastHLine(0, 63, tft.width(), ST7735_RED);
+          tft.drawFastHLine(0, 76, tft.width(), ST7735_RED);
 
-          tft.setFont(&FreeSans12pt7b);
-          tft.setTextColor(ST7735_YELLOW);
-          tft.setCursor(1, 122);
+          tft.setFont(&FreeSans9pt7b);
+          tft.setCursor(1, 118);
           tft.setTextColor(ST7735_WHITE);
           tft.println(currentPatchNameL);
 
           // parameter in upper section
           tft.setFont(&FreeSans12pt7b);
-          tft.setCursor(0, 29);
+          tft.setCursor(5, 45);
           tft.setTextColor(ST7735_YELLOW);
           tft.setTextSize(1);
           tft.println(currentParameter);
-          tft.drawFastHLine(0, 63, tft.width(), ST7735_RED);
-          tft.setCursor(1, 55);
+          tft.drawFastHLine(0, 76, tft.width(), ST7735_RED);
+          tft.setFont(&FreeSans9pt7b);
+          tft.setCursor(1, 65);
           tft.setTextColor(ST7735_WHITE);
           tft.println(currentValue);
 
         } else {
           tft.fillScreen(ST7735_BLACK);
+          tft.fillRect(0, boxY, 160, boxHeight, ST7735_YELLOW);
+          // Draw text in black, centered
+          tft.setCursor(textX, textY);
+          tft.setTextColor(ST7735_BLACK);
+          tft.setTextSize(1);
+          tft.println(label);
+
           tft.setFont(&FreeSans12pt7b);
-          tft.setCursor(0, 29);
+          tft.setCursor(5, 45);
           tft.setTextColor(ST7735_YELLOW);
           tft.setTextSize(1);
           tft.println(currentParameter);
-          tft.drawFastHLine(0, 63, tft.width(), ST7735_RED);
-          tft.setCursor(1, 55);
+          tft.drawFastHLine(0, 76, tft.width(), ST7735_RED);
+          tft.setCursor(1, 65);
+          tft.setFont(&FreeSans9pt7b);
           tft.setTextColor(ST7735_WHITE);
           tft.println(currentValue);
           // upper patch
-          tft.setFont(&FreeSansBold18pt7b);
-          tft.setCursor(5, 97);
+          tft.setFont(&FreeSansBold12pt7b);
+          tft.setCursor(5, 99);
           tft.setTextColor(ST7735_YELLOW);
           tft.setTextSize(1);
           tft.println(currentPgmNumL);
-          tft.setCursor(80, 87);
-          tft.setFont(&FreeSans12pt7b);
+          tft.setCursor(80, 97);
+          tft.setFont(&FreeSans9pt7b);
           tft.setTextSize(1);
           tft.println("Lower");
-          tft.setFont(&FreeSans12pt7b);
-          tft.setTextColor(ST7735_YELLOW);
-          tft.setCursor(1, 122);
+          ;
+          tft.setCursor(1, 118);
           tft.setTextColor(ST7735_WHITE);
           tft.println(currentPatchNameL);
           switch (paramType) {

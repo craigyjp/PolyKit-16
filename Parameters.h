@@ -26,6 +26,7 @@ int patchNo = 0;
 int patchNoU = 1;
 int patchNoL = 1;
 bool recallHeldToggleLatch = false;
+String label = "";
 
 
 //Delayed LFO
