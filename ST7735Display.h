@@ -56,10 +56,27 @@ boolean MIDIClkSignal = false;
 
 unsigned long timer = 0;
 
+const char *noteNames[] = {
+  "C", "C#", "D", "D#", "E", "F",
+  "F#", "G", "G#", "A", "A#", "B"
+};
+
 void startTimer() {
   if (state == PARAMETER) {
     timer = millis();
   }
+}
+
+String getNoteName(byte midiNote) {
+  byte note = midiNote % 12;
+  int octave = (midiNote / 12) - 1;  // MIDI octave 0 starts at C-1
+  return String(noteNames[note]) + String(octave);
+}
+
+String getTransposeString(byte splitTrans) {
+  int oct = (int)splitTrans - 2;  // center = 0
+  if (oct >= 0) return "+" + String(oct);
+  else return String(oct);
 }
 
 void renderBootUpPage() {
@@ -118,7 +135,7 @@ void renderCurrentPatchPage() {
     tft.setTextColor(ST7735_YELLOW);
     tft.setTextSize(1);
     tft.println(currentPgmNumU);
-    tft.setCursor(80, 43);
+    tft.setCursor(50, 43);
     tft.setFont(&FreeSans9pt7b);
     tft.setTextSize(1);
     tft.println("Upper");
@@ -136,15 +153,38 @@ void renderCurrentPatchPage() {
   tft.println(currentPgmNumL);
 
   if (wholemode) {
-    tft.setCursor(80, 97);
+    tft.setCursor(50, 97);
     tft.setFont(&FreeSans9pt7b);
     tft.setTextSize(1);
     tft.println("Whole");
   } else {
-    tft.setCursor(80, 97);
+    tft.setCursor(50, 97);
     tft.setFont(&FreeSans9pt7b);
     tft.setTextSize(1);
     tft.println("Lower");
+  }
+
+  if (splitmode) {
+
+    tft.setCursor(110, 43);
+    tft.setFont(&FreeSans9pt7b);
+    tft.setTextSize(1);
+    tft.setTextColor(ST7735_WHITE);
+    tft.print("S: ");
+    tft.setCursor(130, 43);
+    tft.setTextColor(ST7735_YELLOW);
+    String splitNote = getNoteName(newsplitPoint + 36);
+    tft.print(splitNote);
+
+    tft.setCursor(110, 97);
+    tft.setFont(&FreeSans9pt7b);
+    tft.setTextSize(1);
+    tft.setTextColor(ST7735_WHITE);
+    tft.print("X: ");
+    tft.setCursor(130, 97);
+    tft.setTextColor(ST7735_YELLOW);
+    String transStr = getTransposeString(splitTrans);
+    tft.print(transStr);
   }
 
   tft.drawFastHLine(0, 76, tft.width(), ST7735_RED);
@@ -244,33 +284,23 @@ void renderPerformancePage() {
       tft.println(modeLabel);
       break;
     case SPLIT:
-      modeLabel = "Split Mode - " + String(currentPerformance.newsplitPoint);
-      tft.print(modeLabel);
-      tft.setCursor(1, 80);
-      modeLabel = "Low Xpose - " + String(currentPerformance.splitTrans);
-      tft.print(modeLabel);
-      break;
+      {
+        String splitNote = getNoteName(currentPerformance.newsplitPoint + 36);
+        String transStr = getTransposeString(currentPerformance.splitTrans);
+
+        modeLabel = "Split Mode: " + splitNote;
+        tft.setCursor(1, 60);
+        tft.print(modeLabel);
+
+        modeLabel = "Low Xpose: " + transStr;
+        tft.setCursor(1, 80);
+        tft.print(modeLabel);
+        break;
+      }
     default:
       modeLabel = "Mode ?";
       break;
   }
-
-}
-
-void renderPerformanceNamingPage() {
-  tft.fillScreen(ST7735_BLACK);
-  tft.setFont(&FreeSansBold18pt7b);
-  tft.setCursor(10, 20);
-  tft.setTextColor(ST7735_YELLOW);
-  tft.setTextSize(1);
-  tft.println("Rename Perf");
-  tft.drawFastHLine(10, 50, tft.width() - 20, ST7735_RED);
-
-  tft.setTextSize(2);
-  tft.setFont(&FreeSans9pt7b);
-  tft.setTextColor(ST7735_WHITE);
-  tft.setCursor(10, 80);
-  tft.println(newPatchName);  // reused for performance too
 }
 
 void renderPerformanceDeletePage() {
@@ -353,7 +383,7 @@ void renderCurrentParameterPage() {
         tft.setTextColor(ST7735_YELLOW);
         tft.setTextSize(1);
         tft.println(currentPgmNumU);
-        tft.setCursor(80, 43);
+        tft.setCursor(50, 43);
         tft.setFont(&FreeSans9pt7b);
         tft.setTextSize(1);
         tft.println("Upper");
@@ -368,6 +398,21 @@ void renderCurrentParameterPage() {
             renderEnv(upperData[P_ampAttack] * 0.0001, upperData[P_ampDecay] * 0.0001, upperData[P_ampSustain], upperData[P_ampRelease] * 0.0001);
             break;
         }
+
+        if (splitmode) {
+
+          tft.setCursor(110, 43);
+          tft.setFont(&FreeSans9pt7b);
+          tft.setTextSize(1);
+          tft.setTextColor(ST7735_WHITE);
+          tft.print("S: ");
+          tft.setCursor(130, 43);
+          tft.setTextColor(ST7735_YELLOW);
+          String splitNote = getNoteName(newsplitPoint + 36);
+          tft.print(splitNote);
+
+        }
+
       } else {
         if (wholemode) {
           //lower whole mode patch lower ection
@@ -385,7 +430,7 @@ void renderCurrentParameterPage() {
           tft.setTextSize(1);
           tft.println(currentPgmNumL);
 
-          tft.setCursor(80, 97);
+          tft.setCursor(50, 97);
           tft.setFont(&FreeSans9pt7b);
           tft.setTextSize(1);
           tft.println("Whole");
@@ -436,11 +481,10 @@ void renderCurrentParameterPage() {
           tft.setTextColor(ST7735_YELLOW);
           tft.setTextSize(1);
           tft.println(currentPgmNumL);
-          tft.setCursor(80, 97);
+          tft.setCursor(50, 97);
           tft.setFont(&FreeSans9pt7b);
           tft.setTextSize(1);
           tft.println("Lower");
-          ;
           tft.setCursor(1, 118);
           tft.setTextColor(ST7735_WHITE);
           tft.println(currentPatchNameL);
@@ -451,6 +495,18 @@ void renderCurrentParameterPage() {
             case AMP_ENV:
               renderEnv(lowerData[P_ampAttack] * 0.0001, lowerData[P_ampDecay] * 0.0001, lowerData[P_ampSustain], lowerData[P_ampRelease] * 0.0001);
               break;
+          }
+          if (splitmode) {
+
+            tft.setCursor(110, 97);
+            tft.setFont(&FreeSans9pt7b);
+            tft.setTextSize(1);
+            tft.setTextColor(ST7735_WHITE);
+            tft.print("X: ");
+            tft.setCursor(130, 97);
+            tft.setTextColor(ST7735_YELLOW);
+            String transStr = getTransposeString(splitTrans);
+            tft.print(transStr);
           }
         }
       }
@@ -539,6 +595,19 @@ void renderPatchNamingPage() {
   tft.setTextColor(ST7735_WHITE);
   tft.setCursor(5, 90);
   tft.println(newPatchName);
+}
+
+void renderPerformanceNamingPage() {
+  tft.fillScreen(ST7735_BLACK);
+  tft.setFont(&FreeSans12pt7b);
+  tft.setCursor(0, 53);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.setTextSize(1);
+  tft.println("Rename Perf");
+  tft.drawFastHLine(0, 62, tft.width(), ST7735_RED);
+  tft.setTextColor(ST7735_WHITE);
+  tft.setCursor(5, 90);
+  tft.println(newPatchName);  // reused for performance too
 }
 
 void renderRecallPage() {

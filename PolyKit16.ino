@@ -404,7 +404,6 @@ void loadPerformances() {
       int splitTrans = dataLine.substring(comma5 + 1).toInt();
 
       performances.push({ perfNo, upper, lower, name, (PlayMode)mode, (byte)newsplitPoint, (byte)splitTrans });
-
     }
   }
 
@@ -3179,10 +3178,16 @@ void myProgramChange(byte channel, byte program) {
       performanceIndex = program;
       currentPerformance = performances[performanceIndex];
 
-      // Update playmode and patch indices
+      // Update play mode flags
       playMode = currentPerformance.mode;
       wholemode = (playMode == WHOLE);
+      dualmode = (playMode == DUAL);
+      splitmode = (playMode == SPLIT);
       updateplayMode(0);
+
+      // Apply split settings
+      newsplitPoint = currentPerformance.newsplitPoint;
+      splitTrans = currentPerformance.splitTrans;
 
       // Set patch indices
       for (int i = 0; i < patches.size(); i++) {
@@ -3196,7 +3201,24 @@ void myProgramChange(byte channel, byte program) {
       upperSW = false;
       recallPatch(currentPerformance.lowerPatchNo);
 
+      if (wholemode) {
+        patchNoU = patchNoL;
+        patchNameU = patchNameL;
+        currentPatchNameU = currentPatchNameL;
+        currentPgmNumU = currentPgmNumL;
+        memcpy(upperData, lowerData, sizeof(upperData));
+      }
+
       refreshPatchDisplayFromState();
+
+      // ✅ Update the performance display
+      showPerformancePage(
+        String(currentPerformance.performanceNo),
+        currentPerformance.name,
+        currentPerformance.upperPatchNo,
+        getPatchName(currentPerformance.upperPatchNo),
+        currentPerformance.lowerPatchNo,
+        getPatchName(currentPerformance.lowerPatchNo));
     }
   } else {
     // Normal patch recall
@@ -3206,6 +3228,7 @@ void myProgramChange(byte channel, byte program) {
     state = PARAMETER;
   }
 }
+
 
 void myAfterTouch(byte channel, byte value) {
   afterTouch = int(value * MIDICCTOPOT);
@@ -3981,7 +4004,7 @@ void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
   }
 
   if (btnIndex == UPPER_SW && btnType == ROX_HELD) {
-    if (!inPerformanceMode && state == PARAMETER) {
+    if (state == PARAMETER || state == PERFORMANCE_RECALL) {
       // Switch to performance mode temporarily to select a slot
       inPerformanceMode = true;
       state = PERFORMANCE_SAVE;
@@ -4201,19 +4224,24 @@ void checkSwitches() {
 
       case PERFORMANCE_NAMING:
         if (saveButton.numClicks() == 1) {
-          // ✅ Apply renamed name
+          // ✅ Update name if anything was entered
           if (renamedPatch.length() > 0) {
             currentPerformance.name = renamedPatch;
           }
 
-          // ✅ Finalize patch numbers
+          // ✅ Finalize data fields
           currentPerformance.upperPatchNo = patches[upperPatchIndex].patchNo;
           currentPerformance.lowerPatchNo = patches[lowerPatchIndex].patchNo;
-          //currentPerformance.mode = (PlayMode)playMode;
+
+          PlayMode currentMode = WHOLE;
+          if (dualmode) currentMode = DUAL;
+          else if (splitmode) currentMode = SPLIT;
+
+          currentPerformance.mode = currentMode;
           currentPerformance.newsplitPoint = newsplitPoint;
           currentPerformance.splitTrans = splitTrans;
 
-          // ✅ Insert or overwrite into buffer
+          // ✅ Update or insert in buffer
           if (performanceIndex < performances.size()) {
             performances[performanceIndex] = currentPerformance;
           } else {
@@ -4224,23 +4252,49 @@ void checkSwitches() {
           char filename[16];
           snprintf(filename, sizeof(filename), "perf%03d", currentPerformance.performanceNo);
           savePerformance(filename, currentPerformance);
-          loadPerformances();  // refresh in case of renumbering
 
-          // ✅ Cleanup
+          // ✅ Reload full list
+          loadPerformances();
+
+          // ✅ Re-sync currentPerformance and index
+          for (int i = 0; i < performances.size(); i++) {
+            if (performances[i].performanceNo == currentPerformance.performanceNo) {
+              performanceIndex = i;
+              currentPerformance = performances[i];
+              break;
+            }
+          }
+
+          // ✅ Show updated page with new name
+          showPerformancePage(
+            String(currentPerformance.performanceNo),
+            currentPerformance.name,
+            currentPerformance.upperPatchNo,
+            getPatchName(currentPerformance.upperPatchNo),
+            currentPerformance.lowerPatchNo,
+            getPatchName(currentPerformance.lowerPatchNo));
+
+          // ✅ Reset renaming state
           renamedPatch = "";
           charIndex = 0;
           currentCharacter = CHARACTERS[0];
           startedRenaming = false;
+
+          // ✅ Return to performance view
           state = PERFORMANCE_RECALL;
-          inPerformanceMode = true;  // ✅ stay in performance mode after saving
-        } else if (recallButton.numClicks() == 1) {
+          inPerformanceMode = true;
+        }
+
+        else if (recallButton.numClicks() == 1) {
           if (renamedPatch.length() < 12) {
             renamedPatch.concat(String(currentCharacter));
             charIndex = 0;
             currentCharacter = CHARACTERS[charIndex];
             showRenamingPage(renamedPatch);
           }
-        } else if (backButton.numClicks() == 1) {
+        }
+
+        else if (backButton.numClicks() == 1) {
           renamedPatch = "";
           charIndex = 0;
           startedRenaming = false;
@@ -4332,9 +4386,41 @@ void checkSwitches() {
       showCurrentParameterPage("Mode", inPerformanceMode ? "Performance" : "Patch");
 
       if (inPerformanceMode && performances.size() > 0) {
-        // Entering Performance Mode
         performanceIndex = 0;
         currentPerformance = performances[performanceIndex];
+
+        // Apply mode and split info
+        playMode = currentPerformance.mode;
+        wholemode = (playMode == WHOLE);
+        dualmode = (playMode == DUAL);
+        splitmode = (playMode == SPLIT);
+
+        newsplitPoint = currentPerformance.newsplitPoint;
+        splitTrans = currentPerformance.splitTrans;
+        updateplayMode(0);
+
+        // Find patch indices
+        for (int i = 0; i < patches.size(); i++) {
+          if (patches[i].patchNo == currentPerformance.upperPatchNo) upperPatchIndex = i;
+          if (patches[i].patchNo == currentPerformance.lowerPatchNo) lowerPatchIndex = i;
+        }
+
+        upperSW = true;
+        recallPatch(currentPerformance.upperPatchNo);
+
+        upperSW = false;
+        recallPatch(currentPerformance.lowerPatchNo);
+
+        // WHOLE mode needs to mirror lower into upper
+        if (wholemode) {
+          patchNoU = patchNoL;
+          patchNameU = patchNameL;
+          currentPatchNameU = currentPatchNameL;
+          currentPgmNumU = currentPgmNumL;
+          memcpy(upperData, lowerData, sizeof(upperData));
+        }
+
+        refreshPatchDisplayFromState();
 
         showPerformancePage(
           String(currentPerformance.performanceNo),
@@ -4345,7 +4431,6 @@ void checkSwitches() {
           getPatchName(currentPerformance.lowerPatchNo));
 
         state = PERFORMANCE_RECALL;
-
       } else {
         state = PARAMETER;
         upperSW = true;
@@ -4415,49 +4500,6 @@ void checkSwitches() {
             currentPerformance.lowerPatchNo,
             getPatchName(currentPerformance.lowerPatchNo));
           state = PERFORMANCE_RECALL;
-        }
-        break;
-
-      case PERFORMANCE_RECALL:
-        for (int i = 0; i < patches.size(); i++) {
-          if (patches[i].patchNo == currentPerformance.upperPatchNo) {
-            upperPatchIndex = i;
-          }
-          if (patches[i].patchNo == currentPerformance.lowerPatchNo) {
-            lowerPatchIndex = i;
-          }
-        }
-
-        playMode = currentPerformance.mode;
-        wholemode = (playMode == WHOLE);
-        updateplayMode(0);
-
-        if (wholemode) {
-          patchNoU = patchNoL;
-          patchNameU = patchNameL;
-          currentPatchNameU = currentPatchNameL;
-          currentPgmNumU = currentPgmNumL;
-          memcpy(upperData, lowerData, sizeof(upperData));
-        }
-
-        upperSW = true;
-        recallPatch(currentPerformance.upperPatchNo);
-
-        upperSW = false;
-        recallPatch(currentPerformance.lowerPatchNo);
-
-        refreshPatchDisplayFromState();
-
-        state = PARAMETER;
-        patchNo = 0;  // ✅ Clear global patchNo to avoid accidental reuse
-        return;
-
-      case PERFORMANCE_NAMING:
-        if (renamedPatch.length() < 12) {
-          renamedPatch.concat(String(currentCharacter));
-          charIndex = 0;
-          currentCharacter = CHARACTERS[charIndex];
-          showRenamingPage(renamedPatch);
         }
         break;
 
@@ -4531,6 +4573,42 @@ void checkEncoder() {
         performanceIndex++;
         if (performanceIndex >= performances.size()) performanceIndex = 0;
         currentPerformance = performances[performanceIndex];
+
+        // 🟡 Apply mode and split info
+        playMode = currentPerformance.mode;
+        wholemode = (playMode == WHOLE);
+        dualmode = (playMode == DUAL);
+        splitmode = (playMode == SPLIT);
+
+        newsplitPoint = currentPerformance.newsplitPoint;
+        splitTrans = currentPerformance.splitTrans;
+        updateplayMode(0);
+
+        // 🟡 Match patch indices
+        for (int i = 0; i < patches.size(); i++) {
+          if (patches[i].patchNo == currentPerformance.upperPatchNo) upperPatchIndex = i;
+          if (patches[i].patchNo == currentPerformance.lowerPatchNo) lowerPatchIndex = i;
+        }
+
+        // 🟡 Recall both patches
+        upperSW = true;
+        recallPatch(currentPerformance.upperPatchNo);
+
+        upperSW = false;
+        recallPatch(currentPerformance.lowerPatchNo);
+
+        // 🟡 Mirror lower into upper in WHOLE mode
+        if (wholemode) {
+          patchNoU = patchNoL;
+          patchNameU = patchNameL;
+          currentPatchNameU = currentPatchNameL;
+          currentPgmNumU = currentPgmNumL;
+          memcpy(upperData, lowerData, sizeof(upperData));
+        }
+
+        refreshPatchDisplayFromState();
+
+        // 🟡 Update the performance page with correct info
         showPerformancePage(
           String(currentPerformance.performanceNo),
           currentPerformance.name,
@@ -4638,7 +4716,39 @@ void checkEncoder() {
       case PERFORMANCE_RECALL:
         performanceIndex--;
         if (performanceIndex < 0) performanceIndex = performances.size() - 1;
+
         currentPerformance = performances[performanceIndex];
+
+        // Apply mode and split info
+        playMode = currentPerformance.mode;
+        wholemode = (playMode == WHOLE);
+        dualmode = (playMode == DUAL);
+        splitmode = (playMode == SPLIT);
+
+        newsplitPoint = currentPerformance.newsplitPoint;
+        splitTrans = currentPerformance.splitTrans;
+        updateplayMode(0);
+
+        for (int i = 0; i < patches.size(); i++) {
+          if (patches[i].patchNo == currentPerformance.upperPatchNo) upperPatchIndex = i;
+          if (patches[i].patchNo == currentPerformance.lowerPatchNo) lowerPatchIndex = i;
+        }
+
+        upperSW = true;
+        recallPatch(currentPerformance.upperPatchNo);
+        upperSW = false;
+        recallPatch(currentPerformance.lowerPatchNo);
+
+        if (wholemode) {
+          patchNoU = patchNoL;
+          patchNameU = patchNameL;
+          currentPatchNameU = currentPatchNameL;
+          currentPgmNumU = currentPgmNumL;
+          memcpy(upperData, lowerData, sizeof(upperData));
+        }
+
+        refreshPatchDisplayFromState();
+
         showPerformancePage(
           String(currentPerformance.performanceNo),
           currentPerformance.name,
