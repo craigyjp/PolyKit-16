@@ -24,6 +24,7 @@ This repository contains my versions of the filter/adsr/lfo with added velocity,
 - Velocity sensitivity for filters and amplifiers.
 - Analogue chorus similar to Juno 60.
 - 999 memory locations to store patches.
+- 128 Performance patches
 - MIDI in/out/thru - channels 1-16
 - USB MIDI
 
@@ -34,6 +35,8 @@ This repository contains my versions of the filter/adsr/lfo with added velocity,
 ## Things to fix/improve
 
 - Initial startup can cause issues in stack more and 32 foot mode, need to fix
+- DCO1 and DCO1 are the wrong way around.
+- Additional poly mode (POLY 2) available by press and holding the WHOLE button
 
 ## The source of the inspiration for these modifications and acknowledgements
 
