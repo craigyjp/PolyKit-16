@@ -270,4 +270,6 @@ boolean wholemode = true;
 boolean dualmode = false;
 boolean splitmode = false;
 
+int lastUsedVoice = 0; // Global variable to store the last used voice
+boolean polyMode = false;
 int returnvalue = 0;

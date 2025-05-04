@@ -171,6 +171,7 @@ void setup() {
   octoswitch.begin(PIN_DATA, PIN_LOAD, PIN_CLK);
   octoswitch.setCallback(onButtonPress);
   octoswitch.setIgnoreAfterHold(UPPER_SW, true);
+  octoswitch.setIgnoreAfterHold(WHOLE_SW, true);
 
   srp.begin(SRP_DATA, SRP_LATCH, SRP_CLK, SRP_PWM);
   sr.begin(SR_DATA, SR_LATCH, SR_CLK, SR_PWM);
@@ -731,6 +732,49 @@ int getVoiceNo(int note) {
     }
   }
   //Shouldn't get here, return voice 1
+  return 1;
+}
+
+int getVoiceNoPoly2(int note) {
+  voiceToReturn = -1;       // Initialize to 'null'
+  earliestTime = millis();  // Initialize to now
+
+  if (note == -1) {
+    // NoteOn() - Get the oldest free voice (recent voices may still be on the release stage)
+    if (voices[lastUsedVoice].note == -1) {
+      return lastUsedVoice + 1;
+    }
+
+    // If the last used voice is not free or doesn't exist, check if the first voice is free
+    if (voices[0].note == -1) {
+      return 1;
+    }
+
+    // Find the lowest available voice for the new note
+    for (int i = 0; i < NO_OF_VOICES; i++) {
+      if (voices[i].note == -1) {
+        return i + 1;
+      }
+    }
+
+    // If no voice is available, release the oldest note
+    int oldestVoice = 0;
+    for (int i = 1; i < NO_OF_VOICES; i++) {
+      if (voices[i].timeOn < voices[oldestVoice].timeOn) {
+        oldestVoice = i;
+      }
+    }
+    return oldestVoice + 1;
+  } else {
+    // NoteOff() - Get the voice number from the note
+    for (int i = 0; i < NO_OF_VOICES; i++) {
+      if (voices[i].note == note) {
+        return i + 1;
+      }
+    }
+  }
+
+  // Shouldn't get here, return voice 1
   return 1;
 }
 
@@ -4052,7 +4096,9 @@ void onButtonPress(uint16_t btnIndex, uint8_t btnType) {
     myControlChange(midiChannel, CCupperSW, upperSW);
   }
 
-  if (btnIndex == WHOLE_SW && btnType == ROX_PRESSED) {
+  if (btnIndex == WHOLE_SW && btnType == ROX_HELD) {
+    polyMode = !polyMode;
+  } else if (btnIndex == WHOLE_SW && btnType == ROX_RELEASED) {
     wholemode = !wholemode;
     myControlChange(midiChannel, CCwholemode, wholemode);
   }
